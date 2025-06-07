@@ -14,12 +14,16 @@ DECLARE --declaring values and names for our checks
     schema_size varchar(255) --size of each schema
     tables_without_pkeys (255) --list of tables without primary keys
     database_size varchar(255) --list of databases and their size (binary)
+    pg_version varchar(255) --current version of Postgres
 
 BEGIN
     /* uptime health check*/
-    select current_timestamp - pg_postmaster_start_time() into uptime
+    select current_timestamp - pg_postmaster_start_time() into uptime;
     --https://www.postgresql.org/docs/current/functions-info.html
 
+    /* postgres version check*/
+
+    show server_version in pg_version
 
     /* unused_indexes check */
     SELECT s.schemaname,
@@ -41,6 +45,39 @@ BEGIN
     ORDER BY pg_relation_size(s.indexrelid) DESC;
         --https://www.rockdata.net/tutorial/check-unused-indexes/
         --https://pgdash.io/blog/finding-unused-indexes-in-postgresql.htmls
+
+    /* tables without primary keys check*/
+
+    select
+        pc.oid as table_name,
+        pg_table_size(pc.oid) as table_size
+    from
+        pg_catalog.pg_class pc
+        inner join pg_catalog.pg_namespace nsp on nsp.oid = pc.relnamespace
+    where
+        pc.relkind in ('r', 'p') and
+        pc.oid not in (
+            select c.conrelid as table_oid
+            from pg_catalog.pg_constraint c
+            where c.contype = 'p'
+        ) and
+        nsp.nspname = 'public' --Need to add variable here for schema selection, or provide an option to select all
+    order by table_name;
+    /*
+    Details for first section of the check-making sure we are grabing normal tables and partitioned tables
+    https://www.postgresql.org/docs/current/catalog-pg-class.html
+    r = ordinary table, i = index, S = sequence, t = TOAST table, v = view, m = materialized view, c = composite type, f = foreign table, p = partitioned table, I = partitioned index
+
+    Details for subquery to ensure we are grabbing tables without primary key constraints
+    https://www.postgresql.org/docs/current/catalog-pg-constraint.html
+    c = check constraint, f = foreign key constraint, n = not-null constraint (domains only), p = primary key constraint, u = unique constraint, t = constraint trigger, x = exclusion constraint
+    **/
+
+    /* pg_extensions installed  */
+
+    select * from pg_extension;
+
+
 END
 
 

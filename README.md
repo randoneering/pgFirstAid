@@ -106,13 +106,13 @@ ORDER BY MIN(CASE severity
 
 ## Important Notes
 
-⚠️ **Read Before Acting**
+**Read Before Acting**
 - Always review recommendations carefully before making changes. I have been supporting Postgres databases for close to a decade, but I learn something new each day
 - Test in a non-production environment first
 - Some operations (like VACUUM FULL) require maintenance windows
 - Never drop an index without validating its usage patterns over time
 
-🔒 **Permissions**
+**Permissions**
 - Requires read access to system catalogs (`pg_catalog`)
 - Works with standard user permissions for most checks
 - Some checks may return fewer results for non-superuser accounts

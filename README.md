@@ -147,4 +147,4 @@ Dave-IYKYK
 
 ---
 
-**Made with ❤️ for the PostgreSQL and Open Source community**
+**Made with ☕ for the PostgreSQL and Open Source community**

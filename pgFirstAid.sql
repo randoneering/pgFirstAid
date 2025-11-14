@@ -89,8 +89,8 @@ select
 	pt.schemaname || '.' || pt.tablename as object_name,
 	'Table has significant bloat affecting performance and storage' as issue_description,
 	'Estimated bloat: ' || ROUND(
-        case when pg_relation_size(pt.schemaname || '.' || pt.tablename) > 0
-        then (pg_relation_size(pt.schemaname || '.' || pt.tablename) - pg_relation_size(pt.schemaname || '.' || pt.tablename, 'main')) * 100.0 / pg_relation_size(pt.schemaname || '.' || pt.tablename)
+        case when pg_relation_size(pt.schemaname || '.' || quote_ident(pt.tablename)) > 0
+        then (pg_relation_size(pt.schemaname || '.' || quote_ident(pt.tablename)) - pg_relation_size(pt.schemaname || '.' || quote_ident(pt.tablename), 'main')) * 100.0 / pg_relation_size(pt.schemaname || '.' || quote_ident(pt.tablename))
         else 0 end, 2
     ) || '%' as current_value,
 	'Run VACUUM FULL to reclaim space' as recommended_action,
@@ -100,9 +100,9 @@ from
 	pg_tables pt
 where
 	pt.schemaname not in ('information_schema', 'pg_catalog', 'pg_toast')
-	and pg_relation_size(pt.schemaname || '.' || pt.tablename) > 104857600
+	and pg_relation_size(pt.schemaname || '.' || quote_ident(pt.tablename)) > 104857600
 	-- 100MB
-	and (pg_relation_size(pt.schemaname || '.' || pt.tablename) - pg_relation_size(pt.schemaname || '.' || pt.tablename, 'main')) * 100.0 / nullif(pg_relation_size(pt.schemaname || '.' || pt.tablename), 0) > 20;
+	and (pg_relation_size(pt.schemaname || '.' || quote_ident(pt.tablename)) - pg_relation_size(pt.schemaname || '.' || quote_ident(pt.tablename), 'main')) * 100.0 / nullif(pg_relation_size(pt.schemaname || '.' || quote_ident(pt.tablename)), 0) > 20;
 -- 4. HIGH: Tables never analyzed
     insert
 	into

@@ -52,28 +52,6 @@
 **Platform-specific notes:**
 <!-- Describe any platform-specific behavior, limitations, or compatibility issues -->
 
-
-### Additional Context
-
-<!-- Any additional information that reviewers should know -->
-
-**Performance Impact:**
-<!-- Does this change affect query performance? Describe any performance testing done -->
-
-**Breaking Changes:**
-<!-- If this is a breaking change, describe the migration path -->
-
----
-
-## Checklist
-
-- [ ] Code follows project style guidelines
-- [ ] Self-review of code completed
-- [ ] Code comments added for complex logic
-- [ ] No sensitive information (credentials, internal URLs) included
-- [ ] Tested locally before submitting
-- [ ] All checks marked above are complete
-
 ---
 
 ## Additional Notes

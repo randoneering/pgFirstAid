@@ -32,7 +32,7 @@ begin
 	'CRITICAL' as severity,
 	'Table Structure' as category,
 	'Missing Primary Key' as check_name,
-	pt.schemaname || '.' || tablename as object_name,
+	quote_ident(pt.schemaname) || '.' || quote_ident(tablename) as object_name,
 	'Table missing a primary key, which can cause replication issues and/or poor performance' as issue_description,
 	'No primary key defined' as current_value,
 	'Add a primary key or unique constraint with NOT NULL columns' as recommended_action,
@@ -64,7 +64,7 @@ where
 	'CRITICAL' as severity,
 	'Index Management' as category,
 	'Unused Large Index' as check_name,
-	psi.schemaname || '.' || psio.indexrelname as object_name,
+	quote_ident(psi.schemaname) || '.' || quote_ident(psio.indexrelname) as object_name,
 	'Large unused index consuming disk space and potentially impacting write performance' as issue_description,
 	pg_size_pretty(pg_relation_size(psi.indexrelid)) || ' (0 scans)' as current_value,
 	'Consider dropping this index if truly unused after monitoring usage patterns. Never drop an index without validating usage!' as recommended_action,
@@ -86,11 +86,11 @@ select
 	'HIGH' as severity,
 	'Table Maintenance' as category,
 	'Table Bloat' as check_name,
-	pt.schemaname || '.' || pt.tablename as object_name,
+	quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename) as object_name,
 	'Table has significant bloat affecting performance and storage' as issue_description,
 	'Estimated bloat: ' || ROUND(
-        case when pg_relation_size(pt.schemaname || '.' || pt.tablename) > 0
-        then (pg_relation_size(pt.schemaname || '.' || pt.tablename) - pg_relation_size(pt.schemaname || '.' || pt.tablename, 'main')) * 100.0 / pg_relation_size(pt.schemaname || '.' || pt.tablename)
+        case when pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) > 0
+        then (pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) - pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename), 'main')) * 100.0 / pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename))
         else 0 end, 2
     ) || '%' as current_value,
 	'Run VACUUM FULL to reclaim space' as recommended_action,
@@ -100,9 +100,9 @@ from
 	pg_tables pt
 where
 	pt.schemaname not in ('information_schema', 'pg_catalog', 'pg_toast')
-	and pg_relation_size(pt.schemaname || '.' || pt.tablename) > 104857600
+	and pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) > 104857600
 	-- 100MB
-	and (pg_relation_size(pt.schemaname || '.' || pt.tablename) - pg_relation_size(pt.schemaname || '.' || pt.tablename, 'main')) * 100.0 / nullif(pg_relation_size(pt.schemaname || '.' || pt.tablename), 0) > 20;
+	and (pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) - pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename), 'main')) * 100.0 / nullif(pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)), 0) > 20;
 -- 4. HIGH: Tables never analyzed
     insert
 	into
@@ -111,7 +111,7 @@ where
 	'HIGH' as severity,
 	'Statistics' as category,
 	'Missing Statistics' as check_name,
-	schemaname || '.' || relname as object_name,
+	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
 	'Table has never been analyzed, query planner missing statistics' as issue_description,
 	'Last analyze: Never' as current_value,
 	'Run ANALYZE on this table or enable auto-analyze' as recommended_action,
@@ -131,7 +131,7 @@ where
 	'HIGH' as severity,
 	'Index Optimization' as category,
 	'Duplicate Index' as check_name,
-	i1.schemaname || '.' || i1.indexname || ' & ' || i2.indexname as object_name,
+	quote_ident(i1.schemaname) || '.' || i1.indexname || ' & ' || i2.indexname as object_name,
 	'Multiple indexes with identical or overlapping column sets' as issue_description,
 	'Indexes: ' || i1.indexname || ', ' || i2.indexname as current_value,
 	'Review and consolidate duplicate indexes and focus on keeping the most efficient one' as recommended_action,
@@ -154,7 +154,7 @@ where
 	'MEDIUM' as severity,
 	'Statistics' as category,
 	'Outdated Statistics' as check_name,
-	schemaname || '.' || relname as object_name,
+	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
 	'Table statistics are outdated, which can lead to poor query plans' as issue_description,
 	'Last analyze: ' || coalesce(last_analyze::text, 'Never') ||
         ' (modifications: ' || n_tup_ins + n_tup_upd + n_tup_del || ')' as current_value,
@@ -175,7 +175,7 @@ where
 	'MEDIUM' as severity,
 	'Index Performance' as category,
 	'Low Index Efficiency' as check_name,
-	schemaname || '.' || indexrelname as object_name,
+	quote_ident(schemaname) || '.' || quote_ident(indexrelname) as object_name,
 	'Index has low scan to tuple read ratio indicating poor selectivity' as issue_description,
 	'Scans: ' || idx_scan || ', Tuples: ' || idx_tup_read ||
         ' (Ratio: ' || ROUND(idx_tup_read::numeric / nullif(idx_scan, 0), 2) || ')' as current_value,
@@ -195,7 +195,7 @@ where
 	'MEDIUM' as severity,
 	'Query Performance' as category,
 	'Excessive Sequential Scans' as check_name,
-	schemaname || '.' || relname as object_name,
+	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
 	'Table has high sequential scan activity, may benefit from additional indexes' as issue_description,
 	'Sequential scans: ' || seq_scan || ', Tuples read: ' || seq_tup_read as current_value,
 	'Analyze query patterns and consider adding appropriate indexes' as recommended_action,

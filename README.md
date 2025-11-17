@@ -139,7 +139,7 @@ GPLv3
 
 ## Credits
 
-Inspired by [Brent Ozar's FirstResponderKit](https://github.com/BrentOzarUK/SQL-Server-First-Responder-Kit) for SQL Server. Thank you to the SQL Server community for pioneering accessible database health monitoring!
+Inspired by [Brent Ozar's FirstResponderKit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit)) for SQL Server. Thank you to the SQL Server community for pioneering accessible database health monitoring!
 
 Dave-IYKYK
 

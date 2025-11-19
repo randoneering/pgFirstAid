@@ -310,6 +310,21 @@ group by
 	'Keep PostgreSQL updated and review configuration settings' as recommended_action,
 	'https://www.postgresql.org/docs/current/upgrading.html' as documentation_link,
 	5 as severity_order;
+-- 13. INFO: Installed Extensions
+   insert
+   into
+   health_results
+   select
+	'INFO' as severity,
+	'System Info' as category,
+	'Installed Extension' as check_name,
+	'System' as object_name,
+	'Installed Postgres Extension' as issue_description,
+	 pe.extname || ':' || pe.extversion as current_value,
+	'Before updating to the latest minor/major version of PG, verify extension compatability' as recommended_action,
+	'https://youtu.be/mpEdQm3TpE0?si=VMcHBo1VnDfGZvtI&t=937' as documentation_link, --Link is from a fantastic talk from SCALE 22x on bugging pg_extension maintainers!
+	5 as severity_order
+   FROM pg_extension pe;
 -- Return results ordered by severity
     return QUERY
     select

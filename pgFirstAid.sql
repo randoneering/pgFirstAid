@@ -41,7 +41,7 @@ begin
 from
 	pg_tables pt
 where
-	pt.schemaname not in ('information_schema', 'pg_catalog', 'pg_toast')
+    pt.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 	and not exists (
 	select
 		1
@@ -76,8 +76,8 @@ join pg_statio_user_indexes psio on
 	psi.indexrelid = psio.indexrelid
 where
 	idx_scan = 0
-	and pg_relation_size(psi.indexrelid) > 10485760;
--- 10MB
+	and pg_relation_size(psi.indexrelid) > 104857600;
+-- 100MB
 -- 3. HIGH: Tables with high bloat
 insert
 	into
@@ -99,7 +99,7 @@ select
 from
 	pg_tables pt
 where
-	pt.schemaname not in ('information_schema', 'pg_catalog', 'pg_toast')
+    pt.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 	and pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) > 104857600
 	-- 100MB
 	and (pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) - pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename), 'main')) * 100.0 / nullif(pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)), 0) > 20;
@@ -145,7 +145,7 @@ join pg_indexes i2 on
 	and i1.indexname < i2.indexname
 	and i1.indexdef = i2.indexdef
 where
-	i1.schemaname not in ('information_schema', 'pg_catalog');
+	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%']);
 -- 6. MEDIUM: Tables with outdated statistics
     insert
 	into
@@ -260,7 +260,7 @@ join pg_attribute a on
 	and a.attnum = any(c.conkey)
 where
 	c.contype = 'f'
-	and n.nspname not in ('information_schema', 'pg_catalog')
+	and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 	and not exists (
 	select
 		1

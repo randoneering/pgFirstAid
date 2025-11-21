@@ -1,4 +1,6 @@
 
+select * from pg_firstAid();
+
 create or replace
 function pg_firstAid()
 returns table (
@@ -24,7 +26,7 @@ begin
         documentation_link TEXT,
         severity_order INTEGER
     );
--- 1. CRITICAL: Tables without primary keys
+-- CRITICAL: Tables without primary keys
     insert
 	into
 	health_results
@@ -41,7 +43,7 @@ begin
 from
 	pg_tables pt
 where
-    pt.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+	pt.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 	and not exists (
 	select
 		1
@@ -56,7 +58,7 @@ where
 		and n.nspname = pt.schemaname
 		and c.relname = pt.tablename
     );
--- 2. CRITICAL: Unused indexes consuming significant space
+-- CRITICAL: Unused indexes consuming significant space
     insert
 	into
 	health_results
@@ -78,7 +80,7 @@ where
 	idx_scan = 0
 	and pg_relation_size(psi.indexrelid) > 104857600;
 -- 100MB
--- 3. HIGH: Tables with high bloat
+-- HIGH: Tables with high bloat
 insert
 	into
 	health_results
@@ -99,11 +101,11 @@ select
 from
 	pg_tables pt
 where
-    pt.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+	pt.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 	and pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) > 104857600
 	-- 100MB
 	and (pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) - pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename), 'main')) * 100.0 / nullif(pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)), 0) > 20;
--- 4. HIGH: Tables never analyzed
+-- HIGH: Tables never analyzed
     insert
 	into
 	health_results
@@ -123,7 +125,7 @@ where
 	last_analyze is null
 	and last_autoanalyze is null
 	and n_tup_ins + n_tup_upd + n_tup_del > 1000;
--- 5. HIGH: Duplicate or redundant indexes
+-- HIGH: Duplicate or redundant indexes
     insert
 	into
 	health_results
@@ -146,7 +148,7 @@ join pg_indexes i2 on
 	and i1.indexdef = i2.indexdef
 where
 	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%']);
--- 6. MEDIUM: Tables with outdated statistics
+-- MEDIUM: Tables with outdated statistics
     insert
 	into
 	health_results
@@ -167,7 +169,7 @@ where
 	(last_analyze < NOW() - interval '7 days'
 		or last_autoanalyze < NOW() - interval '7 days')
 	and n_tup_ins + n_tup_upd + n_tup_del > n_tup_ins * 0.1;
--- 7. MEDIUM: Low index usage efficiency
+-- MEDIUM: Low index usage efficiency
     insert
 	into
 	health_results
@@ -187,7 +189,7 @@ from
 where
 	idx_scan > 100
 	and idx_tup_read::numeric / nullif(idx_scan, 0) > 1000;
--- 8. MEDIUM: Large sequential scans
+-- MEDIUM: Large sequential scans
     insert
 	into
 	health_results
@@ -206,7 +208,7 @@ from
 where
 	seq_scan > 1000
 	and seq_tup_read > seq_scan * 10000;
--- 9. MEDIUM: Connection and lock monitoring
+-- MEDIUM: Connection and lock monitoring
     insert
 	into
 	health_results
@@ -235,7 +237,34 @@ group by
 	9
 having
 	COUNT(*) > 50;
--- 10. LOW: Missing indexes on foreign keys
+-- MEDIUM: Queries running longer than 5 minutes
+    insert
+	into
+	health_results
+    select
+	'MEDIUM' as severity,
+	'Query Performance' as category,
+	'Long Running Queries' as check_name,
+	concat_ws(' | ',
+            'pid: ' || pgs.pid::text,
+            'usename: ' || pgs.usename,
+            'datname: ' || pgs.datname,
+            'client_address: ' || pgs.client_addr::text,
+            'state: ' || pgs.state,
+            'duration: ' || to_char(now() - query_start, 'HH24:MI:SS')
+        ) as object_name,
+	'The following query has been running for more than 5 minutes. Might be helpful to see if this is expected behavior' as issue_description,
+	query as current_value,
+	'Review query using EXPLAIN ANALYZE to identify any bottlenecks, such as full table scans, missing indexes, etc' as recommendation_action,
+	'https://www.postgresql.org/docs/current/using-explain.html#USING-EXPLAIN-ANALYZE' as documentation_link
+from
+	pg_stat_activity pgs
+where
+	state = 'active'
+	and now() - query_start > interval '5 minutes'
+order by
+	(now() - query_start) desc;
+-- LOW: Missing indexes on foreign keys
     insert
 	into
 	health_results
@@ -282,7 +311,7 @@ group by
 	7,
 	8,
 	9;
--- 11. INFO: Database size and growth
+-- INFO: Database size and growth
     insert
 	into
 	health_results
@@ -296,7 +325,7 @@ group by
 	'Monitor growth trends and plan capacity accordingly' as recommended_action,
 	'https://www.postgresql.org/docs/current/diskusage.html' as documentation_link,
 	5 as severity_order;
--- 12. INFO: Version and configuration
+-- INFO: Version and configuration
     insert
 	into
 	health_results
@@ -310,10 +339,10 @@ group by
 	'Keep PostgreSQL updated and review configuration settings' as recommended_action,
 	'https://www.postgresql.org/docs/current/upgrading.html' as documentation_link,
 	5 as severity_order;
--- 13. INFO: Installed Extensions
+-- INFO: Installed Extensions
    insert
-   into
-   health_results
+	into
+	health_results
    select
 	'INFO' as severity,
 	'System Info' as category,
@@ -322,9 +351,25 @@ group by
 	'Installed Postgres Extension' as issue_description,
 	 pe.extname || ':' || pe.extversion as current_value,
 	'Before updating to the latest minor/major version of PG, verify extension compatability' as recommended_action,
-	'https://youtu.be/mpEdQm3TpE0?si=VMcHBo1VnDfGZvtI&t=937' as documentation_link, --Link is from a fantastic talk from SCALE 22x on bugging pg_extension maintainers!
+	'https://youtu.be/mpEdQm3TpE0?si=VMcHBo1VnDfGZvtI&t=937' as documentation_link,
+	--Link is from a fantastic talk from SCALE 22x on bugging pg_extension maintainers!
 	5 as severity_order
-   FROM pg_extension pe;
+from
+	pg_extension pe;
+-- INFO: Server Uptime
+    insert
+	into
+	health_results
+    select
+	'INFO' as severity,
+	'System Info' as category,
+	'Server Uptime' as check_name,
+	'System' as object_name,
+	'Current Uptime of Server' as issue_description,
+	 current_timestamp - pg_postmaster_start_time() as current_value,
+	'No Recommendation - Informational' as recommended_action,
+	'N/A' as documentation_link,
+	5 as severity_order;
 -- Return results ordered by severity
     return QUERY
     select

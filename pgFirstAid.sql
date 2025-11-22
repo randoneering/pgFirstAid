@@ -152,23 +152,52 @@ where
     insert
 	into
 	health_results
+	with s as (
+        select
+            current_setting('autovacuum_analyze_scale_factor')::float8  as  analyze_factor,
+            current_setting('autovacuum_analyze_threshold')::float8     as  analyze_threshold,
+            current_setting('autovacuum_vacuum_scale_factor')::float8   as  vacuum_factor,
+            current_setting('autovacuum_vacuum_threshold')::float8      as  vacuum_threshold
+    ), tt as (
+        select
+            n.nspname,
+            c.relname,
+            c.oid as relid,
+            t.n_dead_tup,
+            t.n_mod_since_analyze,
+            c.reltuples * s.vacuum_factor + s.vacuum_threshold as v_threshold,
+            c.reltuples * s.analyze_factor + s.analyze_threshold as a_threshold
+        from
+            s,
+            pg_class c
+            join pg_namespace n on c.relnamespace = n.oid
+            join pg_stat_all_tables t on c.oid = t.relid
+        where
+            c.relkind = 'r'
+            and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+    )
     select
-	'MEDIUM' as severity,
-	'Statistics' as category,
-	'Outdated Statistics' as check_name,
-	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
-	'Table statistics are outdated, which can lead to poor query plans' as issue_description,
-	'Last analyze: ' || coalesce(last_analyze::text, 'Never') ||
-        ' (modifications: ' || n_tup_ins + n_tup_upd + n_tup_del || ')' as current_value,
-	'Run ANALYZE or increase autovacuum_analyze_scale_factor' as recommended_action,
-	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM' as documentation_link,
-	3 as severity_order
-from
-	pg_stat_user_tables
-where
-	(last_analyze < NOW() - interval '7 days'
-		or last_autoanalyze < NOW() - interval '7 days')
-	and n_tup_ins + n_tup_upd + n_tup_del > n_tup_ins * 0.1;
+        'MEDIUM' as severity,
+        'Statistics' as category,
+        'Outdated Statistics' as check_name,
+        quote_ident(nspname) || '.' || quote_ident(relname) as object_name,
+        'Table statistics are outdated, which can lead to poor query plans' as issue_description,
+        'Dead tuples: ' || n_dead_tup || ' (threshold: ' || round(v_threshold) || '), ' ||
+        'Modifications since analyze: ' || n_mod_since_analyze || ' (threshold: ' || round(a_threshold) || ')' as current_value,
+        case
+            when n_dead_tup > v_threshold and n_mod_since_analyze > a_threshold then 'Run VACUUM ANALYZE'
+            when n_dead_tup > v_threshold then 'Run VACUUM'
+            when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
+        end as recommended_action,
+        'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM,
+        https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
+        3 as severity_order
+    from
+        tt
+    where
+        n_dead_tup > v_threshold
+        or n_mod_since_analyze > a_threshold
+    order BY nspname, relname;
 -- MEDIUM: Low index usage efficiency
     insert
 	into

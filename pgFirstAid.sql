@@ -79,6 +79,9 @@ where
 -- 100MB
 
 -- HIGH: Tables with high bloat
+insert
+	into
+	health_results
 with q as (
 select
 	current_database(),

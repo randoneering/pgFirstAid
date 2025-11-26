@@ -1,6 +1,3 @@
-
-select * from pg_firstAid();
-
 create or replace
 function pg_firstAid()
 returns table (

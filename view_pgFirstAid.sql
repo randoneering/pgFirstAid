@@ -1,0 +1,463 @@
+create or replace
+view v_pg_firstaid as
+-- CRITICAL: Tables without primary keys
+select
+	'CRITICAL' as severity,
+	'Table Structure' as category,
+	'Missing Primary Key' as check_name,
+	quote_ident(pt.schemaname) || '.' || quote_ident(tablename) as object_name,
+	'Table missing a primary key, which can cause replication issues and/or poor performance' as issue_description,
+	'No primary key defined' as current_value,
+	'Add a primary key or unique constraint with NOT NULL columns' as recommended_action,
+	'https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-PRIMARY-KEYS' as documentation_link,
+	1 as severity_order
+from
+	pg_tables pt
+where
+	pt.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+	and not exists (
+	select
+		1
+	from
+		pg_constraint pc
+	join pg_class c on
+		pc.conrelid = c.oid
+	join pg_namespace n on
+		c.relnamespace = n.oid
+	where
+		pc.contype = 'p'
+		and n.nspname = pt.schemaname
+		and c.relname = pt.tablename
+    )
+union all
+-- CRITICAL: Unused indexes consuming significant space
+select
+	'CRITICAL' as severity,
+	'Index Management' as category,
+	'Unused Large Index' as check_name,
+	quote_ident(psi.schemaname) || '.' || quote_ident(psio.indexrelname) as object_name,
+	'Large unused index consuming disk space and potentially impacting write performance' as issue_description,
+	pg_size_pretty(pg_relation_size(psi.indexrelid)) || ' (0 scans)' as current_value,
+	'Consider dropping this index if truly unused after monitoring usage patterns. Never drop an index without validating usage!' as recommended_action,
+	'https://www.postgresql.org/docs/current/sql-dropindex.html' as documentation_link,
+	1 as severity_order
+from
+	pg_stat_user_indexes psi
+join pg_statio_user_indexes psio on
+	psi.indexrelid = psio.indexrelid
+where
+	idx_scan = 0
+	and pg_relation_size(psi.indexrelid) > 104857600
+	-- 100MB
+union all
+-- HIGH: Tables with high bloat
+select
+	'HIGH' as severity,
+	'Table Maintenance' as category,
+	'Table Bloat (Detailed)' as check_name,
+	quote_ident(q.schemaname) || '.' || quote_ident(q.tblname) as object_name,
+	'Table has significant bloat (>50%) affecting performance and storage' as issue_description,
+	'Real size: ' || pg_size_pretty(q.real_size::bigint) ||
+    ', Bloat: ' || pg_size_pretty(q.bloat_size::bigint) ||
+    ' (' || ROUND(q.bloat_pct::numeric, 2) || '%)' as current_value,
+	'Run VACUUM FULL to reclaim space' as recommended_action,
+	'https://www.postgresql.org/docs/current/sql-vacuum.html, https://github.com/ioguix/pgsql-bloat-estimation/' as documentation_link,
+	2 as severity_order
+from
+	(
+	select
+		current_database(),
+		schemaname,
+		tblname,
+		bs * tblpages as real_size,
+		(tblpages-est_tblpages) * bs as extra_size,
+		case
+			when tblpages > 0
+				and tblpages - est_tblpages > 0
+            then 100 * (tblpages - est_tblpages) / tblpages::float
+				else 0
+			end as extra_pct,
+			fillfactor,
+			case
+				when tblpages - est_tblpages_ff > 0
+            then (tblpages-est_tblpages_ff) * bs
+				else 0
+			end as bloat_size,
+			case
+				when tblpages > 0
+					and tblpages - est_tblpages_ff > 0
+            then 100 * (tblpages - est_tblpages_ff) / tblpages::float
+					else 0
+				end as bloat_pct,
+				is_na
+			from
+				(
+				select
+					ceil(reltuples / ((bs-page_hdr) / tpl_size)) + ceil(toasttuples / 4) as est_tblpages,
+					ceil(reltuples / ((bs-page_hdr) * fillfactor / (tpl_size * 100))) + ceil(toasttuples / 4) as est_tblpages_ff,
+					tblpages,
+					fillfactor,
+					bs,
+					tblid,
+					schemaname,
+					tblname,
+					heappages,
+					toastpages,
+					is_na
+				from
+					(
+					select
+						(4 + tpl_hdr_size + tpl_data_size + (2 * ma)
+                - case
+							when tpl_hdr_size%ma = 0 then ma
+							else tpl_hdr_size%ma
+						end
+                - case
+							when ceil(tpl_data_size)::int%ma = 0 then ma
+							else ceil(tpl_data_size)::int%ma
+						end
+                ) as tpl_size,
+						bs - page_hdr as size_per_block,
+						(heappages + toastpages) as tblpages,
+						heappages,
+						toastpages,
+						reltuples,
+						toasttuples,
+						bs,
+						page_hdr,
+						tblid,
+						schemaname,
+						tblname,
+						fillfactor,
+						is_na
+					from
+						(
+						select
+							tbl.oid as tblid,
+							ns.nspname as schemaname,
+							tbl.relname as tblname,
+							tbl.reltuples,
+							tbl.relpages as heappages,
+							coalesce(toast.relpages, 0) as toastpages,
+							coalesce(toast.reltuples, 0) as toasttuples,
+							coalesce(substring(
+                        array_to_string(tbl.reloptions, ' ')
+                        from 'fillfactor=([0-9]+)')::smallint, 100) as fillfactor,
+							current_setting('block_size')::numeric as bs,
+							case
+								when version() ~ 'mingw32'
+									or version() ~ '64-bit|x86_64|ppc64|ia64|amd64' then 8
+									else 4
+								end as ma,
+								24 as page_hdr,
+								23 + case
+									when MAX(coalesce(s.null_frac, 0)) > 0 then (7 + count(s.attname)) / 8
+									else 0::int
+								end
+                    + case
+									when bool_or(att.attname = 'oid' and att.attnum < 0) then 4
+									else 0
+								end as tpl_hdr_size,
+								sum((1-coalesce(s.null_frac, 0)) * coalesce(s.avg_width, 0)) as tpl_data_size,
+								bool_or(att.atttypid = 'pg_catalog.name'::regtype)
+									or sum(case when att.attnum > 0 then 1 else 0 end) <> count(s.attname) as is_na
+								from
+									pg_attribute as att
+								join pg_class as tbl on
+									att.attrelid = tbl.oid
+								join pg_namespace as ns on
+									ns.oid = tbl.relnamespace
+								left join pg_stats as s on
+									s.schemaname = ns.nspname
+									and s.tablename = tbl.relname
+									and s.inherited = false
+									and s.attname = att.attname
+								left join pg_class as toast on
+									tbl.reltoastrelid = toast.oid
+								where
+									not att.attisdropped
+									and tbl.relkind in ('r', 'm')
+								group by
+									1,
+									2,
+									3,
+									4,
+									5,
+									6,
+									7,
+									8,
+									9,
+									10
+            ) as s
+        ) as s2
+    ) as s3
+) q
+where
+	q.bloat_pct > 50.0
+union all
+-- HIGH: Tables never analyzed
+select
+	'HIGH' as severity,
+	'Statistics' as category,
+	'Missing Statistics' as check_name,
+	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
+	'Table has never been analyzed, query planner missing statistics' as issue_description,
+	'Last analyze: Never' as current_value,
+	'Run ANALYZE on this table or enable auto-analyze' as recommended_action,
+	'https://www.postgresql.org/docs/current/sql-analyze.html' as documentation_link,
+	2 as severity_order
+from
+	pg_stat_user_tables pt
+where
+	last_analyze is null
+	and last_autoanalyze is null
+	and n_tup_ins + n_tup_upd + n_tup_del > 1000
+union all
+-- HIGH: Duplicate or redundant indexes
+select
+	'HIGH' as severity,
+	'Index Optimization' as category,
+	'Duplicate Index' as check_name,
+	quote_ident(i1.schemaname) || '.' || i1.indexname || ' & ' || i2.indexname as object_name,
+	'Multiple indexes with identical or overlapping column sets' as issue_description,
+	'Indexes: ' || i1.indexname || ', ' || i2.indexname as current_value,
+	'Review and consolidate duplicate indexes and focus on keeping the most efficient one' as recommended_action,
+	'https://www.postgresql.org/docs/current/indexes-multicolumn.html' as documentation_link,
+	2 as severity_order
+from
+	pg_indexes i1
+join pg_indexes i2 on
+	i1.schemaname = i2.schemaname
+	and i1.tablename = i2.tablename
+	and i1.indexname < i2.indexname
+	and i1.indexdef = i2.indexdef
+where
+	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+union all
+-- MEDIUM: Tables with outdated statistics
+select
+	'MEDIUM' as severity,
+	'Statistics' as category,
+	'Outdated Statistics' as check_name,
+	quote_ident(tt.nspname) || '.' || quote_ident(tt.relname) as object_name,
+	'Table statistics are outdated, which can lead to poor query plans' as issue_description,
+	'Dead tuples: ' || tt.n_dead_tup || ' (threshold: ' || round(tt.v_threshold) || '), ' ||
+    'Modifications since analyze: ' || tt.n_mod_since_analyze || ' (threshold: ' || round(tt.a_threshold) || ')' as current_value,
+	case
+		when tt.n_dead_tup > tt.v_threshold
+		and tt.n_mod_since_analyze > tt.a_threshold then 'Run VACUUM ANALYZE'
+		when tt.n_dead_tup > tt.v_threshold then 'Run VACUUM'
+		when tt.n_mod_since_analyze > tt.a_threshold then 'Run ANALYZE'
+	end as recommended_action,
+	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM, https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
+	3 as severity_order
+from
+	(
+	select
+		n.nspname,
+		c.relname,
+		c.oid as relid,
+		t.n_dead_tup,
+		t.n_mod_since_analyze,
+		c.reltuples * current_setting('autovacuum_vacuum_scale_factor')::float8 +
+            current_setting('autovacuum_vacuum_threshold')::float8 as v_threshold,
+		c.reltuples * current_setting('autovacuum_analyze_scale_factor')::float8 +
+            current_setting('autovacuum_analyze_threshold')::float8 as a_threshold
+	from
+		pg_class c
+	join pg_namespace n on
+		c.relnamespace = n.oid
+	join pg_stat_all_tables t on
+		c.oid = t.relid
+	where
+		c.relkind = 'r'
+		and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+) tt
+where
+	tt.n_dead_tup > tt.v_threshold
+	or tt.n_mod_since_analyze > tt.a_threshold
+union all
+-- MEDIUM: Low index usage efficiency
+select
+	'MEDIUM' as severity,
+	'Index Performance' as category,
+	'Low Index Efficiency' as check_name,
+	quote_ident(schemaname) || '.' || quote_ident(indexrelname) as object_name,
+	'Index has low scan to tuple read ratio indicating poor selectivity' as issue_description,
+	'Scans: ' || idx_scan || ', Tuples: ' || idx_tup_read ||
+        ' (Ratio: ' || ROUND(idx_tup_read::numeric / nullif(idx_scan, 0), 2) || ')' as current_value,
+	'Review index definition and query patterns, consider partial indexes' as recommended_action,
+	'https://www.postgresql.org/docs/current/indexes-partial.html' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_user_indexes psi
+where
+	idx_scan > 100
+	and idx_tup_read::numeric / nullif(idx_scan, 0) > 1000
+union all
+-- MEDIUM: Large sequential scans
+select
+	'MEDIUM' as severity,
+	'Query Performance' as category,
+	'Excessive Sequential Scans' as check_name,
+	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
+	'Table has high sequential scan activity, may benefit from additional indexes' as issue_description,
+	'Sequential scans: ' || seq_scan || ', Tuples read: ' || seq_tup_read as current_value,
+	'Analyze query patterns and consider adding appropriate indexes' as recommended_action,
+	'https://www.postgresql.org/docs/current/using-explain.html' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_user_tables
+where
+	seq_scan > 1000
+	and seq_tup_read > seq_scan * 10000
+union all
+-- MEDIUM: Connection and lock monitoring
+select
+	'MEDIUM' as severity,
+	'System Health' as category,
+	'High Connection Count' as check_name,
+	'Database Connections' as object_name,
+	'High number of active connections may impact performance' as issue_description,
+	COUNT(*)::text || ' active connections' as current_value,
+	'Monitor connection pooling and consider adjusting max_connections' as recommended_action,
+	'https://www.postgresql.org/docs/current/runtime-config-connection.html' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_activity
+where
+	state = 'active'
+group by
+	severity,
+	category,
+	check_name,
+	object_name,
+	issue_description,
+	recommended_action,
+	documentation_link,
+	severity_order
+having
+	COUNT(*) > 50
+union all
+-- MEDIUM: Queries running longer than 5 minutes
+select
+	'MEDIUM' as severity,
+	'Query Performance' as category,
+	'Long Running Queries' as check_name,
+	concat_ws(' | ',
+        'pid: ' || pgs.pid::text,
+        'usename: ' || pgs.usename,
+        'datname: ' || pgs.datname,
+        'client_address: ' || pgs.client_addr::text,
+        'state: ' || pgs.state,
+        'duration: ' || to_char(now() - query_start, 'HH24:MI:SS')
+    ) as object_name,
+	'The following query has been running for more than 5 minutes. Might be helpful to see if this is expected behavior' as issue_description,
+	query as current_value,
+	'Review query using EXPLAIN ANALYZE to identify any bottlenecks, such as full table scans, missing indexes, etc' as recommended_action,
+	'https://www.postgresql.org/docs/current/using-explain.html#USING-EXPLAIN-ANALYZE' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_activity pgs
+where
+	state = 'active'
+	and now() - query_start > interval '5 minutes'
+union all
+-- LOW: Missing indexes on foreign keys
+select
+	'LOW' as severity,
+	'Index Recommendations' as category,
+	'Missing FK Index' as check_name,
+	n.nspname || '.' || t.relname || '.' || string_agg(a.attname, ', ') as object_name,
+	'Foreign key constraint missing supporting index for efficient joins' as issue_description,
+	'FK constraint without index' as current_value,
+	'Consider adding index on foreign key columns for better join performance' as recommended_action,
+	'https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK' as documentation_link,
+	4 as severity_order
+from
+	pg_constraint c
+join pg_class t on
+	c.conrelid = t.oid
+join pg_namespace n on
+	t.relnamespace = n.oid
+join pg_attribute a on
+	a.attrelid = t.oid
+	and a.attnum = any(c.conkey)
+where
+	c.contype = 'f'
+	and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+	and not exists (
+	select
+		1
+	from
+		pg_index i
+	where
+		i.indrelid = c.conrelid
+		and i.indkey::int2[] @> c.conkey::int2[]
+    )
+group by
+	n.nspname,
+	t.relname,
+	c.conname,
+	severity,
+	category,
+	check_name,
+	issue_description,
+	current_value,
+	recommended_action,
+	documentation_link,
+	severity_order
+union all
+-- INFO: Database size and growth
+select
+	'INFO' as severity,
+	'Database Health' as category,
+	'Database Size' as check_name,
+	current_database() as object_name,
+	'Current database size information' as issue_description,
+	pg_size_pretty(pg_database_size(current_database())) as current_value,
+	'Monitor growth trends and plan capacity accordingly' as recommended_action,
+	'https://www.postgresql.org/docs/current/diskusage.html' as documentation_link,
+	5 as severity_order
+union all
+-- INFO: Version and configuration
+select
+	'INFO' as severity,
+	'System Info' as category,
+	'PostgreSQL Version' as check_name,
+	'System' as object_name,
+	'Current PostgreSQL version and basic configuration' as issue_description,
+	version() as current_value,
+	'Keep PostgreSQL updated and review configuration settings' as recommended_action,
+	'https://www.postgresql.org/docs/current/upgrading.html' as documentation_link,
+	5 as severity_order
+union all
+-- INFO: Installed Extensions
+select
+	'INFO' as severity,
+	'System Info' as category,
+	'Installed Extension' as check_name,
+	'System' as object_name,
+	'Installed Postgres Extension' as issue_description,
+	pe.extname || ':' || pe.extversion as current_value,
+	'Before updating to the latest minor/major version of PG, verify extension compatability' as recommended_action,
+	'https://youtu.be/mpEdQm3TpE0?si=VMcHBo1VnDfGZvtI&t=937' as documentation_link,
+	5 as severity_order
+from
+	pg_extension pe
+union all
+-- INFO: Server Uptime
+select
+	'INFO' as severity,
+	'System Info' as category,
+	'Server Uptime' as check_name,
+	'System' as object_name,
+	'Current Uptime of Server' as issue_description,
+	(current_timestamp - pg_postmaster_start_time())::text as current_value,
+	'No Recommendation - Informational' as recommended_action,
+	'N/A' as documentation_link,
+	5 as severity_order
+order by
+	severity_order,
+	category,
+	check_name;

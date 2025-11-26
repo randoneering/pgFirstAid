@@ -218,8 +218,8 @@ select
 	'Table Bloat (Detailed)' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(tblname) as object_name,
 	'Table has significant bloat (>50%) affecting performance and storage' as issue_description,
-	'Real size: ' || pg_relation_size(real_size) ||
-    ', Bloat: ' || pg_relation_size(bloat_size) ||
+	'Real size: ' || pg_size_pretty(real_size::bigint) ||
+    ', Bloat: ' || pg_size_pretty(bloat_size::bigint) ||
     ' (' || ROUND(bloat_pct::numeric, 2) || '%)' as current_value,
 	'Run VACUUM FULL to reclaim space' as recommended_action,
 	'https://www.postgresql.org/docs/current/sql-vacuum.html,
@@ -231,7 +231,7 @@ where
 	bloat_pct > 50.0
 order by
 	quote_ident(schemaname),
-	quote_ident(tblname)
+	quote_ident(tblname);
 --Credit: https://github.com/ioguix/pgsql-bloat-estimation -- Jehan-Guillaume (ioguix) de Rorthais!
 
 -- HIGH: Tables never analyzed

@@ -80,31 +80,160 @@ where
 	idx_scan = 0
 	and pg_relation_size(psi.indexrelid) > 104857600;
 -- 100MB
+
 -- HIGH: Tables with high bloat
-insert
-	into
-	health_results
+with q as (
+select
+	current_database(),
+	schemaname,
+	tblname,
+	bs * tblpages as real_size,
+	(tblpages-est_tblpages)* bs as extra_size,
+	case
+		when tblpages > 0
+		and tblpages - est_tblpages > 0
+    then 100 * (tblpages - est_tblpages)/ tblpages::float
+		else 0
+	end as extra_pct,
+	fillfactor,
+	case
+		when tblpages - est_tblpages_ff > 0
+    then (tblpages-est_tblpages_ff)* bs
+		else 0
+	end as bloat_size,
+	case
+		when tblpages > 0
+		and tblpages - est_tblpages_ff > 0
+    then 100 * (tblpages - est_tblpages_ff)/ tblpages::float
+		else 0
+	end as bloat_pct,
+	is_na
+from
+	(
+	select
+		ceil( reltuples / ( (bs-page_hdr)/ tpl_size ) ) + ceil( toasttuples / 4 ) as est_tblpages,
+		ceil( reltuples / ( (bs-page_hdr)* fillfactor /(tpl_size * 100) ) ) + ceil( toasttuples / 4 ) as est_tblpages_ff,
+		tblpages,
+		fillfactor,
+		bs,
+		tblid,
+		schemaname,
+		tblname,
+		heappages,
+		toastpages,
+		is_na
+	from
+		(
+		select
+			( 4 + tpl_hdr_size + tpl_data_size + (2 * ma)
+        - case
+				when tpl_hdr_size%ma = 0 then ma
+				else tpl_hdr_size%ma
+			end
+        - case
+				when ceil(tpl_data_size)::int%ma = 0 then ma
+				else ceil(tpl_data_size)::int%ma
+			end
+      ) as tpl_size,
+			bs - page_hdr as size_per_block,
+			(heappages + toastpages) as tblpages,
+			heappages,
+			toastpages,
+			reltuples,
+			toasttuples,
+			bs,
+			page_hdr,
+			tblid,
+			schemaname,
+			tblname,
+			fillfactor,
+			is_na
+		from
+			(
+			select
+				tbl.oid as tblid,
+				ns.nspname as schemaname,
+				tbl.relname as tblname,
+				tbl.reltuples,
+				tbl.relpages as heappages,
+				coalesce(toast.relpages, 0) as toastpages,
+				coalesce(toast.reltuples, 0) as toasttuples,
+				coalesce(substring(
+          array_to_string(tbl.reloptions, ' ')
+          from 'fillfactor=([0-9]+)')::smallint, 100) as fillfactor,
+				current_setting('block_size')::numeric as bs,
+				case
+					when version()~ 'mingw32'
+					or version()~ '64-bit|x86_64|ppc64|ia64|amd64' then 8
+					else 4
+				end as ma,
+				24 as page_hdr,
+				23 + case
+					when MAX(coalesce(s.null_frac, 0)) > 0 then ( 7 + count(s.attname) ) / 8
+					else 0::int
+				end
+           + case
+					when bool_or(att.attname = 'oid' and att.attnum < 0) then 4
+					else 0
+				end as tpl_hdr_size,
+				sum( (1-coalesce(s.null_frac, 0)) * coalesce(s.avg_width, 0) ) as tpl_data_size,
+				bool_or(att.atttypid = 'pg_catalog.name'::regtype)
+				or sum(case when att.attnum > 0 then 1 else 0 end) <> count(s.attname) as is_na
+			from
+				pg_attribute as att
+			join pg_class as tbl on
+				att.attrelid = tbl.oid
+			join pg_namespace as ns on
+				ns.oid = tbl.relnamespace
+			left join pg_stats as s on
+				s.schemaname = ns.nspname
+				and s.tablename = tbl.relname
+				and s.inherited = false
+				and s.attname = att.attname
+			left join pg_class as toast on
+				tbl.reltoastrelid = toast.oid
+			where
+				not att.attisdropped
+				and tbl.relkind in ('r', 'm')
+			group by
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10
+			order by
+				2,
+				3
+    ) as s
+  ) as s2
+) as s3)
 select
 	'HIGH' as severity,
 	'Table Maintenance' as category,
-	'Table Bloat' as check_name,
-	quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename) as object_name,
-	'Table has significant bloat affecting performance and storage' as issue_description,
-	'Estimated bloat: ' || ROUND(
-        case when pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) > 0
-        then (pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) - pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename), 'main')) * 100.0 / pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename))
-        else 0 end, 2
-    ) || '%' as current_value,
+	'Table Bloat (Detailed)' as check_name,
+	quote_ident(schemaname) || '.' || quote_ident(tblname) as object_name,
+	'Table has significant bloat (>50%) affecting performance and storage' as issue_description,
+	'Real size: ' || pg_relation_size(real_size) ||
+    ', Bloat: ' || pg_relation_size(bloat_size) ||
+    ' (' || ROUND(bloat_pct::numeric, 2) || '%)' as current_value,
 	'Run VACUUM FULL to reclaim space' as recommended_action,
-	'https://www.postgresql.org/docs/current/sql-vacuum.html' as documentation_link,
+	'https://www.postgresql.org/docs/current/sql-vacuum.html,
+    https://github.com/ioguix/pgsql-bloat-estimation/' as documentation_link,
 	2 as severity_order
 from
-	pg_tables pt
+	q
 where
-	pt.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
-	and pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) > 104857600
-	-- 100MB
-	and (pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)) - pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename), 'main')) * 100.0 / nullif(pg_relation_size(quote_ident(pt.schemaname) || '.' || quote_ident(pt.tablename)), 0) > 20;
+	bloat_pct > 50.0
+order by
+	quote_ident(schemaname),
+	quote_ident(tblname)
+--Credit: https://github.com/ioguix/pgsql-bloat-estimation -- Jehan-Guillaume (ioguix) de Rorthais!
+
 -- HIGH: Tables never analyzed
     insert
 	into
@@ -198,6 +327,8 @@ where
         n_dead_tup > v_threshold
         or n_mod_since_analyze > a_threshold
     order BY nspname, relname;
+-- credit: https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed -- Thanks depesz!
+
 -- MEDIUM: Low index usage efficiency
     insert
 	into

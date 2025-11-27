@@ -50,6 +50,44 @@ where
 	and pg_relation_size(psi.indexrelid) > 104857600
 	-- 100MB
 union all
+-- HIGH: Inactive Replication slots
+    select
+	'HIGH' as severity,
+	'Replication Health' as category,
+	'Inactive Replication Slots' as check_name,
+	'Slot name:' || slot_name as object_name,
+	'Target replication slot is inactive' as issue_description,
+	'Retained wal:' || retained_wal || ' database:' || database as current_value,
+	'If the replication slot is no longer needed, drop the slot' as recommended_action,
+	'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
+	2 as severity_order
+from
+	(
+	select
+		slot_name,
+		plugin,
+		database,
+		restart_lsn,
+		case
+			when 'invalidation_reason' is not null then 'invalid'
+			else
+          case
+				when active is true then 'active'
+				else 'inactive'
+			end
+		end as "status",
+		pg_size_pretty(
+        pg_wal_lsn_diff(
+          pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
+		pg_size_pretty(safe_wal_size) as "safe_wal_size"
+	from
+		pg_replication_slots
+	where
+		'status' = 'inactive'
+	order by
+		slot_name
+    )
+union all
 -- HIGH: Tables with high bloat
 select
 	'HIGH' as severity,
@@ -311,6 +349,44 @@ from
 where
 	seq_scan > 1000
 	and seq_tup_read > seq_scan * 10000
+union all
+-- MEDIUM: Replication slots with high wal retation (90% of max wal)
+select
+		'MEDIUM' as severity,
+		'Replication Health' as category,
+		'Replication Slots Near Max Wal Size' as check_name,
+		'Slot name:' || slot_name as object_name,
+		'Target replication slot has retained close to 90% of the max wal size' as issue_description,
+		'Retained wal:' || retained_wal || ' safe_wal_size:' || safe_wal_size as current_value,
+		'Consider implementing a heartbeat table or using pg_logical_emit_message()' as recommended_action,
+		'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
+		3 as severity_order
+from
+	(
+	select
+		slot_name,
+		plugin,
+		database,
+		restart_lsn,
+		case
+			when 'invalidation_reason' is not null then 'invalid'
+			else
+      case
+				when active is true then 'active'
+				else 'inactive'
+			end
+		end as "status",
+		pg_size_pretty(
+    pg_wal_lsn_diff(
+      pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
+		pg_size_pretty(safe_wal_size) as "safe_wal_size"
+	from
+		pg_replication_slots
+	where
+		pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) >= (safe_wal_size * 0.9)
+	order by
+		slot_name
+)
 union all
 -- MEDIUM: Connection and lock monitoring
 select

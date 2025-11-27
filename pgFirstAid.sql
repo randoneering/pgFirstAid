@@ -77,138 +77,179 @@ where
 	idx_scan = 0
 	and pg_relation_size(psi.indexrelid) > 104857600;
 -- 100MB
-
+-- HIGH: Inactive Replication slots
+    insert
+	into
+	health_results
+with q as (
+	select
+		slot_name,
+		plugin,
+		database,
+		restart_lsn,
+		case
+			when 'invalidation_reason' is not null then 'invalid'
+			else
+          case
+				when active is true then 'active'
+				else 'inactive'
+			end
+		end as "status",
+		pg_size_pretty(
+        pg_wal_lsn_diff(
+          pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
+		pg_size_pretty(safe_wal_size) as "safe_wal_size"
+	from
+		pg_replication_slots
+	where
+		'status' = 'inactive'
+    )
+    select
+	'HIGH' as severity,
+	'Replication Health' as category,
+	'Inactive Replication Slots' as check_name,
+	'Slot name:' || slot_name as object_name,
+	'Target replication slot is inactive' as issue_description,
+	'Retained wal:' || retained_wal || ' database:' || database as current_value,
+	'If the replication slot is no longer needed, drop the slot' as recommended_action,
+	'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
+	2 as severity_order
+from
+	q
+order by
+	slot_name;
+-- credit: https://www.morling.dev/blog/mastering-postgres-replication-slots/ -- Thank you Gunnar Morling!
 -- HIGH: Tables with high bloat
 insert
 	into
 	health_results
 with q as (
-select
-	current_database(),
-	schemaname,
-	tblname,
-	bs * tblpages as real_size,
-	(tblpages-est_tblpages)* bs as extra_size,
-	case
-		when tblpages > 0
-		and tblpages - est_tblpages > 0
-    then 100 * (tblpages - est_tblpages)/ tblpages::float
-		else 0
-	end as extra_pct,
-	fillfactor,
-	case
-		when tblpages - est_tblpages_ff > 0
-    then (tblpages-est_tblpages_ff)* bs
-		else 0
-	end as bloat_size,
-	case
-		when tblpages > 0
-		and tblpages - est_tblpages_ff > 0
-    then 100 * (tblpages - est_tblpages_ff)/ tblpages::float
-		else 0
-	end as bloat_pct,
-	is_na
-from
-	(
 	select
-		ceil( reltuples / ( (bs-page_hdr)/ tpl_size ) ) + ceil( toasttuples / 4 ) as est_tblpages,
-		ceil( reltuples / ( (bs-page_hdr)* fillfactor /(tpl_size * 100) ) ) + ceil( toasttuples / 4 ) as est_tblpages_ff,
-		tblpages,
-		fillfactor,
-		bs,
-		tblid,
+		current_database(),
 		schemaname,
 		tblname,
-		heappages,
-		toastpages,
-		is_na
-	from
-		(
-		select
-			( 4 + tpl_hdr_size + tpl_data_size + (2 * ma)
-        - case
-				when tpl_hdr_size%ma = 0 then ma
-				else tpl_hdr_size%ma
-			end
-        - case
-				when ceil(tpl_data_size)::int%ma = 0 then ma
-				else ceil(tpl_data_size)::int%ma
-			end
-      ) as tpl_size,
-			bs - page_hdr as size_per_block,
-			(heappages + toastpages) as tblpages,
-			heappages,
-			toastpages,
-			reltuples,
-			toasttuples,
-			bs,
-			page_hdr,
-			tblid,
-			schemaname,
-			tblname,
+		bs * tblpages as real_size,
+		(tblpages-est_tblpages)* bs as extra_size,
+		case
+			when tblpages > 0
+				and tblpages - est_tblpages > 0
+    then 100 * (tblpages - est_tblpages)/ tblpages::float
+				else 0
+			end as extra_pct,
 			fillfactor,
-			is_na
-		from
-			(
-			select
-				tbl.oid as tblid,
-				ns.nspname as schemaname,
-				tbl.relname as tblname,
-				tbl.reltuples,
-				tbl.relpages as heappages,
-				coalesce(toast.relpages, 0) as toastpages,
-				coalesce(toast.reltuples, 0) as toasttuples,
-				coalesce(substring(
+			case
+				when tblpages - est_tblpages_ff > 0
+    then (tblpages-est_tblpages_ff)* bs
+				else 0
+			end as bloat_size,
+			case
+				when tblpages > 0
+					and tblpages - est_tblpages_ff > 0
+    then 100 * (tblpages - est_tblpages_ff)/ tblpages::float
+					else 0
+				end as bloat_pct,
+				is_na
+			from
+				(
+				select
+					ceil( reltuples / ( (bs-page_hdr)/ tpl_size ) ) + ceil( toasttuples / 4 ) as est_tblpages,
+					ceil( reltuples / ( (bs-page_hdr)* fillfactor /(tpl_size * 100) ) ) + ceil( toasttuples / 4 ) as est_tblpages_ff,
+					tblpages,
+					fillfactor,
+					bs,
+					tblid,
+					schemaname,
+					tblname,
+					heappages,
+					toastpages,
+					is_na
+				from
+					(
+					select
+						( 4 + tpl_hdr_size + tpl_data_size + (2 * ma)
+        - case
+							when tpl_hdr_size%ma = 0 then ma
+							else tpl_hdr_size%ma
+						end
+        - case
+							when ceil(tpl_data_size)::int%ma = 0 then ma
+							else ceil(tpl_data_size)::int%ma
+						end
+      ) as tpl_size,
+						bs - page_hdr as size_per_block,
+						(heappages + toastpages) as tblpages,
+						heappages,
+						toastpages,
+						reltuples,
+						toasttuples,
+						bs,
+						page_hdr,
+						tblid,
+						schemaname,
+						tblname,
+						fillfactor,
+						is_na
+					from
+						(
+						select
+							tbl.oid as tblid,
+							ns.nspname as schemaname,
+							tbl.relname as tblname,
+							tbl.reltuples,
+							tbl.relpages as heappages,
+							coalesce(toast.relpages, 0) as toastpages,
+							coalesce(toast.reltuples, 0) as toasttuples,
+							coalesce(substring(
           array_to_string(tbl.reloptions, ' ')
           from 'fillfactor=([0-9]+)')::smallint, 100) as fillfactor,
-				current_setting('block_size')::numeric as bs,
-				case
-					when version()~ 'mingw32'
-					or version()~ '64-bit|x86_64|ppc64|ia64|amd64' then 8
-					else 4
-				end as ma,
-				24 as page_hdr,
-				23 + case
-					when MAX(coalesce(s.null_frac, 0)) > 0 then ( 7 + count(s.attname) ) / 8
-					else 0::int
-				end
+							current_setting('block_size')::numeric as bs,
+							case
+								when version()~ 'mingw32'
+									or version()~ '64-bit|x86_64|ppc64|ia64|amd64' then 8
+									else 4
+								end as ma,
+								24 as page_hdr,
+								23 + case
+									when MAX(coalesce(s.null_frac, 0)) > 0 then ( 7 + count(s.attname) ) / 8
+									else 0::int
+								end
            + case
-					when bool_or(att.attname = 'oid' and att.attnum < 0) then 4
-					else 0
-				end as tpl_hdr_size,
-				sum( (1-coalesce(s.null_frac, 0)) * coalesce(s.avg_width, 0) ) as tpl_data_size,
-				bool_or(att.atttypid = 'pg_catalog.name'::regtype)
-				or sum(case when att.attnum > 0 then 1 else 0 end) <> count(s.attname) as is_na
-			from
-				pg_attribute as att
-			join pg_class as tbl on
-				att.attrelid = tbl.oid
-			join pg_namespace as ns on
-				ns.oid = tbl.relnamespace
-			left join pg_stats as s on
-				s.schemaname = ns.nspname
-				and s.tablename = tbl.relname
-				and s.inherited = false
-				and s.attname = att.attname
-			left join pg_class as toast on
-				tbl.reltoastrelid = toast.oid
-			where
-				not att.attisdropped
-				and tbl.relkind in ('r', 'm')
-			group by
-				1,
-				2,
-				3,
-				4,
-				5,
-				6,
-				7,
-				8,
-				9,
-				10
-			order by
-				2,
-				3
+									when bool_or(att.attname = 'oid' and att.attnum < 0) then 4
+									else 0
+								end as tpl_hdr_size,
+								sum( (1-coalesce(s.null_frac, 0)) * coalesce(s.avg_width, 0) ) as tpl_data_size,
+								bool_or(att.atttypid = 'pg_catalog.name'::regtype)
+									or sum(case when att.attnum > 0 then 1 else 0 end) <> count(s.attname) as is_na
+								from
+									pg_attribute as att
+								join pg_class as tbl on
+									att.attrelid = tbl.oid
+								join pg_namespace as ns on
+									ns.oid = tbl.relnamespace
+								left join pg_stats as s on
+									s.schemaname = ns.nspname
+									and s.tablename = tbl.relname
+									and s.inherited = false
+									and s.attname = att.attname
+								left join pg_class as toast on
+									tbl.reltoastrelid = toast.oid
+								where
+									not att.attisdropped
+									and tbl.relkind in ('r', 'm')
+								group by
+									1,
+									2,
+									3,
+									4,
+									5,
+									6,
+									7,
+									8,
+									9,
+									10
+								order by
+									2,
+									3
     ) as s
   ) as s2
 ) as s3)
@@ -233,7 +274,6 @@ order by
 	quote_ident(schemaname),
 	quote_ident(tblname);
 --Credit: https://github.com/ioguix/pgsql-bloat-estimation -- Jehan-Guillaume (ioguix) de Rorthais!
-
 -- HIGH: Tables never analyzed
     insert
 	into
@@ -282,53 +322,58 @@ where
 	into
 	health_results
 	with s as (
-        select
-            current_setting('autovacuum_analyze_scale_factor')::float8  as  analyze_factor,
-            current_setting('autovacuum_analyze_threshold')::float8     as  analyze_threshold,
-            current_setting('autovacuum_vacuum_scale_factor')::float8   as  vacuum_factor,
-            current_setting('autovacuum_vacuum_threshold')::float8      as  vacuum_threshold
-    ), tt as (
-        select
-            n.nspname,
-            c.relname,
-            c.oid as relid,
-            t.n_dead_tup,
-            t.n_mod_since_analyze,
-            c.reltuples * s.vacuum_factor + s.vacuum_threshold as v_threshold,
-            c.reltuples * s.analyze_factor + s.analyze_threshold as a_threshold
-        from
-            s,
-            pg_class c
-            join pg_namespace n on c.relnamespace = n.oid
-            join pg_stat_all_tables t on c.oid = t.relid
-        where
-            c.relkind = 'r'
-            and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+	select
+		current_setting('autovacuum_analyze_scale_factor')::float8 as analyze_factor,
+		current_setting('autovacuum_analyze_threshold')::float8 as analyze_threshold,
+		current_setting('autovacuum_vacuum_scale_factor')::float8 as vacuum_factor,
+		current_setting('autovacuum_vacuum_threshold')::float8 as vacuum_threshold
+    ),
+	tt as (
+	select
+		n.nspname,
+		c.relname,
+		c.oid as relid,
+		t.n_dead_tup,
+		t.n_mod_since_analyze,
+		c.reltuples * s.vacuum_factor + s.vacuum_threshold as v_threshold,
+		c.reltuples * s.analyze_factor + s.analyze_threshold as a_threshold
+	from
+		s,
+		pg_class c
+	join pg_namespace n on
+		c.relnamespace = n.oid
+	join pg_stat_all_tables t on
+		c.oid = t.relid
+	where
+		c.relkind = 'r'
+		and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
     )
     select
-        'MEDIUM' as severity,
-        'Statistics' as category,
-        'Outdated Statistics' as check_name,
-        quote_ident(nspname) || '.' || quote_ident(relname) as object_name,
-        'Table statistics are outdated, which can lead to poor query plans' as issue_description,
-        'Dead tuples: ' || n_dead_tup || ' (threshold: ' || round(v_threshold) || '), ' ||
+	'MEDIUM' as severity,
+	'Statistics' as category,
+	'Outdated Statistics' as check_name,
+	quote_ident(nspname) || '.' || quote_ident(relname) as object_name,
+	'Table statistics are outdated, which can lead to poor query plans' as issue_description,
+	'Dead tuples: ' || n_dead_tup || ' (threshold: ' || round(v_threshold) || '), ' ||
         'Modifications since analyze: ' || n_mod_since_analyze || ' (threshold: ' || round(a_threshold) || ')' as current_value,
-        case
-            when n_dead_tup > v_threshold and n_mod_since_analyze > a_threshold then 'Run VACUUM ANALYZE'
-            when n_dead_tup > v_threshold then 'Run VACUUM'
-            when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
-        end as recommended_action,
-        'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM,
+	case
+		when n_dead_tup > v_threshold
+		and n_mod_since_analyze > a_threshold then 'Run VACUUM ANALYZE'
+		when n_dead_tup > v_threshold then 'Run VACUUM'
+		when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
+	end as recommended_action,
+	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM,
         https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
-        3 as severity_order
-    from
-        tt
-    where
-        n_dead_tup > v_threshold
-        or n_mod_since_analyze > a_threshold
-    order BY nspname, relname;
+	3 as severity_order
+from
+	tt
+where
+	n_dead_tup > v_threshold
+	or n_mod_since_analyze > a_threshold
+order by
+	nspname,
+	relname;
 -- credit: https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed -- Thanks depesz!
-
 -- MEDIUM: Low index usage efficiency
     insert
 	into
@@ -349,6 +394,47 @@ from
 where
 	idx_scan > 100
 	and idx_tup_read::numeric / nullif(idx_scan, 0) > 1000;
+-- MEDIUM: Replication slots with high wal retation (90% of max wal)
+insert
+	into
+	health_results
+with q as (
+	select
+		slot_name,
+		plugin,
+		database,
+		restart_lsn,
+		case
+			when 'invalidation_reason' is not null then 'invalid'
+			else
+      case
+				when active is true then 'active'
+				else 'inactive'
+			end
+		end as "status",
+		pg_size_pretty(
+    pg_wal_lsn_diff(
+      pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
+		pg_size_pretty(safe_wal_size) as "safe_wal_size"
+	from
+		pg_replication_slots
+	where
+		pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) >= (safe_wal_size * 0.9)
+)
+select
+		'MEDIUM' as severity,
+		'Replication Health' as category,
+		'Replication Slots Near Max Wal Size' as check_name,
+		'Slot name:' || slot_name as object_name,
+		'Target replication slot has retained close to 90% of the max wal size' as issue_description,
+		'Retained wal:' || retained_wal || ' safe_wal_size:' || safe_wal_size as current_value,
+		'Consider implementing a heartbeat table or using pg_logical_emit_message()' as recommended_action,
+		'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
+		3 as severity_order
+from
+		q
+order by
+		slot_name;
 -- MEDIUM: Large sequential scans
     insert
 	into

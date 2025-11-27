@@ -1,5 +1,5 @@
 create or replace
-view v_pg_firstaid as
+view v_pg_firstAid as
 -- CRITICAL: Tables without primary keys
 select
 	'CRITICAL' as severity,

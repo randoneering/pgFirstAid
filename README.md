@@ -1,11 +1,11 @@
 # pgFirstAid
 
-Easy-to-deploy, open source PostgreSQL function that provides a prioritized list of actions to improve database stability and performance.Inspired by Brent Ozar's [FirstResponderKit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) for SQL Server, **pgFirstAid** is designed for everyone to use—not just DBAs! Get actionable health insights from your PostgreSQL database in seconds.
+Easy-to-deploy, open source PostgreSQL function (and view!) that provides a prioritized list of actions to improve database stability and performance.Inspired by Brent Ozar's [FirstResponderKit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) for SQL Server, **pgFirstAid** is designed for everyone to use—not just DBAs! Get actionable health insights from your PostgreSQL database in seconds.
 
 ## Features
 
 - **Zero Dependencies** - Single SQL function, no external tools required
-- **Comprehensive Checks** - 12 (and growing!) built-in health checks covering critical performance and stability issues
+- **Detailed Checks** - 12 (and growing!) built-in health checks covering critical performance and stability issues
 - **Prioritized Results** - Issues ranked by severity (CRITICAL → HIGH → MEDIUM → LOW → INFO)
 - **Actionable Recommendations** - Each issue includes specific remediation steps
 - **Documentation Links** - Direct links to official PostgreSQL documentation for deeper learning
@@ -15,9 +15,14 @@ Easy-to-deploy, open source PostgreSQL function that provides a prioritized list
 ### Installation
 
 ```sql
--- Copy and paste the function definition into your PostgreSQL database
+-- Copy and paste the function or view definition into your PostgreSQL database
 -- Then run it:
+
+--- function
 SELECT * FROM pg_firstAid();
+
+--- view
+SELECT * FROM v_pg_firstaid;
 ```
 
 That's it! No configuration needed. Deploy as a user with the highest possible priviledges (in your environment) to avoid issues.
@@ -41,22 +46,27 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 3. **Table Bloat** - Tables with >20% bloat affecting performance (tables >100MB)
 4. **Missing Statistics** - Tables never analyzed, leaving the query planner without statistics
 5. **Duplicate Indexes** - Multiple indexes with identical or overlapping column sets
+6. **Inactive Replication Slots** - Identify replication slots that are inactive and can be removed if no longer needed
+
 
 ### MEDIUM Priority Issues
 
-6. **Outdated Statistics** - Table statistics older than 7 days with significant modifications
-7. **Low Index Efficiency** - Indexes with poor selectivity (scan-to-tuple ratio >1000)
-8. **Excessive Sequential Scans** - Tables with high sequential scan activity that may benefit from indexes
-9. **High Connection Count** - More than 50 active connections potentially impacting performance
-
+7. **Outdated Statistics** - Table statistics older than 7 days with significant modifications
+8. **Low Index Efficiency** - Indexes with poor selectivity (scan-to-tuple ratio >1000)
+9. **Excessive Sequential Scans** - Tables with high sequential scan activity that may benefit from indexes
+10. **High Connection Count** - More than 50 active connections potentially impacting performance
+11. **Replication Slots With High WAL Retention** - Replication slots that have 90% of max wal setting
+12. **Long Running Queries** - Queries that have been running for 5 minutes or more
 ### LOW Priority Issues
 
-10. **Missing Foreign Key Indexes** - Foreign key constraints without supporting indexes for efficient joins
+13. **Missing Foreign Key Indexes** - Foreign key constraints without supporting indexes for efficient joins
 
 ### INFORMATIONAL
 
-11. **Database Size** - Current database size and growth monitoring
-12. **PostgreSQL Version** - Version information and configuration details
+14. **Database Size** - Current database size and growth monitoring
+15. **PostgreSQL Version** - Version information and configuration details
+16. **Installed Extensions** - Lists installed extensions on the Server
+17. **Server Uptime** - Server uptime since last restart
 
 ## Usage Tips
 
@@ -66,8 +76,12 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 -- Show only critical issues
 SELECT * FROM pg_firstAid() WHERE severity = 'CRITICAL';
 
+SELECT * FROM v_pg_firstAid WHERE severity = 'MEDIUM';
+
 -- Show critical and high priority issues
 SELECT * FROM pg_firstAid() WHERE severity IN ('CRITICAL', 'HIGH');
+
+SELECT * FROM v_pg_firstAid WHERE severity IN ('CRITICAL', 'HIGH');
 ```
 
 ### Filter by Category
@@ -76,8 +90,11 @@ SELECT * FROM pg_firstAid() WHERE severity IN ('CRITICAL', 'HIGH');
 -- Focus on index-related issues
 SELECT * FROM pg_firstAid() WHERE category LIKE '%Index%';
 
+SELECT * FROM v_pg_firstaid WHERE category LIKE '%Index%';
 -- Check table maintenance issues
 SELECT * FROM pg_firstAid() WHERE category = 'Table Maintenance';
+
+SELECT * FROM v_pg_firstAid WHERE category = 'Table Maintenance';
 ```
 
 ### Count Issues by Severity

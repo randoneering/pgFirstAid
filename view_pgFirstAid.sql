@@ -1,5 +1,5 @@
 create or replace
-view v_pg_firstAid as
+view v_pgfirstAid as
 -- CRITICAL: Tables without primary keys
 select
 	'CRITICAL' as severity,
@@ -86,7 +86,8 @@ from
 		'status' = 'inactive'
 	order by
 		slot_name
-    )
+    ) as q
+
 union all
 -- HIGH: Tables with high bloat
 select
@@ -229,11 +230,11 @@ from
             ) as s
         ) as s2
     ) as s3
-) q
+) as q
+
 where
 	q.bloat_pct > 50.0
-	and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
-
+	and q.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 union all
 -- HIGH: Tables never analyzed
 select
@@ -388,7 +389,8 @@ from
 		pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) >= (safe_wal_size * 0.9)
 	order by
 		slot_name
-)
+) as q
+
 union all
 -- MEDIUM: Connection and lock monitoring
 select

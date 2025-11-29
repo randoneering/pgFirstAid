@@ -22,7 +22,7 @@ Easy-to-deploy, open source PostgreSQL function (and view!) that provides a prio
 SELECT * FROM pg_firstAid();
 
 --- view
-SELECT * FROM v_pg_firstaid;
+SELECT * FROM v_pgfirstAid;
 ```
 
 That's it! No configuration needed. Deploy as a user with the highest possible priviledges (in your environment) to avoid issues.
@@ -76,12 +76,12 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 -- Show only critical issues
 SELECT * FROM pg_firstAid() WHERE severity = 'CRITICAL';
 
-SELECT * FROM v_pg_firstAid WHERE severity = 'MEDIUM';
+SELECT * FROM v_pgfirstAid WHERE severity = 'MEDIUM';
 
 -- Show critical and high priority issues
 SELECT * FROM pg_firstAid() WHERE severity IN ('CRITICAL', 'HIGH');
 
-SELECT * FROM v_pg_firstAid WHERE severity IN ('CRITICAL', 'HIGH');
+SELECT * FROM v_pgfirstAid WHERE severity IN ('CRITICAL', 'HIGH');
 ```
 
 ### Filter by Category
@@ -90,11 +90,11 @@ SELECT * FROM v_pg_firstAid WHERE severity IN ('CRITICAL', 'HIGH');
 -- Focus on index-related issues
 SELECT * FROM pg_firstAid() WHERE category LIKE '%Index%';
 
-SELECT * FROM v_pg_firstaid WHERE category LIKE '%Index%';
+SELECT * FROM v_pgfirstAid WHERE category LIKE '%Index%';
 -- Check table maintenance issues
 SELECT * FROM pg_firstAid() WHERE category = 'Table Maintenance';
 
-SELECT * FROM v_pg_firstAid WHERE category = 'Table Maintenance';
+SELECT * FROM v_pgfirstAid WHERE category = 'Table Maintenance';
 ```
 
 ### Count Issues by Severity

@@ -270,6 +270,7 @@ from
 	q
 where
 	bloat_pct > 50.0
+    and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 order by
 	quote_ident(schemaname),
 	quote_ident(tblname);

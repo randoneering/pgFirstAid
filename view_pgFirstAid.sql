@@ -232,6 +232,8 @@ from
 ) q
 where
 	q.bloat_pct > 50.0
+	and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+
 union all
 -- HIGH: Tables never analyzed
 select

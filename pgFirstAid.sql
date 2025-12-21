@@ -270,7 +270,7 @@ from
 	q
 where
 	bloat_pct > 50.0
-    and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+	and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 order by
 	quote_ident(schemaname),
 	quote_ident(tblname);
@@ -618,24 +618,50 @@ from
 	'N/A' as documentation_link,
 	5 as severity_order;
 -- INFO: Log Directory
-    WITH ld AS (
-        SELECT current_setting('log_directory') as log_directory
+    with ld as (
+select
+	current_setting('log_directory') as log_directory
     )
-    SELECT
-        'INFO' as severity,
-        'System Info' as category,
-        'Is Logging Enabled' as check_name,
-        'System' as object_name,
-        'If no log file is present, this indicates logging is not enabled' as issue_description,
-        ld.log_directory as current_value,
-        'Logging enabled will assist with troubleshooting future issues. Dont you like logs?' as recommended_action,
-        'For self-hosting: https://www.postgresql.org/docs/current/runtime-config-logging.html /
+    select
+	'INFO' as severity,
+	'System Info' as category,
+	'Is Logging Enabled' as check_name,
+	'System' as object_name,
+	'If no log file is present, this indicates logging is not enabled' as issue_description,
+	ld.log_directory as current_value,
+	'Logging enabled will assist with troubleshooting future issues. Dont you like logs?' as recommended_action,
+	'For self-hosting: https://www.postgresql.org/docs/current/runtime-config-logging.html /
          For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
          For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
          For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
         ' as documentation_link,
-        5 as severity_order
-    FROM ld;
+	5 as severity_order
+from
+	ld;
+-- INFO: Log File(s) Size(s)
+with ls as (
+select
+	ROUND(sum(stat.size) / (1024.0 * 1024.0), 2) || ' MB' as size_mb
+from
+	pg_ls_dir(current_setting('log_directory')) as logs
+cross join lateral
+	      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
+select
+	'INFO' as severity,
+	'System Info' as category,
+	'Size of ALL Logfiles combined' as check_name,
+	'System' as object_name,
+	'Monitoring your logfile size will prevent from filling up storage (or expanding your storage in cloud managed). This can also lead to the server cashing when the logfile cannot be saved.' as issue_description,
+	ls.size_mb as current_value,
+	'Set log_rotation_age and size for proper rotation of log files. This will prevent runaway log sizes.' as recommended_action,
+	'For self-hosting:https://www.postgresql.org/docs/current/runtime-config-logging.html /
+         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
+         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
+         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
+        ' as documentation_link,
+	5 as severity_order
+from
+	ls;
 -- Return results ordered by severity
     return QUERY
     select

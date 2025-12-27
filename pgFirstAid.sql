@@ -295,6 +295,36 @@ where
 	last_analyze is null
 	and last_autoanalyze is null
 	and n_tup_ins + n_tup_upd + n_tup_del > 1000;
+-- HIGH: Tables larger than 100GB
+with ts as (
+select
+	table_schema,
+	table_name,
+	pg_relation_size('"' || table_schema || '"."' || table_name || '"') as size_bytes,
+	pg_size_pretty(pg_relation_size('"' || table_schema || '"."' || table_name || '"')) as size_pretty
+from
+	information_schema.tables
+where
+	table_type = 'BASE TABLE'
+	and pg_relation_size('"' || table_schema || '"."' || table_name || '"') > 107374182400
+	-- 100GB in bytes
+order by
+	size_bytes desc)
+    insert
+	into
+	health_results
+   select
+	'HIGH' as severity,
+	'Table Maintenance' as category,
+	'Tables larger than 100GB' as check_name,
+	ts.table_schema || '"."' || ts.table_name as object_name,
+	'The following table' as description,
+	 ts.size_pretty as current_value,
+	'I suggest looking into partitioning tables. Do you need all of this data? Can some of it be archived into something like S3?' as recommended_action,
+	'https://www.heroku.com/blog/handling-very-large-tables-in-postgres-using-partitioning/' as documentation_link,
+	2 as severity_order
+from
+	ts;
 -- HIGH: Duplicate or redundant indexes
     insert
 	into
@@ -484,6 +514,35 @@ group by
 	9
 having
 	COUNT(*) > 50;
+-- MEDIUM: Tables larger than 50GB
+with ts as (
+select
+	table_schema,
+	table_name,
+	pg_relation_size('"' || table_schema || '"."' || table_name || '"') as size_bytes,
+	pg_size_pretty(pg_relation_size('"' || table_schema || '"."' || table_name || '"')) as size_pretty
+from
+	information_schema.tables
+where
+	table_type = 'BASE TABLE'
+	and pg_relation_size('"' || table_schema || '"."' || table_name || '"') between 53687091200 and 107374182400
+order by
+	size_bytes desc)
+insert
+	into
+	health_results
+   select
+	'MEDIUM' as severity,
+	'Table Maintenance' as category,
+	'Tables larger than 100GB' as check_name,
+	ts.table_schema || '"."' || ts.table_name as object_name,
+	'The following table' as description,
+	 ts.size_pretty as current_value,
+	'Tables larger than 50GB should be monitored and reviewed if a data archiving or removal process should be implemented. I suggest looking into partitioning tables, if possible.' as recommended_action,
+	'https://www.heroku.com/blog/handling-very-large-tables-in-postgres-using-partitioning/' as documentation_link,
+	3 as severity_order
+from
+	ts;
 -- MEDIUM: Queries running longer than 5 minutes
     insert
 	into
@@ -622,6 +681,9 @@ from
 select
 	current_setting('log_directory') as log_directory
     )
+    insert
+	into
+	health_results
     select
 	'INFO' as severity,
 	'System Info' as category,
@@ -646,6 +708,9 @@ from
 	pg_ls_dir(current_setting('log_directory')) as logs
 cross join lateral
 	      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
+insert
+	into
+	health_results
 select
 	'INFO' as severity,
 	'System Info' as category,

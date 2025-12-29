@@ -5,7 +5,7 @@ Easy-to-deploy, open source PostgreSQL function (and view!) that provides a prio
 ## Features
 
 - **Zero Dependencies** - Single SQL function, no external tools required
-- **Detailed Checks** - 12 (and growing!) built-in health checks covering critical performance and stability issues
+- **Detailed Checks** - built-in health checks covering critical performance and stability issues
 - **Prioritized Results** - Issues ranked by severity (CRITICAL → HIGH → MEDIUM → LOW → INFO)
 - **Actionable Recommendations** - Each issue includes specific remediation steps
 - **Documentation Links** - Direct links to official PostgreSQL documentation for deeper learning

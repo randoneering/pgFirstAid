@@ -348,6 +348,40 @@ join pg_indexes i2 on
 	and i1.indexdef = i2.indexdef
 where
 	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%']);
+-- HIGH: Table with more than 200 columns
+with cc as (
+select
+	table_schema,
+	table_name,
+	COUNT(*) as column_count
+from
+	information_schema.columns
+where
+	table_schema not in ('pg_catalog', 'information_schema')
+group by
+	table_schema,
+	table_name
+order by
+	column_count desc)
+insert
+	into
+	health_results
+select
+	'HIGH' as severity,
+	'Table Maintenance' as category,
+	'Table with more than 200 columns' as check_name,
+	 cc.table_schema || '.' || cc.table_name as object_name,
+	'Postgres has a hard 1600 column limit, but that also includes columns you have dropped. Continuing to widen your table can impact performance.' as issue_description,
+	 cc.column_count as current_value,
+	'Yikes-it is about time you put a hard stop on widing your tables and begin breaking this table into several tables. I once worked on a table with over 300 columns before.......' as recommended_action,
+	'https://www.tigerdata.com/learn/designing-your-database-schema-wide-vs-narrow-postgres-tables \
+	 https://nerderati.com/postgresql-tables-can-have-at-most-1600-columns \
+     https://www.postgresql.org/docs/current/limits.html' as documentation_link,
+	2 as severity_order
+from
+	cc
+where
+	cc.column_count > 200;
 -- MEDIUM: Tables with outdated statistics
     insert
 	into
@@ -485,6 +519,40 @@ from
 where
 	seq_scan > 1000
 	and seq_tup_read > seq_scan * 10000;
+-- MEDIUM: Table with more than 50 columns
+with cc as (
+select
+	table_schema,
+	table_name,
+	COUNT(*) as column_count
+from
+	information_schema.columns tc
+where
+	table_schema not in ('pg_catalog', 'information_schema')
+group by
+	table_schema,
+	table_name
+order by
+	column_count desc)
+insert
+	into
+	health_results
+select
+	'MEDIUM' as severity,
+	'Table Maintenance' as category,
+	'Table with more than 50 columns' as check_name,
+	 cc.table_schema || '.' || cc.table_name as object_name,
+	'Postgres has a hard 1600 column limit, but that also includes columns you have dropped. Continuing to widen your table can impact performance.' as issue_description,
+	 cc.column_count as current_value,
+	'The most straightforward recommendation is to split your table into more tables connected via foreign keys. However, your situation may very based on the type of data stored. Consider the documentation links to learn more.' as recommended_action,
+	'https://www.tigerdata.com/learn/designing-your-database-schema-wide-vs-narrow-postgres-tables \
+	 https://nerderati.com/postgresql-tables-can-have-at-most-1600-columns \
+     https://www.postgresql.org/docs/current/limits.html' as documentation_link,
+	3 as severity_order
+from
+	cc
+where
+	cc.column_count between 50 and 199;
 -- MEDIUM: Connection and lock monitoring
     insert
 	into

@@ -29,7 +29,7 @@ begin
 	health_results
     select
 	'CRITICAL' as severity,
-	'Table Structure' as category,
+	'Table Health' as category,
 	'Missing Primary Key' as check_name,
 	quote_ident(pt.schemaname) || '.' || quote_ident(tablename) as object_name,
 	'Table missing a primary key, which can cause replication issues and/or poor performance' as issue_description,
@@ -61,7 +61,7 @@ where
 	health_results
 	select
 	'CRITICAL' as severity,
-	'Index Management' as category,
+	'Table Health' as category,
 	'Unused Large Index' as check_name,
 	quote_ident(psi.schemaname) || '.' || quote_ident(psio.indexrelname) as object_name,
 	'Large unused index consuming disk space and potentially impacting write performance' as issue_description,
@@ -255,7 +255,7 @@ with q as (
 ) as s3)
 select
 	'HIGH' as severity,
-	'Table Maintenance' as category,
+	'Table Health' as category,
 	'Table Bloat (Detailed)' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(tblname) as object_name,
 	'Table has significant bloat (>50%) affecting performance and storage' as issue_description,
@@ -281,7 +281,7 @@ order by
 	health_results
     select
 	'HIGH' as severity,
-	'Statistics' as category,
+	'Table Health' as category,
 	'Missing Statistics' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
 	'Table has never been analyzed, query planner missing statistics' as issue_description,
@@ -315,7 +315,7 @@ order by
 	health_results
    select
 	'HIGH' as severity,
-	'Table Maintenance' as category,
+	'Table Health' as category,
 	'Tables larger than 100GB' as check_name,
 	ts.table_schema || '"."' || ts.table_name as object_name,
 	'The following table' as description,
@@ -331,7 +331,7 @@ from
 	health_results
     select
 	'HIGH' as severity,
-	'Index Optimization' as category,
+	'Table Health' as category,
 	'Duplicate Index' as check_name,
 	quote_ident(i1.schemaname) || '.' || i1.indexname || ' & ' || i2.indexname as object_name,
 	'Multiple indexes with identical or overlapping column sets' as issue_description,
@@ -368,7 +368,7 @@ insert
 	health_results
 select
 	'HIGH' as severity,
-	'Table Maintenance' as category,
+	'Table Health' as category,
 	'Table with more than 200 columns' as check_name,
 	 cc.table_schema || '.' || cc.table_name as object_name,
 	'Postgres has a hard 1600 column limit, but that also includes columns you have dropped. Continuing to widen your table can impact performance.' as issue_description,
@@ -452,7 +452,7 @@ insert
     )
     select
 	'MEDIUM' as severity,
-	'Statistics' as category,
+	'Table Health' as category,
 	'Outdated Statistics' as check_name,
 	quote_ident(nspname) || '.' || quote_ident(relname) as object_name,
 	'Table statistics are outdated, which can lead to poor query plans' as issue_description,
@@ -482,7 +482,7 @@ order by
 	health_results
     select
 	'MEDIUM' as severity,
-	'Index Performance' as category,
+	'Table Health' as category,
 	'Low Index Efficiency' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(indexrelname) as object_name,
 	'Index has low scan to tuple read ratio indicating poor selectivity' as issue_description,
@@ -543,7 +543,7 @@ order by
 	health_results
     select
 	'MEDIUM' as severity,
-	'Query Performance' as category,
+	'Query Health' as category,
 	'Excessive Sequential Scans' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
 	'Table has high sequential scan activity, may benefit from additional indexes' as issue_description,
@@ -576,7 +576,7 @@ insert
 	health_results
 select
 	'MEDIUM' as severity,
-	'Table Maintenance' as category,
+	'Table Health' as category,
 	'Table with more than 50 columns' as check_name,
 	 cc.table_schema || '.' || cc.table_name as object_name,
 	'Postgres has a hard 1600 column limit, but that also includes columns you have dropped. Continuing to widen your table can impact performance.' as issue_description,
@@ -638,7 +638,7 @@ insert
 	health_results
    select
 	'MEDIUM' as severity,
-	'Table Maintenance' as category,
+	'Table Health' as category,
 	'Tables larger than 100GB' as check_name,
 	ts.table_schema || '"."' || ts.table_name as object_name,
 	'The following table' as description,
@@ -654,7 +654,7 @@ from
 	health_results
     select
 	'MEDIUM' as severity,
-	'Query Performance' as category,
+	'Query Health' as category,
 	'Long Running Queries' as check_name,
 	concat_ws(' | ',
             'pid: ' || pgs.pid::text,
@@ -681,7 +681,7 @@ order by
 	health_results
     select
 	'LOW' as severity,
-	'Index Recommendations' as category,
+	'Table Health' as category,
 	'Missing FK Index' as check_name,
 	n.nspname || '.' || t.relname || '.' || string_agg(a.attname, ', ') as object_name,
 	'Foreign key constraint missing supporting index for efficient joins' as issue_description,

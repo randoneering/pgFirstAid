@@ -270,7 +270,7 @@ from
 	q
 where
 	bloat_pct > 50.0
-	and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+    and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 order by
 	quote_ident(schemaname),
 	quote_ident(tblname);
@@ -318,43 +318,6 @@ join pg_indexes i2 on
 	and i1.indexdef = i2.indexdef
 where
 	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%']);
--- MEDIUM: Blocked and Blocking Queries
-with bq as (
-select
-	blocked.pid as blocked_pid,
-	blocked.query as blocked_query,
-	blocking.pid as blocking_pid,
-	blocking.query as blocking_query,
-	now() - blocked.query_start as blocked_duration
-from
-	pg_locks blocked_locks
-join pg_stat_activity blocked on
-	blocked.pid = blocked_locks.pid
-join pg_locks blocking_locks
-on
-	blocking_locks.transactionid = blocked_locks.transactionid
-	and blocking_locks.pid != blocked_locks.pid
-join pg_stat_activity blocking on
-	blocking.pid = blocking_locks.pid
-where
-	not blocked_locks.granted)
-insert
-	into
-	health_results
-select
-	'MEDIUM' as severity,
-	'Query Health' as category,
-	'Current Blocked/Blocking Queries' as check_name,
-	'Blocked PID: ' || bq.blocked_pid || chr(10) ||
-    'Blocked Query: ' || bq.blocked_query as object_name,
-	'The following query is being blocked by an already running query' as issue_description,
-	'Blocking PID: ' || bq.blocking_pid || chr(10) ||
-	'Blocking Query: ' || bq.blocking_query as current_value,
-	'Blocked queries are part of concurrency behavior. However, it is always recommended to monitor long running blocking queries. The Crunchy Data article recommended has an excellent walk through and suggested steps on how to tackle unnecessary blocking queries' as recommended_action,
-	'https://www.postgresql.org/docs/current/explicit-locking.html' as documentation_link,
-	3 as severity_order
-from
-	bq
 -- MEDIUM: Tables with outdated statistics
     insert
 	into

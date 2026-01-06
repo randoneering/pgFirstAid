@@ -38,42 +38,42 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 
 ### CRITICAL Issues
 
-**Missing Primary Keys** - Tables without primary keys that can cause replication issues and poor performance
-**Unused Large Indexes** - Indexes consuming significant disk space but never used (>10MB, 0 scans)
+- **Missing Primary Keys** - Tables without primary keys that can cause replication issues and poor performance
+- **Unused Large Indexes** - Indexes consuming significant disk space but never used (>10MB, 0 scans)
 
 ### HIGH Priority Issues
 
-**Table Bloat** - Tables with >20% bloat affecting performance (tables >100MB)
-**Missing Statistics** - Tables never analyzed, leaving the query planner without statistics
-**Duplicate Indexes** - Multiple indexes with identical or overlapping column sets
-**Inactive Replication Slots** - Identifies replication slots that are inactive and can be removed if no longer needed
-**Tables Larger Than 100GB** - Identifies tables that are larger than 100GB
-**Tables With More Than 200 Columns** - List tables with more than 200 columns. You should probably look into those...
+- **Table Bloat** - Tables with >20% bloat affecting performance (tables >100MB)
+- **Missing Statistics** - Tables never analyzed, leaving the query planner without statistics
+- **Duplicate Indexes** - Multiple indexes with identical or overlapping column sets
+- **Inactive Replication Slots** - Identifies replication slots that are inactive and can be removed if no longer needed
+- **Tables Larger Than 100GB** - Identifies tables that are larger than 100GB
+- **Tables With More Than 200 Columns** - List tables with more than 200 columns. You should probably look into those...
 
 ### MEDIUM Priority Issues
 
-**Outdated Statistics** - Table statistics older than 7 days with significant modifications
-**Low Index Efficiency** - Indexes with poor selectivity (scan-to-tuple ratio >1000)
-**Excessive Sequential Scans** - Tables with high sequential scan activity that may benefit from indexes
-**High Connection Count** - More than 50 active connections potentially impacting performance
-**Replication Slots With High WAL Retention** - Replication slots that have 90% of max wal setting
-**Long Running Queries** - Queries that have been running for 5 minutes or more
-**Blocked and Blocking Queries** - Queries that are currently blocked or blocking other queries at the time you run pg_firstAid
-**Tables With More Than 50 Columns** - List tables with more than 50 columns (but less than 200)
-**Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
+- **Outdated Statistics** - Table statistics older than 7 days with significant modifications
+- **Low Index Efficiency** - Indexes with poor selectivity (scan-to-tuple ratio >1000)
+- **Excessive Sequential Scans** - Tables with high sequential scan activity that may benefit from indexes
+- **High Connection Count** - More than 50 active connections potentially impacting performance
+- **Replication Slots With High WAL Retention** - Replication slots that have 90% of max wal setting
+- **Long Running Queries** - Queries that have been running for 5 minutes or more
+- **Blocked and Blocking Queries** - Queries that are currently blocked or blocking other queries at the time you run pg_firstAid
+- **Tables With More Than 50 Columns** - List tables with more than 50 columns (but less than 200)
+- **Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
 
 ### LOW Priority Issues
 
-**Missing Foreign Key Indexes** - Foreign key constraints without supporting indexes for efficient joins
+- **Missing Foreign Key Indexes** - Foreign key constraints without supporting indexes for efficient joins
 
 ### INFORMATIONAL
 
-**Database Size** - Current database size and growth monitoring
-**PostgreSQL Version** - Version information and configuration details
-**Installed Extensions** - Lists installed extensions on the Server
-**Server Uptime** - Server uptime since last restart
-**Log Directory** - Location of Log File(s). Results will vary for managed services like AWS RDS. (note: need access to AWS/Azure/GCP environments where I can test against!)
-**Log File Sizes** - The size of the log files. Again, this will vary for managed services. 
+- **Database Size** - Current database size and growth monitoring
+- **PostgreSQL Version** - Version information and configuration details
+- **Installed Extensions** - Lists installed extensions on the Server
+- **Server Uptime** - Server uptime since last restart
+- **Log Directory** - Location of Log File(s). Results will vary for managed services like AWS RDS. (note: need access to AWS/Azure/GCP environments where I can test against!)
+- **Log File Sizes** - The size of the log files. Again, this will vary for managed services. 
 
 ## Usage Tips
 

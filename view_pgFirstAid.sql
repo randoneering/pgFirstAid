@@ -1,9 +1,10 @@
 create or replace
 view v_pgfirstAid as
+
 -- CRITICAL: Tables without primary keys
-select
+    select
 	'CRITICAL' as severity,
-	'Table Structure' as category,
+	'Table Health' as category,
 	'Missing Primary Key' as check_name,
 	quote_ident(pt.schemaname) || '.' || quote_ident(tablename) as object_name,
 	'Table missing a primary key, which can cause replication issues and/or poor performance' as issue_description,
@@ -29,11 +30,11 @@ where
 		and n.nspname = pt.schemaname
 		and c.relname = pt.tablename
     )
-union all
+    union all
 -- CRITICAL: Unused indexes consuming significant space
-select
+	select
 	'CRITICAL' as severity,
-	'Index Management' as category,
+	'Table Health' as category,
 	'Unused Large Index' as check_name,
 	quote_ident(psi.schemaname) || '.' || quote_ident(psio.indexrelname) as object_name,
 	'Large unused index consuming disk space and potentially impacting write performance' as issue_description,
@@ -48,21 +49,11 @@ join pg_statio_user_indexes psio on
 where
 	idx_scan = 0
 	and pg_relation_size(psi.indexrelid) > 104857600
-	-- 100MB
+-- 100MB
 union all
+
 -- HIGH: Inactive Replication slots
-    select
-	'HIGH' as severity,
-	'Replication Health' as category,
-	'Inactive Replication Slots' as check_name,
-	'Slot name:' || slot_name as object_name,
-	'Target replication slot is inactive' as issue_description,
-	'Retained wal:' || retained_wal || ' database:' || database as current_value,
-	'If the replication slot is no longer needed, drop the slot' as recommended_action,
-	'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
-	2 as severity_order
-from
-	(
+(with q as (
 	select
 		slot_name,
 		plugin,
@@ -84,56 +75,55 @@ from
 		pg_replication_slots
 	where
 		'status' = 'inactive'
-	order by
-		slot_name
-    ) as q
-
-union all
--- HIGH: Tables with high bloat
-select
+    )
+    select
 	'HIGH' as severity,
-	'Table Maintenance' as category,
-	'Table Bloat (Detailed)' as check_name,
-	quote_ident(q.schemaname) || '.' || quote_ident(q.tblname) as object_name,
-	'Table has significant bloat (>50%) affecting performance and storage' as issue_description,
-	'Real size: ' || pg_size_pretty(q.real_size::bigint) ||
-    ', Bloat: ' || pg_size_pretty(q.bloat_size::bigint) ||
-    ' (' || ROUND(q.bloat_pct::numeric, 2) || '%)' as current_value,
-	'Run VACUUM FULL to reclaim space' as recommended_action,
-	'https://www.postgresql.org/docs/current/sql-vacuum.html, https://github.com/ioguix/pgsql-bloat-estimation/' as documentation_link,
+	'Replication Health' as category,
+	'Inactive Replication Slots' as check_name,
+	'Slot name:' || slot_name as object_name,
+	'Target replication slot is inactive' as issue_description,
+	'Retained wal:' || retained_wal || ' database:' || database as current_value,
+	'If the replication slot is no longer needed, drop the slot' as recommended_action,
+	'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
 	2 as severity_order
 from
-	(
+	q
+order by
+	slot_name)
+union all
+-- credit: https://www.morling.dev/blog/mastering-postgres-replication-slots/ -- Thank you Gunnar Morling!
+-- HIGH: Tables with high bloat
+(with q as (
 	select
 		current_database(),
 		schemaname,
 		tblname,
 		bs * tblpages as real_size,
-		(tblpages-est_tblpages) * bs as extra_size,
+		(tblpages-est_tblpages)* bs as extra_size,
 		case
 			when tblpages > 0
 				and tblpages - est_tblpages > 0
-            then 100 * (tblpages - est_tblpages) / tblpages::float
+    then 100 * (tblpages - est_tblpages)/ tblpages::float
 				else 0
 			end as extra_pct,
 			fillfactor,
 			case
 				when tblpages - est_tblpages_ff > 0
-            then (tblpages-est_tblpages_ff) * bs
+    then (tblpages-est_tblpages_ff)* bs
 				else 0
 			end as bloat_size,
 			case
 				when tblpages > 0
 					and tblpages - est_tblpages_ff > 0
-            then 100 * (tblpages - est_tblpages_ff) / tblpages::float
+    then 100 * (tblpages - est_tblpages_ff)/ tblpages::float
 					else 0
 				end as bloat_pct,
 				is_na
 			from
 				(
 				select
-					ceil(reltuples / ((bs-page_hdr) / tpl_size)) + ceil(toasttuples / 4) as est_tblpages,
-					ceil(reltuples / ((bs-page_hdr) * fillfactor / (tpl_size * 100))) + ceil(toasttuples / 4) as est_tblpages_ff,
+					ceil( reltuples / ( (bs-page_hdr)/ tpl_size ) ) + ceil( toasttuples / 4 ) as est_tblpages,
+					ceil( reltuples / ( (bs-page_hdr)* fillfactor /(tpl_size * 100) ) ) + ceil( toasttuples / 4 ) as est_tblpages_ff,
 					tblpages,
 					fillfactor,
 					bs,
@@ -146,16 +136,16 @@ from
 				from
 					(
 					select
-						(4 + tpl_hdr_size + tpl_data_size + (2 * ma)
-                - case
+						( 4 + tpl_hdr_size + tpl_data_size + (2 * ma)
+        - case
 							when tpl_hdr_size%ma = 0 then ma
 							else tpl_hdr_size%ma
 						end
-                - case
+        - case
 							when ceil(tpl_data_size)::int%ma = 0 then ma
 							else ceil(tpl_data_size)::int%ma
 						end
-                ) as tpl_size,
+      ) as tpl_size,
 						bs - page_hdr as size_per_block,
 						(heappages + toastpages) as tblpages,
 						heappages,
@@ -180,24 +170,24 @@ from
 							coalesce(toast.relpages, 0) as toastpages,
 							coalesce(toast.reltuples, 0) as toasttuples,
 							coalesce(substring(
-                        array_to_string(tbl.reloptions, ' ')
-                        from 'fillfactor=([0-9]+)')::smallint, 100) as fillfactor,
+          array_to_string(tbl.reloptions, ' ')
+          from 'fillfactor=([0-9]+)')::smallint, 100) as fillfactor,
 							current_setting('block_size')::numeric as bs,
 							case
-								when version() ~ 'mingw32'
-									or version() ~ '64-bit|x86_64|ppc64|ia64|amd64' then 8
+								when version()~ 'mingw32'
+									or version()~ '64-bit|x86_64|ppc64|ia64|amd64' then 8
 									else 4
 								end as ma,
 								24 as page_hdr,
 								23 + case
-									when MAX(coalesce(s.null_frac, 0)) > 0 then (7 + count(s.attname)) / 8
+									when MAX(coalesce(s.null_frac, 0)) > 0 then ( 7 + count(s.attname) ) / 8
 									else 0::int
 								end
-                    + case
+           + case
 									when bool_or(att.attname = 'oid' and att.attnum < 0) then 4
 									else 0
 								end as tpl_hdr_size,
-								sum((1-coalesce(s.null_frac, 0)) * coalesce(s.avg_width, 0)) as tpl_data_size,
+								sum( (1-coalesce(s.null_frac, 0)) * coalesce(s.avg_width, 0) ) as tpl_data_size,
 								bool_or(att.atttypid = 'pg_catalog.name'::regtype)
 									or sum(case when att.attnum > 0 then 1 else 0 end) <> count(s.attname) as is_na
 								from
@@ -227,19 +217,39 @@ from
 									8,
 									9,
 									10
-            ) as s
-        ) as s2
-    ) as s3
-) as q
-
-where
-	q.bloat_pct > 50.0
-	and q.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
-union all
--- HIGH: Tables never analyzed
+								order by
+									2,
+									3
+    ) as s
+  ) as s2
+) as s3)
 select
 	'HIGH' as severity,
-	'Statistics' as category,
+	'Table Health' as category,
+	'Table Bloat (Detailed)' as check_name,
+	quote_ident(schemaname) || '.' || quote_ident(tblname) as object_name,
+	'Table has significant bloat (>50%) affecting performance and storage' as issue_description,
+	'Real size: ' || pg_size_pretty(real_size::bigint) ||
+    ', Bloat: ' || pg_size_pretty(bloat_size::bigint) ||
+    ' (' || ROUND(bloat_pct::numeric, 2) || '%)' as current_value,
+	'Run VACUUM FULL to reclaim space' as recommended_action,
+	'https://www.postgresql.org/docs/current/sql-vacuum.html,
+    https://github.com/ioguix/pgsql-bloat-estimation/' as documentation_link,
+	2 as severity_order
+from
+	q
+where
+	bloat_pct > 50.0
+	and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+order by
+	quote_ident(schemaname),
+	quote_ident(tblname))
+union all
+--Credit: https://github.com/ioguix/pgsql-bloat-estimation -- Jehan-Guillaume (ioguix) de Rorthais!
+-- HIGH: Tables never analyzed
+    select
+	'HIGH' as severity,
+	'Table Health' as category,
 	'Missing Statistics' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
 	'Table has never been analyzed, query planner missing statistics' as issue_description,
@@ -254,10 +264,38 @@ where
 	and last_autoanalyze is null
 	and n_tup_ins + n_tup_upd + n_tup_del > 1000
 union all
--- HIGH: Duplicate or redundant indexes
+-- HIGH: Tables larger than 100GB
+(with ts as (
 select
+	table_schema,
+	table_name,
+	pg_relation_size('"' || table_schema || '"."' || table_name || '"') as size_bytes,
+	pg_size_pretty(pg_relation_size('"' || table_schema || '"."' || table_name || '"')) as size_pretty
+from
+	information_schema.tables
+where
+	table_type = 'BASE TABLE'
+	and pg_relation_size('"' || table_schema || '"."' || table_name || '"') > 107374182400
+	-- 100GB in bytes
+order by
+	size_bytes desc)
+   select
 	'HIGH' as severity,
-	'Index Optimization' as category,
+	'Table Health' as category,
+	'Tables larger than 100GB' as check_name,
+	ts.table_schema || '"."' || ts.table_name as object_name,
+	'The following table' as description,
+	 ts.size_pretty as current_value,
+	'I suggest looking into partitioning tables. Do you need all of this data? Can some of it be archived into something like S3?' as recommended_action,
+	'https://www.heroku.com/blog/handling-very-large-tables-in-postgres-using-partitioning/' as documentation_link,
+	2 as severity_order
+from
+	ts)
+union all
+-- HIGH: Duplicate or redundant indexes
+    select
+	'HIGH' as severity,
+	'Table Health' as category,
 	'Duplicate Index' as check_name,
 	quote_ident(i1.schemaname) || '.' || i1.indexname || ' & ' || i2.indexname as object_name,
 	'Multiple indexes with identical or overlapping column sets' as issue_description,
@@ -275,36 +313,92 @@ join pg_indexes i2 on
 where
 	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 union all
--- MEDIUM: Tables with outdated statistics
+-- HIGH: Table with more than 200 columns
+(with cc as (
+select
+	table_schema,
+	table_name,
+	COUNT(*) as column_count
+from
+	information_schema.columns
+where
+	table_schema not in ('pg_catalog', 'information_schema')
+group by
+	table_schema,
+	table_name
+order by
+	column_count desc)
+select
+	'HIGH' as severity,
+	'Table Health' as category,
+	'Table with more than 200 columns' as check_name,
+	 cc.table_schema || '.' || cc.table_name as object_name,
+	'Postgres has a hard 1600 column limit, but that also includes columns you have dropped. Continuing to widen your table can impact performance.' as issue_description,
+	 cc.column_count::text as current_value,
+	'Yikes-it is about time you put a hard stop on widing your tables and begin breaking this table into several tables. I once worked on a table with over 300 columns before.......' as recommended_action,
+	'https://www.tigerdata.com/learn/designing-your-database-schema-wide-vs-narrow-postgres-tables \
+	 https://nerderati.com/postgresql-tables-can-have-at-most-1600-columns \
+     https://www.postgresql.org/docs/current/limits.html' as documentation_link,
+	2 as severity_order
+from
+	cc
+where
+	cc.column_count > 200)
+union all
+-- MEDIUM: Blocked and Blocking Queries
+(with bq as (
+select
+	blocked.pid as blocked_pid,
+	blocked.query as blocked_query,
+	blocking.pid as blocking_pid,
+	blocking.query as blocking_query,
+	now() - blocked.query_start as blocked_duration
+from
+	pg_locks blocked_locks
+join pg_stat_activity blocked on
+	blocked.pid = blocked_locks.pid
+join pg_locks blocking_locks
+on
+	blocking_locks.transactionid = blocked_locks.transactionid
+	and blocking_locks.pid != blocked_locks.pid
+join pg_stat_activity blocking on
+	blocking.pid = blocking_locks.pid
+where
+	not blocked_locks.granted)
 select
 	'MEDIUM' as severity,
-	'Statistics' as category,
-	'Outdated Statistics' as check_name,
-	quote_ident(tt.nspname) || '.' || quote_ident(tt.relname) as object_name,
-	'Table statistics are outdated, which can lead to poor query plans' as issue_description,
-	'Dead tuples: ' || tt.n_dead_tup || ' (threshold: ' || round(tt.v_threshold) || '), ' ||
-    'Modifications since analyze: ' || tt.n_mod_since_analyze || ' (threshold: ' || round(tt.a_threshold) || ')' as current_value,
-	case
-		when tt.n_dead_tup > tt.v_threshold
-		and tt.n_mod_since_analyze > tt.a_threshold then 'Run VACUUM ANALYZE'
-		when tt.n_dead_tup > tt.v_threshold then 'Run VACUUM'
-		when tt.n_mod_since_analyze > tt.a_threshold then 'Run ANALYZE'
-	end as recommended_action,
-	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM, https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
+	'Query Health' as category,
+	'Current Blocked/Blocking Queries' as check_name,
+	'Blocked PID: ' || bq.blocked_pid || chr(10) ||
+    'Blocked Query: ' || bq.blocked_query as object_name,
+	'The following query is being blocked by an already running query' as issue_description,
+	'Blocking PID: ' || bq.blocking_pid || chr(10) ||
+	'Blocking Query: ' || bq.blocking_query as current_value,
+	'Blocked queries are part of concurrency behavior. However, it is always recommended to monitor long running blocking queries. The Crunchy Data article recommended has an excellent walk through and suggested steps on how to tackle unnecessary blocking queries' as recommended_action,
+	'https://www.postgresql.org/docs/current/explicit-locking.html' as documentation_link,
 	3 as severity_order
 from
-	(
+	bq)
+union all
+-- MEDIUM: Tables with outdated statistics
+(with s as (
+	select
+		current_setting('autovacuum_analyze_scale_factor')::float8 as analyze_factor,
+		current_setting('autovacuum_analyze_threshold')::float8 as analyze_threshold,
+		current_setting('autovacuum_vacuum_scale_factor')::float8 as vacuum_factor,
+		current_setting('autovacuum_vacuum_threshold')::float8 as vacuum_threshold
+    ),
+	tt as (
 	select
 		n.nspname,
 		c.relname,
 		c.oid as relid,
 		t.n_dead_tup,
 		t.n_mod_since_analyze,
-		c.reltuples * current_setting('autovacuum_vacuum_scale_factor')::float8 +
-            current_setting('autovacuum_vacuum_threshold')::float8 as v_threshold,
-		c.reltuples * current_setting('autovacuum_analyze_scale_factor')::float8 +
-            current_setting('autovacuum_analyze_threshold')::float8 as a_threshold
+		c.reltuples * s.vacuum_factor + s.vacuum_threshold as v_threshold,
+		c.reltuples * s.analyze_factor + s.analyze_threshold as a_threshold
 	from
+		s,
 		pg_class c
 	join pg_namespace n on
 		c.relnamespace = n.oid
@@ -313,15 +407,38 @@ from
 	where
 		c.relkind = 'r'
 		and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
-) tt
-where
-	tt.n_dead_tup > tt.v_threshold
-	or tt.n_mod_since_analyze > tt.a_threshold
-union all
--- MEDIUM: Low index usage efficiency
-select
+    )
+    select
 	'MEDIUM' as severity,
-	'Index Performance' as category,
+	'Table Health' as category,
+	'Outdated Statistics' as check_name,
+	quote_ident(nspname) || '.' || quote_ident(relname) as object_name,
+	'Table statistics are outdated, which can lead to poor query plans' as issue_description,
+	'Dead tuples: ' || n_dead_tup || ' (threshold: ' || round(v_threshold) || '), ' ||
+        'Modifications since analyze: ' || n_mod_since_analyze || ' (threshold: ' || round(a_threshold) || ')' as current_value,
+	case
+		when n_dead_tup > v_threshold
+		and n_mod_since_analyze > a_threshold then 'Run VACUUM ANALYZE'
+		when n_dead_tup > v_threshold then 'Run VACUUM'
+		when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
+	end as recommended_action,
+	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM,
+        https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
+	3 as severity_order
+from
+	tt
+where
+	n_dead_tup > v_threshold
+	or n_mod_since_analyze > a_threshold
+order by
+	nspname,
+	relname)
+union all
+-- credit: https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed -- Thanks depesz!
+-- MEDIUM: Low index usage efficiency
+    select
+	'MEDIUM' as severity,
+	'Table Health' as category,
 	'Low Index Efficiency' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(indexrelname) as object_name,
 	'Index has low scan to tuple read ratio indicating poor selectivity' as issue_description,
@@ -336,36 +453,8 @@ where
 	idx_scan > 100
 	and idx_tup_read::numeric / nullif(idx_scan, 0) > 1000
 union all
--- MEDIUM: Large sequential scans
-select
-	'MEDIUM' as severity,
-	'Query Performance' as category,
-	'Excessive Sequential Scans' as check_name,
-	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
-	'Table has high sequential scan activity, may benefit from additional indexes' as issue_description,
-	'Sequential scans: ' || seq_scan || ', Tuples read: ' || seq_tup_read as current_value,
-	'Analyze query patterns and consider adding appropriate indexes' as recommended_action,
-	'https://www.postgresql.org/docs/current/using-explain.html' as documentation_link,
-	3 as severity_order
-from
-	pg_stat_user_tables
-where
-	seq_scan > 1000
-	and seq_tup_read > seq_scan * 10000
-union all
 -- MEDIUM: Replication slots with high wal retation (90% of max wal)
-select
-		'MEDIUM' as severity,
-		'Replication Health' as category,
-		'Replication Slots Near Max Wal Size' as check_name,
-		'Slot name:' || slot_name as object_name,
-		'Target replication slot has retained close to 90% of the max wal size' as issue_description,
-		'Retained wal:' || retained_wal || ' safe_wal_size:' || safe_wal_size as current_value,
-		'Consider implementing a heartbeat table or using pg_logical_emit_message()' as recommended_action,
-		'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
-		3 as severity_order
-from
-	(
+(with q as (
 	select
 		slot_name,
 		plugin,
@@ -387,13 +476,73 @@ from
 		pg_replication_slots
 	where
 		pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) >= (safe_wal_size * 0.9)
-	order by
-		slot_name
-) as q
-
+)
+select
+		'MEDIUM' as severity,
+		'Replication Health' as category,
+		'Replication Slots Near Max Wal Size' as check_name,
+		'Slot name:' || slot_name as object_name,
+		'Target replication slot has retained close to 90% of the max wal size' as issue_description,
+		'Retained wal:' || retained_wal || ' safe_wal_size:' || safe_wal_size as current_value,
+		'Consider implementing a heartbeat table or using pg_logical_emit_message()' as recommended_action,
+		'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
+		3 as severity_order
+from
+		q
+order by
+		slot_name)
+union all
+-- MEDIUM: Large sequential scans
+    select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Excessive Sequential Scans' as check_name,
+	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
+	'Table has high sequential scan activity, may benefit from additional indexes' as issue_description,
+	'Sequential scans: ' || seq_scan || ', Tuples read: ' || seq_tup_read as current_value,
+	'Analyze query patterns and consider adding appropriate indexes' as recommended_action,
+	'https://www.postgresql.org/docs/current/using-explain.html' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_user_tables
+where
+	seq_scan > 1000
+	and seq_tup_read > seq_scan * 10000
+union all
+-- MEDIUM: Table with more than 50 columns
+(with cc as (
+select
+	table_schema,
+	table_name,
+	COUNT(*) as column_count
+from
+	information_schema.columns tc
+where
+	table_schema not in ('pg_catalog', 'information_schema')
+group by
+	table_schema,
+	table_name
+order by
+	column_count desc)
+select
+	'MEDIUM' as severity,
+	'Table Health' as category,
+	'Table with more than 50 columns' as check_name,
+	 cc.table_schema || '.' || cc.table_name as object_name,
+	'Postgres has a hard 1600 column limit, but that also includes columns you have dropped. Continuing to widen your table can impact performance.' as issue_description,
+	 cc.column_count::text as current_value,
+	'The most straightforward recommendation is to split your table into more tables connected via foreign keys. However, your situation may very based on the type of data stored. Consider the documentation links to learn more.' as recommended_action,
+	'https://www.tigerdata.com/learn/designing-your-database-schema-wide-vs-narrow-postgres-tables \
+	 https://nerderati.com/postgresql-tables-can-have-at-most-1600-columns \
+     https://www.postgresql.org/docs/current/limits.html' as documentation_link,
+	3 as severity_order
+from
+	cc
+where
+	cc.column_count between 50 and 199)
 union all
 -- MEDIUM: Connection and lock monitoring
-select
+    select
 	'MEDIUM' as severity,
 	'System Health' as category,
 	'High Connection Count' as check_name,
@@ -408,30 +557,57 @@ from
 where
 	state = 'active'
 group by
-	severity,
-	category,
-	check_name,
-	object_name,
-	issue_description,
-	recommended_action,
-	documentation_link,
-	severity_order
+	1,
+	2,
+	3,
+	4,
+	5,
+	7,
+	8,
+	9
 having
 	COUNT(*) > 50
 union all
--- MEDIUM: Queries running longer than 5 minutes
+-- MEDIUM: Tables larger than 50GB
+(with ts as (
 select
+	table_schema,
+	table_name,
+	pg_relation_size('"' || table_schema || '"."' || table_name || '"') as size_bytes,
+	pg_size_pretty(pg_relation_size('"' || table_schema || '"."' || table_name || '"')) as size_pretty
+from
+	information_schema.tables
+where
+	table_type = 'BASE TABLE'
+	and pg_relation_size('"' || table_schema || '"."' || table_name || '"') between 53687091200 and 107374182400
+order by
+	size_bytes desc)
+   select
 	'MEDIUM' as severity,
-	'Query Performance' as category,
+	'Table Health' as category,
+	'Tables larger than 100GB' as check_name,
+	ts.table_schema || '"."' || ts.table_name as object_name,
+	'The following table' as description,
+	 ts.size_pretty as current_value,
+	'Tables larger than 50GB should be monitored and reviewed if a data archiving or removal process should be implemented. I suggest looking into partitioning tables, if possible.' as recommended_action,
+	'https://www.heroku.com/blog/handling-very-large-tables-in-postgres-using-partitioning/' as documentation_link,
+	3 as severity_order
+from
+	ts)
+union all
+-- MEDIUM: Queries running longer than 5 minutes
+    select
+	'MEDIUM' as severity,
+	'Query Health' as category,
 	'Long Running Queries' as check_name,
 	concat_ws(' | ',
-        'pid: ' || pgs.pid::text,
-        'usename: ' || pgs.usename,
-        'datname: ' || pgs.datname,
-        'client_address: ' || pgs.client_addr::text,
-        'state: ' || pgs.state,
-        'duration: ' || to_char(now() - query_start, 'HH24:MI:SS')
-    ) as object_name,
+            'pid: ' || pgs.pid::text,
+            'usename: ' || pgs.usename,
+            'datname: ' || pgs.datname,
+            'client_address: ' || pgs.client_addr::text,
+            'state: ' || pgs.state,
+            'duration: ' || to_char(now() - query_start, 'HH24:MI:SS')
+        ) as object_name,
 	'The following query has been running for more than 5 minutes. Might be helpful to see if this is expected behavior' as issue_description,
 	query as current_value,
 	'Review query using EXPLAIN ANALYZE to identify any bottlenecks, such as full table scans, missing indexes, etc' as recommended_action,
@@ -444,9 +620,9 @@ where
 	and now() - query_start > interval '5 minutes'
 union all
 -- LOW: Missing indexes on foreign keys
-select
+    select
 	'LOW' as severity,
-	'Index Recommendations' as category,
+	'Table Health' as category,
 	'Missing FK Index' as check_name,
 	n.nspname || '.' || t.relname || '.' || string_agg(a.attname, ', ') as object_name,
 	'Foreign key constraint missing supporting index for efficient joins' as issue_description,
@@ -479,17 +655,17 @@ group by
 	n.nspname,
 	t.relname,
 	c.conname,
-	severity,
-	category,
-	check_name,
-	issue_description,
-	current_value,
-	recommended_action,
-	documentation_link,
-	severity_order
+	1,
+	2,
+	3,
+	5,
+	6,
+	7,
+	8,
+	9
 union all
 -- INFO: Database size and growth
-select
+    select
 	'INFO' as severity,
 	'Database Health' as category,
 	'Database Size' as check_name,
@@ -501,7 +677,7 @@ select
 	5 as severity_order
 union all
 -- INFO: Version and configuration
-select
+    select
 	'INFO' as severity,
 	'System Info' as category,
 	'PostgreSQL Version' as check_name,
@@ -513,21 +689,22 @@ select
 	5 as severity_order
 union all
 -- INFO: Installed Extensions
-select
+   select
 	'INFO' as severity,
 	'System Info' as category,
 	'Installed Extension' as check_name,
 	'System' as object_name,
 	'Installed Postgres Extension' as issue_description,
-	pe.extname || ':' || pe.extversion as current_value,
+	 pe.extname || ':' || pe.extversion as current_value,
 	'Before updating to the latest minor/major version of PG, verify extension compatability' as recommended_action,
 	'https://youtu.be/mpEdQm3TpE0?si=VMcHBo1VnDfGZvtI&t=937' as documentation_link,
+	--Link is from a fantastic talk from SCALE 22x on bugging pg_extension maintainers!
 	5 as severity_order
 from
 	pg_extension pe
 union all
 -- INFO: Server Uptime
-select
+    select
 	'INFO' as severity,
 	'System Info' as category,
 	'Server Uptime' as check_name,
@@ -537,7 +714,50 @@ select
 	'No Recommendation - Informational' as recommended_action,
 	'N/A' as documentation_link,
 	5 as severity_order
-order by
-	severity_order,
-	category,
-	check_name;
+union all
+-- INFO: Log Directory
+(with ld as (
+select
+	current_setting('log_directory') as log_directory
+    )
+    select
+	'INFO' as severity,
+	'System Info' as category,
+	'Is Logging Enabled' as check_name,
+	'System' as object_name,
+	'If no log file is present, this indicates logging is not enabled' as issue_description,
+	ld.log_directory as current_value,
+	'Logging enabled will assist with troubleshooting future issues. Dont you like logs?' as recommended_action,
+	'For self-hosting: https://www.postgresql.org/docs/current/runtime-config-logging.html /
+         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
+         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
+         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
+        ' as documentation_link,
+	5 as severity_order
+from
+	ld)
+union all
+-- INFO: Log File(s) Size(s)
+(with ls as (
+select
+	ROUND(sum(stat.size) / (1024.0 * 1024.0), 2) || ' MB' as size_mb
+from
+	pg_ls_dir(current_setting('log_directory')) as logs
+cross join lateral
+	      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
+select
+	'INFO' as severity,
+	'System Info' as category,
+	'Size of ALL Logfiles combined' as check_name,
+	'System' as object_name,
+	'Monitoring your logfile size will prevent from filling up storage (or expanding your storage in cloud managed). This can also lead to the server cashing when the logfile cannot be saved.' as issue_description,
+	ls.size_mb as current_value,
+	'Set log_rotation_age and size for proper rotation of log files. This will prevent runaway log sizes.' as recommended_action,
+	'For self-hosting:https://www.postgresql.org/docs/current/runtime-config-logging.html /
+         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
+         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
+         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
+        ' as documentation_link,
+	5 as severity_order
+from
+	ls);

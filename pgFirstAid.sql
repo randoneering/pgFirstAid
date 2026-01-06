@@ -29,7 +29,7 @@ begin
 	health_results
     select
 	'CRITICAL' as severity,
-	'Table Structure' as category,
+	'Table Health' as category,
 	'Missing Primary Key' as check_name,
 	quote_ident(pt.schemaname) || '.' || quote_ident(tablename) as object_name,
 	'Table missing a primary key, which can cause replication issues and/or poor performance' as issue_description,
@@ -61,7 +61,7 @@ where
 	health_results
 	select
 	'CRITICAL' as severity,
-	'Index Management' as category,
+	'Table Health' as category,
 	'Unused Large Index' as check_name,
 	quote_ident(psi.schemaname) || '.' || quote_ident(psio.indexrelname) as object_name,
 	'Large unused index consuming disk space and potentially impacting write performance' as issue_description,
@@ -255,7 +255,7 @@ with q as (
 ) as s3)
 select
 	'HIGH' as severity,
-	'Table Maintenance' as category,
+	'Table Health' as category,
 	'Table Bloat (Detailed)' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(tblname) as object_name,
 	'Table has significant bloat (>50%) affecting performance and storage' as issue_description,
@@ -270,7 +270,7 @@ from
 	q
 where
 	bloat_pct > 50.0
-    and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+	and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 order by
 	quote_ident(schemaname),
 	quote_ident(tblname);
@@ -281,7 +281,7 @@ order by
 	health_results
     select
 	'HIGH' as severity,
-	'Statistics' as category,
+	'Table Health' as category,
 	'Missing Statistics' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
 	'Table has never been analyzed, query planner missing statistics' as issue_description,
@@ -295,13 +295,43 @@ where
 	last_analyze is null
 	and last_autoanalyze is null
 	and n_tup_ins + n_tup_upd + n_tup_del > 1000;
+-- HIGH: Tables larger than 100GB
+with ts as (
+select
+	table_schema,
+	table_name,
+	pg_relation_size('"' || table_schema || '"."' || table_name || '"') as size_bytes,
+	pg_size_pretty(pg_relation_size('"' || table_schema || '"."' || table_name || '"')) as size_pretty
+from
+	information_schema.tables
+where
+	table_type = 'BASE TABLE'
+	and pg_relation_size('"' || table_schema || '"."' || table_name || '"') > 107374182400
+	-- 100GB in bytes
+order by
+	size_bytes desc)
+    insert
+	into
+	health_results
+   select
+	'HIGH' as severity,
+	'Table Health' as category,
+	'Tables larger than 100GB' as check_name,
+	ts.table_schema || '"."' || ts.table_name as object_name,
+	'The following table' as description,
+	 ts.size_pretty as current_value,
+	'I suggest looking into partitioning tables. Do you need all of this data? Can some of it be archived into something like S3?' as recommended_action,
+	'https://www.heroku.com/blog/handling-very-large-tables-in-postgres-using-partitioning/' as documentation_link,
+	2 as severity_order
+from
+	ts;
 -- HIGH: Duplicate or redundant indexes
     insert
 	into
 	health_results
     select
 	'HIGH' as severity,
-	'Index Optimization' as category,
+	'Table Health' as category,
 	'Duplicate Index' as check_name,
 	quote_ident(i1.schemaname) || '.' || i1.indexname || ' & ' || i2.indexname as object_name,
 	'Multiple indexes with identical or overlapping column sets' as issue_description,
@@ -318,8 +348,79 @@ join pg_indexes i2 on
 	and i1.indexdef = i2.indexdef
 where
 	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%']);
+-- HIGH: Table with more than 200 columns
+with cc as (
+select
+	table_schema,
+	table_name,
+	COUNT(*) as column_count
+from
+	information_schema.columns
+where
+	table_schema not in ('pg_catalog', 'information_schema')
+group by
+	table_schema,
+	table_name
+order by
+	column_count desc)
+insert
+	into
+	health_results
+select
+	'HIGH' as severity,
+	'Table Health' as category,
+	'Table with more than 200 columns' as check_name,
+	 cc.table_schema || '.' || cc.table_name as object_name,
+	'Postgres has a hard 1600 column limit, but that also includes columns you have dropped. Continuing to widen your table can impact performance.' as issue_description,
+	 cc.column_count as current_value,
+	'Yikes-it is about time you put a hard stop on widing your tables and begin breaking this table into several tables. I once worked on a table with over 300 columns before.......' as recommended_action,
+	'https://www.tigerdata.com/learn/designing-your-database-schema-wide-vs-narrow-postgres-tables \
+	 https://nerderati.com/postgresql-tables-can-have-at-most-1600-columns \
+     https://www.postgresql.org/docs/current/limits.html' as documentation_link,
+	2 as severity_order
+from
+	cc
+where
+	cc.column_count > 200;
+-- MEDIUM: Blocked and Blocking Queries
+with bq as (
+select
+	blocked.pid as blocked_pid,
+	blocked.query as blocked_query,
+	blocking.pid as blocking_pid,
+	blocking.query as blocking_query,
+	now() - blocked.query_start as blocked_duration
+from
+	pg_locks blocked_locks
+join pg_stat_activity blocked on
+	blocked.pid = blocked_locks.pid
+join pg_locks blocking_locks
+on
+	blocking_locks.transactionid = blocked_locks.transactionid
+	and blocking_locks.pid != blocked_locks.pid
+join pg_stat_activity blocking on
+	blocking.pid = blocking_locks.pid
+where
+	not blocked_locks.granted)
+insert
+	into
+	health_results
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Current Blocked/Blocking Queries' as check_name,
+	'Blocked PID: ' || bq.blocked_pid || chr(10) ||
+    'Blocked Query: ' || bq.blocked_query as object_name,
+	'The following query is being blocked by an already running query' as issue_description,
+	'Blocking PID: ' || bq.blocking_pid || chr(10) ||
+	'Blocking Query: ' || bq.blocking_query as current_value,
+	'Blocked queries are part of concurrency behavior. However, it is always recommended to monitor long running blocking queries. The Crunchy Data article recommended has an excellent walk through and suggested steps on how to tackle unnecessary blocking queries' as recommended_action,
+	'https://www.postgresql.org/docs/current/explicit-locking.html' as documentation_link,
+	3 as severity_order
+from
+	bq;
 -- MEDIUM: Tables with outdated statistics
-    insert
+insert
 	into
 	health_results
 	with s as (
@@ -351,7 +452,7 @@ where
     )
     select
 	'MEDIUM' as severity,
-	'Statistics' as category,
+	'Table Health' as category,
 	'Outdated Statistics' as check_name,
 	quote_ident(nspname) || '.' || quote_ident(relname) as object_name,
 	'Table statistics are outdated, which can lead to poor query plans' as issue_description,
@@ -381,7 +482,7 @@ order by
 	health_results
     select
 	'MEDIUM' as severity,
-	'Index Performance' as category,
+	'Table Health' as category,
 	'Low Index Efficiency' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(indexrelname) as object_name,
 	'Index has low scan to tuple read ratio indicating poor selectivity' as issue_description,
@@ -442,7 +543,7 @@ order by
 	health_results
     select
 	'MEDIUM' as severity,
-	'Query Performance' as category,
+	'Query Health' as category,
 	'Excessive Sequential Scans' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(relname) as object_name,
 	'Table has high sequential scan activity, may benefit from additional indexes' as issue_description,
@@ -455,6 +556,40 @@ from
 where
 	seq_scan > 1000
 	and seq_tup_read > seq_scan * 10000;
+-- MEDIUM: Table with more than 50 columns
+with cc as (
+select
+	table_schema,
+	table_name,
+	COUNT(*) as column_count
+from
+	information_schema.columns tc
+where
+	table_schema not in ('pg_catalog', 'information_schema')
+group by
+	table_schema,
+	table_name
+order by
+	column_count desc)
+insert
+	into
+	health_results
+select
+	'MEDIUM' as severity,
+	'Table Health' as category,
+	'Table with more than 50 columns' as check_name,
+	 cc.table_schema || '.' || cc.table_name as object_name,
+	'Postgres has a hard 1600 column limit, but that also includes columns you have dropped. Continuing to widen your table can impact performance.' as issue_description,
+	 cc.column_count as current_value,
+	'The most straightforward recommendation is to split your table into more tables connected via foreign keys. However, your situation may very based on the type of data stored. Consider the documentation links to learn more.' as recommended_action,
+	'https://www.tigerdata.com/learn/designing-your-database-schema-wide-vs-narrow-postgres-tables \
+	 https://nerderati.com/postgresql-tables-can-have-at-most-1600-columns \
+     https://www.postgresql.org/docs/current/limits.html' as documentation_link,
+	3 as severity_order
+from
+	cc
+where
+	cc.column_count between 50 and 199;
 -- MEDIUM: Connection and lock monitoring
     insert
 	into
@@ -484,13 +619,42 @@ group by
 	9
 having
 	COUNT(*) > 50;
+-- MEDIUM: Tables larger than 50GB
+with ts as (
+select
+	table_schema,
+	table_name,
+	pg_relation_size('"' || table_schema || '"."' || table_name || '"') as size_bytes,
+	pg_size_pretty(pg_relation_size('"' || table_schema || '"."' || table_name || '"')) as size_pretty
+from
+	information_schema.tables
+where
+	table_type = 'BASE TABLE'
+	and pg_relation_size('"' || table_schema || '"."' || table_name || '"') between 53687091200 and 107374182400
+order by
+	size_bytes desc)
+insert
+	into
+	health_results
+   select
+	'MEDIUM' as severity,
+	'Table Health' as category,
+	'Tables larger than 100GB' as check_name,
+	ts.table_schema || '"."' || ts.table_name as object_name,
+	'The following table' as description,
+	 ts.size_pretty as current_value,
+	'Tables larger than 50GB should be monitored and reviewed if a data archiving or removal process should be implemented. I suggest looking into partitioning tables, if possible.' as recommended_action,
+	'https://www.heroku.com/blog/handling-very-large-tables-in-postgres-using-partitioning/' as documentation_link,
+	3 as severity_order
+from
+	ts;
 -- MEDIUM: Queries running longer than 5 minutes
     insert
 	into
 	health_results
     select
 	'MEDIUM' as severity,
-	'Query Performance' as category,
+	'Query Health' as category,
 	'Long Running Queries' as check_name,
 	concat_ws(' | ',
             'pid: ' || pgs.pid::text,
@@ -517,7 +681,7 @@ order by
 	health_results
     select
 	'LOW' as severity,
-	'Index Recommendations' as category,
+	'Table Health' as category,
 	'Missing FK Index' as check_name,
 	n.nspname || '.' || t.relname || '.' || string_agg(a.attname, ', ') as object_name,
 	'Foreign key constraint missing supporting index for efficient joins' as issue_description,
@@ -617,6 +781,57 @@ from
 	'No Recommendation - Informational' as recommended_action,
 	'N/A' as documentation_link,
 	5 as severity_order;
+-- INFO: Log Directory
+    with ld as (
+select
+	current_setting('log_directory') as log_directory
+    )
+    insert
+	into
+	health_results
+    select
+	'INFO' as severity,
+	'System Info' as category,
+	'Is Logging Enabled' as check_name,
+	'System' as object_name,
+	'If no log file is present, this indicates logging is not enabled' as issue_description,
+	ld.log_directory as current_value,
+	'Logging enabled will assist with troubleshooting future issues. Dont you like logs?' as recommended_action,
+	'For self-hosting: https://www.postgresql.org/docs/current/runtime-config-logging.html /
+         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
+         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
+         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
+        ' as documentation_link,
+	5 as severity_order
+from
+	ld;
+-- INFO: Log File(s) Size(s)
+with ls as (
+select
+	ROUND(sum(stat.size) / (1024.0 * 1024.0), 2) || ' MB' as size_mb
+from
+	pg_ls_dir(current_setting('log_directory')) as logs
+cross join lateral
+	      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
+insert
+	into
+	health_results
+select
+	'INFO' as severity,
+	'System Info' as category,
+	'Size of ALL Logfiles combined' as check_name,
+	'System' as object_name,
+	'Monitoring your logfile size will prevent from filling up storage (or expanding your storage in cloud managed). This can also lead to the server cashing when the logfile cannot be saved.' as issue_description,
+	ls.size_mb as current_value,
+	'Set log_rotation_age and size for proper rotation of log files. This will prevent runaway log sizes.' as recommended_action,
+	'For self-hosting:https://www.postgresql.org/docs/current/runtime-config-logging.html /
+         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
+         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
+         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
+        ' as documentation_link,
+	5 as severity_order
+from
+	ls;
 -- Return results ordered by severity
     return QUERY
     select

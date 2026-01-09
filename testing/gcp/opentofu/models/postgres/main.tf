@@ -1,3 +1,8 @@
+resource "random_password" "password" {
+  length  = 20
+  special = false
+}
+
 resource "google_sql_database_instance" "postgres" {
   name             = var.instance_name
   database_version = var.postgres_version
@@ -11,10 +16,10 @@ resource "google_sql_database_instance" "postgres" {
 
     ip_configuration {
       ipv4_enabled = true
-      
+
       authorized_networks {
-        name  = "allow-all"
-        value = "0.0.0.0/0"
+        name  = "allow-personal"
+        value = var.personal_ip
       }
     }
 
@@ -34,5 +39,5 @@ resource "google_sql_database" "database" {
 resource "google_sql_user" "user" {
   name     = var.db_user
   instance = google_sql_database_instance.postgres.name
-  password = var.db_password
+  password = random_password.password.result
 }

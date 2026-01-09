@@ -1,6 +1,6 @@
 provider "google" {
-  project = var.gcp_project_id
-  region  = var.region
+  project = ""
+  region  = ""
 }
 
 module "postgres_15" {

@@ -30,3 +30,9 @@ variable "db_user" {
   type        = string
   default     = "randoneering"
 }
+
+variable "personal_ip" {
+  description = "Personal IP to allow connections from"
+  type = string
+  default = "0.0.0.0"
+}

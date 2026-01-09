@@ -1,10 +1,10 @@
 locals {
       service             = "pg15"
       database_name       = "pgFirstAid"
-      engine              = "aurora-postgresql"
+      engine              = "postgres"
       engine_version      = "15.12"
-      engine_family       = "aurora-postgresql15"
-      cluster_parameter_group = [
+      engine_family       = "postgres15"
+      db_parameter_group = [
         {
           name         = "autovacuum"
           value        = "1"

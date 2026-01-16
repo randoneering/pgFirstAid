@@ -806,32 +806,49 @@ select
 from
 	ld;
 -- INFO: Log File(s) Size(s)
-with ls as (
-select
-	ROUND(sum(stat.size) / (1024.0 * 1024.0), 2) || ' MB' as size_mb
-from
-	pg_ls_dir(current_setting('log_directory')) as logs
-cross join lateral
-	      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
-insert
-	into
-	health_results
-select
-	'INFO' as severity,
-	'System Info' as category,
-	'Size of ALL Logfiles combined' as check_name,
-	'System' as object_name,
-	'Monitoring your logfile size will prevent from filling up storage (or expanding your storage in cloud managed). This can also lead to the server cashing when the logfile cannot be saved.' as issue_description,
-	ls.size_mb as current_value,
-	'Set log_rotation_age and size for proper rotation of log files. This will prevent runaway log sizes.' as recommended_action,
-	'For self-hosting:https://www.postgresql.org/docs/current/runtime-config-logging.html /
-         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
-         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
-         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
-        ' as documentation_link,
-	5 as severity_order
-from
-	ls;
+begin
+	with ls as (
+	select
+		ROUND(sum(stat.size) / (1024.0 * 1024.0), 2) || ' MB' as size_mb
+	from
+		pg_ls_dir(current_setting('log_directory')) as logs
+	cross join lateral
+		      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
+	insert
+		into
+		health_results
+	select
+		'INFO' as severity,
+		'System Info' as category,
+		'Size of ALL Logfiles combined' as check_name,
+		'System' as object_name,
+		'Monitoring your logfile size will prevent from filling up storage (or expanding your storage in cloud managed). This can also lead to the server cashing when the logfile cannot be saved.' as issue_description,
+		ls.size_mb as current_value,
+		'Set log_rotation_age and size for proper rotation of log files. This will prevent runaway log sizes.' as recommended_action,
+		'For self-hosting:https://www.postgresql.org/docs/current/runtime-config-logging.html /
+	         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
+	         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
+	         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
+	        ' as documentation_link,
+		5 as severity_order
+	from
+		ls;
+exception
+	when insufficient_privilege then
+		insert into health_results
+		select
+			'INFO' as severity,
+			'System Info' as category,
+			'Size of ALL Logfiles combined' as check_name,
+			'System' as object_name,
+			'Unable to check log file sizes - insufficient privileges' as issue_description,
+			'Permission denied for pg_ls_dir' as current_value,
+			'If this is a managed instance (ex:AWS RDS), you will not be able to view this information from SQL. For RDS, use AWS CLI: aws rds describe-db-log-files --db-instance-identifier <instance-name>. Otherwise, grant pg_read_server_files role or run as superuser to enable this check.' as recommended_action,
+			'https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADMIN-GENFILE /
+			 For AWS RDS: https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-log-files.html /
+			 https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Procedural.Viewing.html' as documentation_link,
+			5 as severity_order;
+end;
 -- Return results ordered by severity
     return QUERY
     select

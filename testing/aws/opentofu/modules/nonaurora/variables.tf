@@ -256,9 +256,9 @@ variable "blue_green_enabled" {
 }
 
 variable "storage_type" {
-  description = "Accepted values are GP2, GP3 (requires iops), io1, io2"
+  description = "Accepted values are GP2, GP3 (requires iops), io1, io2. Use gp2 for AWS Free Tier eligibility."
   type        = string
-  default     = "gp3"
+  default     = "gp2"
 }
 
 variable "iops" {

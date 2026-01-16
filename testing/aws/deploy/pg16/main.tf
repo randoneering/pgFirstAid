@@ -1,7 +1,5 @@
 provider "aws" {
   region  = "us-west-2"
-  profile = ""
-
 }
 
 module "nonaurora" {
@@ -12,6 +10,7 @@ module "nonaurora" {
   engine_version      = local.engine_version
   family              = local.engine_family
   db_parameter_group  = local.db_parameter_group
+  allowed_cidr_block  = var.allowed_cidr_block
 }
 
 output "endpoint" {

@@ -4,7 +4,7 @@ locals {
   instance_class      = var.instance_class == "" ? "db.t4g.micro" : var.instance_class
   allocated_storage   = var.allocated_storage == "" ? 20 : var.allocated_storage
   iops                = var.allocated_storage >= 100 ? 3000 : null
-  storage_type        = var.storage_type == "" ? "gp3" : var.storage_type
+  storage_type        = var.storage_type == "" ? "gp2" : var.storage_type
 
 }
 

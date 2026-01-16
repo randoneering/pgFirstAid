@@ -5,7 +5,8 @@ terraform.tfstate
 terraform.tfstate.backup
 *.tfvars
 !terraform.tfvars.example
-
+*.tfstate
+*.tfstate.backup
 # Sensitive files
 *.pem
 *.key

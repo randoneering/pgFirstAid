@@ -1,11 +1,44 @@
 locals {
   identifier          = var.identifier =="" ? "${var.service}" : var.identifier
   username            = var.username == "" ? "randoneering" : var.username
-  instance_class      = var.instance_class == "" ? "db.t4g.medium" : var.instance_class
-  allocated_storage   = var.allocated_storage == "" ? 100 : var.allocated_storage
+  instance_class      = var.instance_class == "" ? "db.t4g.micro" : var.instance_class
+  allocated_storage   = var.allocated_storage == "" ? 20 : var.allocated_storage
   iops                = var.allocated_storage >= 100 ? 3000 : null
   storage_type        = var.storage_type == "" ? "gp3" : var.storage_type
 
+}
+
+data "aws_vpc" "default" {
+  default = true
+}
+
+resource "aws_security_group" "rds_sg" {
+  name        = "${var.service}-rds-sg"
+  description = "Security group for ${var.service} RDS instance"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress {
+    description = "PostgreSQL access from public IP"
+    from_port   = var.port
+    to_port     = var.port
+    protocol    = "tcp"
+    cidr_blocks = [var.allowed_cidr_block]
+  }
+
+  egress {
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(
+    var.required_tags,
+    {
+      Name = "${var.service}-rds-sg"
+    }
+  )
 }
 
 resource "random_password" "password" {
@@ -23,6 +56,7 @@ resource "aws_db_instance" "rds_instance" {
   instance_class              = local.instance_class
   parameter_group_name        = aws_db_parameter_group.param_group.name
   publicly_accessible         = true
+  vpc_security_group_ids      = [aws_security_group.rds_sg.id]
   allocated_storage           = local.allocated_storage
   apply_immediately           = var.apply_immediately
   skip_final_snapshot         = true
@@ -39,8 +73,6 @@ resource "aws_db_instance" "rds_instance" {
   option_group_name                     = var.option_group_name
   enabled_cloudwatch_logs_exports       = ["postgresql"]
   performance_insights_enabled          = var.performance_insights_enabled
-  performance_insights_kms_key_id       = var.performance_insights_kms_key_id
-  performance_insights_retention_period = var.performance_insights_retention_period
   storage_encrypted                     = true
   storage_type                          = local.storage_type
   storage_throughput                    = var.storage_throughput

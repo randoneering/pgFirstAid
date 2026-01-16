@@ -23,10 +23,16 @@ variable "vpc_security_group_ids" {
   default     = []
 }
 
+variable "allowed_cidr_block" {
+  description = "CIDR block allowed to access the RDS instance"
+  type        = string
+  default     = ""
+}
+
 variable "instance_class" {
   description = "Instance type to use"
   type        = string
-  default     = "db.t3.micro"
+  default     = "db.t4g.micro"
 }
 
 variable "database_name" {
@@ -86,7 +92,7 @@ variable "apply_immediately" {
 variable "monitoring_interval" {
   description = "The interval (seconds) between points when Enhanced Monitoring metrics are collected"
   type        = number
-  default     = 60
+  default     = 0
 }
 
 variable "auto_minor_version_upgrade" {
@@ -120,7 +126,7 @@ variable "storage_encrypted" {
 variable "allocated_storage" {
   description = "Specifies the amount of storage the instance starts with"
   type        = number
-  default     = 60
+  default     = 20
 
 }
 variable "kms_key_id" {

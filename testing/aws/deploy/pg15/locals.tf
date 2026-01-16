@@ -2,8 +2,9 @@ locals {
       service             = "pg15"
       database_name       = "pgFirstAid"
       engine              = "postgres"
-      engine_version      = "15.12"
+      engine_version      = "15.15"
       engine_family       = "postgres15"
+      allowed_cidr_block  = "24.117.71.126/32"
       db_parameter_group = [
         {
           name         = "autovacuum"

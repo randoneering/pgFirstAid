@@ -1,5 +1,5 @@
 locals {
-  project_id       = "165700873236"
+  project_id       = ""
   region           = "us-west1"
   instance_name    = "pgfirstaid-pg18"
   postgres_version = "POSTGRES_18"

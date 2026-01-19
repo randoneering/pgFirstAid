@@ -4,14 +4,14 @@ provider "google" {
 }
 
 module "postgres" {
-  source = "../../models/postgres"
+  source = "../../opentofu/models/postgres"
 
   instance_name    = local.instance_name
   postgres_version = local.postgres_version
   region           = local.region
   database_name    = local.database_name
   db_user          = local.db_user
-  personal_ip      = local.personal_ip
+  personal_ip      = var.personal_ip
 }
 
 output "instance_name" {

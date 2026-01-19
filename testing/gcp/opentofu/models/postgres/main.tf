@@ -9,10 +9,11 @@ resource "google_sql_database_instance" "postgres" {
   region           = var.region
 
   settings {
-    tier              = "db-f1-micro"
+    tier              = "db-g1-small"
     availability_type = "ZONAL"
+    edition = "ENTERPRISE"
     disk_size         = 10
-    disk_type         = "PD_HDD"
+    disk_type         = "PD_SSD"
 
     ip_configuration {
       ipv4_enabled = true

@@ -1,0 +1,13 @@
+# Terraform/OpenTofu
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+!terraform.tfvars.example
+*.tfstate
+*.tfstate.backup
+# Sensitive files
+*.pem
+*.key
+credentials.json

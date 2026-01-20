@@ -3,7 +3,6 @@
 drop view if exists v_pgfirstAid;
 
 create view v_pgfirstAid as
->>>>>>> feature/low_priority_checks
 -- CRITICAL: Tables without primary keys
     select
 	'CRITICAL' as severity,

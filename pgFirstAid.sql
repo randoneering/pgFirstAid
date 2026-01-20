@@ -808,11 +808,11 @@ from
 -- INFO: Log File(s) Size(s)
 begin
 	with ls as (
-	select
+select
 		ROUND(sum(stat.size) / (1024.0 * 1024.0), 2) || ' MB' as size_mb
-	from
+from
 		pg_ls_dir(current_setting('log_directory')) as logs
-	cross join lateral
+cross join lateral
 		      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
 	insert
 		into
@@ -831,11 +831,14 @@ begin
 	         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
 	        ' as documentation_link,
 		5 as severity_order
-	from
+from
 		ls;
+
 exception
-	when insufficient_privilege then
-		insert into health_results
+when insufficient_privilege then
+		insert
+	into
+	health_results
 		select
 			'INFO' as severity,
 			'System Info' as category,
@@ -844,9 +847,10 @@ exception
 			'Unable to check log file sizes - insufficient privileges' as issue_description,
 			'Permission denied for pg_ls_dir' as current_value,
 			'If this is a managed instance (ex:AWS RDS), you will not be able to view this information from SQL. For RDS, use AWS CLI: aws rds describe-db-log-files --db-instance-identifier <instance-name>. Otherwise, grant pg_read_server_files role or run as superuser to enable this check.' as recommended_action,
-			'https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADMIN-GENFILE /
-			 For AWS RDS: https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-log-files.html /
-			 https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Procedural.Viewing.html' as documentation_link,
+			'For AWS Aurora/RDS: https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-log-files.html  /
+         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/logging /
+         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/cli/azure/postgres/flexible-server/server-logs?view=azure-cli-latest
+        ' as documentation_link,
 			5 as severity_order;
 end;
 -- Return results ordered by severity

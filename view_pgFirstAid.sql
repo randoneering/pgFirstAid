@@ -12,7 +12,7 @@ create view v_pgfirstAid as
 	'Table missing a primary key, which can cause replication issues and/or poor performance' as issue_description,
 	'No primary key defined' as current_value,
 	'Add a primary key or unique constraint with NOT NULL columns' as recommended_action,
-	'https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-PRIMARY-KEYS' as documentation_link,
+	'https://www.postgresql.org/docs/current/ddl-constraints.html' as documentation_link,
 	1 as severity_order
 from
 	pg_tables pt
@@ -423,7 +423,7 @@ select
 	when n_dead_tup > v_threshold then 'Run VACUUM'
 	when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
 end as recommended_action,
-	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM,
+	'https://www.postgresql.org/docs/current/routine-vacuuming.html,
         https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
 	3 as severity_order
 from
@@ -612,7 +612,7 @@ union all
 	'The following query has been running for more than 5 minutes. Might be helpful to see if this is expected behavior' as issue_description,
 	query as current_value,
 	'Review query using EXPLAIN ANALYZE to identify any bottlenecks, such as full table scans, missing indexes, etc' as recommended_action,
-	'https://www.postgresql.org/docs/current/using-explain.html#USING-EXPLAIN-ANALYZE' as documentation_link,
+	'https://www.postgresql.org/docs/current/using-explain.html' as documentation_link,
 	3 as severity_order
 from
 	pg_stat_activity pgs
@@ -679,7 +679,7 @@ union all
 	'Foreign key constraint missing supporting index for efficient joins' as issue_description,
 	'FK constraint without index' as current_value,
 	'Consider adding index on foreign key columns for better join performance' as recommended_action,
-	'https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK' as documentation_link,
+	'https://www.postgresql.org/docs/current/ddl-constraints.html' as documentation_link,
 	4 as severity_order
 from
 	pg_constraint c
@@ -774,7 +774,7 @@ SELECT
     'Total scans: ' || it.total_scans || ', Total writes: ' || it.total_writes ||
         ', Size: ' || it.table_size AS current_value,
     'Review if this table is still needed. Check pg_stat_reset() history to determine stats age. Consider archiving or dropping if no longer in use.' AS recommended_action,
-    'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ALL-TABLES-VIEW' AS documentation_link,
+    'https://www.postgresql.org/docs/current/monitoring-stats.html' AS documentation_link,
     4 AS severity_order
 FROM
     it
@@ -889,7 +889,7 @@ select
         ', Client: ' || coalesce(ic.client_addr::text, 'local') as issue_description,
 	ic.idle_duration::text as current_value,
 	'Review if this connection is still needed. Consider implementing connection pooling (PgBouncer), setting idle_session_timeout, or terminating with pg_terminate_backend(' || ic.pid || ')' as recommended_action,
-	'https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-IDLE-SESSION-TIMEOUT' as documentation_link,
+	'https://www.postgresql.org/docs/current/runtime-config-client.html' as documentation_link,
 	4 as severity_order
 from
 	ic)

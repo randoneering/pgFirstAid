@@ -464,7 +464,7 @@ insert
 		when n_dead_tup > v_threshold then 'Run VACUUM'
 		when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
 	end as recommended_action,
-	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM,
+	'https://www.postgresql.org/docs/current/routine-vacuuming.html,
         https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
 	3 as severity_order
 from
@@ -667,7 +667,7 @@ from
 	'The following query has been running for more than 5 minutes. Might be helpful to see if this is expected behavior' as issue_description,
 	query as current_value,
 	'Review query using EXPLAIN ANALYZE to identify any bottlenecks, such as full table scans, missing indexes, etc' as recommendation_action,
-	'https://www.postgresql.org/docs/current/using-explain.html#USING-EXPLAIN-ANALYZE' as documentation_link
+	'https://www.postgresql.org/docs/current/using-explain.html' as documentation_link
 from
 	pg_stat_activity pgs
 where
@@ -687,7 +687,7 @@ order by
 	'Foreign key constraint missing supporting index for efficient joins' as issue_description,
 	'FK constraint without index' as current_value,
 	'Consider adding index on foreign key columns for better join performance' as recommended_action,
-	'https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK' as documentation_link,
+	'https://www.postgresql.org/docs/current/ddl-constraints.html' as documentation_link,
 	4 as severity_order
 from
 	pg_constraint c
@@ -1110,7 +1110,7 @@ when insufficient_privilege then
 			'Unable to check log file sizes - insufficient privileges' as issue_description,
 			'Permission denied for pg_ls_dir' as current_value,
 			'If this is a managed instance (ex:AWS RDS), you will not be able to view this information from SQL. For RDS, use AWS CLI: aws rds describe-db-log-files --db-instance-identifier <instance-name>. Otherwise, grant pg_read_server_files role or run as superuser to enable this check.' as recommended_action,
-			'https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADMIN-GENFILE /
+			'https://www.postgresql.org/docs/current/functions-admin.html /
 			 For AWS RDS: https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-log-files.html /
 			 https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Procedural.Viewing.html' as documentation_link,
 			5 as severity_order;

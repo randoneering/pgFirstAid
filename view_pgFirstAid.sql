@@ -1,6 +1,5 @@
 create or replace
 view v_pgfirstAid as
-
 -- CRITICAL: Tables without primary keys
     select
 	'CRITICAL' as severity,
@@ -30,7 +29,7 @@ where
 		and n.nspname = pt.schemaname
 		and c.relname = pt.tablename
     )
-    union all
+union all
 -- CRITICAL: Unused indexes consuming significant space
 	select
 	'CRITICAL' as severity,
@@ -49,34 +48,33 @@ join pg_statio_user_indexes psio on
 where
 	idx_scan = 0
 	and pg_relation_size(psi.indexrelid) > 104857600
--- 100MB
+	-- 100MB
 union all
-
 -- HIGH: Inactive Replication slots
 (with q as (
-	select
+select
 		slot_name,
 		plugin,
 		database,
 		restart_lsn,
 		case
 			when 'invalidation_reason' is not null then 'invalid'
-			else
+		else
           case
 				when active is true then 'active'
-				else 'inactive'
-			end
-		end as "status",
+			else 'inactive'
+		end
+	end as "status",
 		pg_size_pretty(
         pg_wal_lsn_diff(
           pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
 		pg_size_pretty(safe_wal_size) as "safe_wal_size"
-	from
+from
 		pg_replication_slots
-	where
+where
 		'status' = 'inactive'
     )
-    select
+select
 	'HIGH' as severity,
 	'Replication Health' as category,
 	'Inactive Replication Slots' as check_name,
@@ -94,7 +92,7 @@ union all
 -- credit: https://www.morling.dev/blog/mastering-postgres-replication-slots/ -- Thank you Gunnar Morling!
 -- HIGH: Tables with high bloat
 (with q as (
-	select
+select
 		current_database(),
 		schemaname,
 		tblname,
@@ -102,26 +100,26 @@ union all
 		(tblpages-est_tblpages)* bs as extra_size,
 		case
 			when tblpages > 0
-				and tblpages - est_tblpages > 0
+		and tblpages - est_tblpages > 0
     then 100 * (tblpages - est_tblpages)/ tblpages::float
-				else 0
-			end as extra_pct,
+		else 0
+	end as extra_pct,
 			fillfactor,
 			case
 				when tblpages - est_tblpages_ff > 0
     then (tblpages-est_tblpages_ff)* bs
-				else 0
-			end as bloat_size,
+		else 0
+	end as bloat_size,
 			case
 				when tblpages > 0
-					and tblpages - est_tblpages_ff > 0
+			and tblpages - est_tblpages_ff > 0
     then 100 * (tblpages - est_tblpages_ff)/ tblpages::float
-					else 0
-				end as bloat_pct,
+			else 0
+		end as bloat_pct,
 				is_na
-			from
+	from
 				(
-				select
+		select
 					ceil( reltuples / ( (bs-page_hdr)/ tpl_size ) ) + ceil( toasttuples / 4 ) as est_tblpages,
 					ceil( reltuples / ( (bs-page_hdr)* fillfactor /(tpl_size * 100) ) ) + ceil( toasttuples / 4 ) as est_tblpages_ff,
 					tblpages,
@@ -133,18 +131,18 @@ union all
 					heappages,
 					toastpages,
 					is_na
-				from
+		from
 					(
-					select
+			select
 						( 4 + tpl_hdr_size + tpl_data_size + (2 * ma)
         - case
 							when tpl_hdr_size%ma = 0 then ma
-							else tpl_hdr_size%ma
-						end
+					else tpl_hdr_size%ma
+				end
         - case
 							when ceil(tpl_data_size)::int%ma = 0 then ma
-							else ceil(tpl_data_size)::int%ma
-						end
+					else ceil(tpl_data_size)::int%ma
+				end
       ) as tpl_size,
 						bs - page_hdr as size_per_block,
 						(heappages + toastpages) as tblpages,
@@ -159,9 +157,9 @@ union all
 						tblname,
 						fillfactor,
 						is_na
-					from
+			from
 						(
-						select
+				select
 							tbl.oid as tblid,
 							ns.nspname as schemaname,
 							tbl.relname as tblname,
@@ -175,38 +173,38 @@ union all
 							current_setting('block_size')::numeric as bs,
 							case
 								when version()~ 'mingw32'
-									or version()~ '64-bit|x86_64|ppc64|ia64|amd64' then 8
-									else 4
-								end as ma,
+							or version()~ '64-bit|x86_64|ppc64|ia64|amd64' then 8
+							else 4
+						end as ma,
 								24 as page_hdr,
 								23 + case
 									when MAX(coalesce(s.null_frac, 0)) > 0 then ( 7 + count(s.attname) ) / 8
-									else 0::int
-								end
+							else 0::int
+						end
            + case
 									when bool_or(att.attname = 'oid' and att.attnum < 0) then 4
-									else 0
-								end as tpl_hdr_size,
+							else 0
+						end as tpl_hdr_size,
 								sum( (1-coalesce(s.null_frac, 0)) * coalesce(s.avg_width, 0) ) as tpl_data_size,
 								bool_or(att.atttypid = 'pg_catalog.name'::regtype)
-									or sum(case when att.attnum > 0 then 1 else 0 end) <> count(s.attname) as is_na
-								from
+							or sum(case when att.attnum > 0 then 1 else 0 end) <> count(s.attname) as is_na
+						from
 									pg_attribute as att
-								join pg_class as tbl on
+						join pg_class as tbl on
 									att.attrelid = tbl.oid
-								join pg_namespace as ns on
+						join pg_namespace as ns on
 									ns.oid = tbl.relnamespace
-								left join pg_stats as s on
+						left join pg_stats as s on
 									s.schemaname = ns.nspname
-									and s.tablename = tbl.relname
-									and s.inherited = false
-									and s.attname = att.attname
-								left join pg_class as toast on
+							and s.tablename = tbl.relname
+							and s.inherited = false
+							and s.attname = att.attname
+						left join pg_class as toast on
 									tbl.reltoastrelid = toast.oid
-								where
+						where
 									not att.attisdropped
-									and tbl.relkind in ('r', 'm')
-								group by
+							and tbl.relkind in ('r', 'm')
+						group by
 									1,
 									2,
 									3,
@@ -217,7 +215,7 @@ union all
 									8,
 									9,
 									10
-								order by
+						order by
 									2,
 									3
     ) as s
@@ -240,7 +238,7 @@ from
 	q
 where
 	bloat_pct > 50.0
-	and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 order by
 	quote_ident(schemaname),
 	quote_ident(tblname))
@@ -279,7 +277,7 @@ where
 	-- 100GB in bytes
 order by
 	size_bytes desc)
-   select
+select
 	'HIGH' as severity,
 	'Table Health' as category,
 	'Tables larger than 100GB' as check_name,
@@ -360,7 +358,7 @@ join pg_stat_activity blocked on
 join pg_locks blocking_locks
 on
 	blocking_locks.transactionid = blocked_locks.transactionid
-	and blocking_locks.pid != blocked_locks.pid
+and blocking_locks.pid != blocked_locks.pid
 join pg_stat_activity blocking on
 	blocking.pid = blocking_locks.pid
 where
@@ -382,14 +380,14 @@ from
 union all
 -- MEDIUM: Tables with outdated statistics
 (with s as (
-	select
+select
 		current_setting('autovacuum_analyze_scale_factor')::float8 as analyze_factor,
 		current_setting('autovacuum_analyze_threshold')::float8 as analyze_threshold,
 		current_setting('autovacuum_vacuum_scale_factor')::float8 as vacuum_factor,
 		current_setting('autovacuum_vacuum_threshold')::float8 as vacuum_threshold
     ),
 	tt as (
-	select
+select
 		n.nspname,
 		c.relname,
 		c.oid as relid,
@@ -397,18 +395,18 @@ union all
 		t.n_mod_since_analyze,
 		c.reltuples * s.vacuum_factor + s.vacuum_threshold as v_threshold,
 		c.reltuples * s.analyze_factor + s.analyze_threshold as a_threshold
-	from
+from
 		s,
 		pg_class c
-	join pg_namespace n on
+join pg_namespace n on
 		c.relnamespace = n.oid
-	join pg_stat_all_tables t on
+join pg_stat_all_tables t on
 		c.oid = t.relid
-	where
+where
 		c.relkind = 'r'
-		and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
     )
-    select
+select
 	'MEDIUM' as severity,
 	'Table Health' as category,
 	'Outdated Statistics' as check_name,
@@ -418,10 +416,10 @@ union all
         'Modifications since analyze: ' || n_mod_since_analyze || ' (threshold: ' || round(a_threshold) || ')' as current_value,
 	case
 		when n_dead_tup > v_threshold
-		and n_mod_since_analyze > a_threshold then 'Run VACUUM ANALYZE'
-		when n_dead_tup > v_threshold then 'Run VACUUM'
-		when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
-	end as recommended_action,
+	and n_mod_since_analyze > a_threshold then 'Run VACUUM ANALYZE'
+	when n_dead_tup > v_threshold then 'Run VACUUM'
+	when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
+end as recommended_action,
 	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM,
         https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
 	3 as severity_order
@@ -429,7 +427,7 @@ from
 	tt
 where
 	n_dead_tup > v_threshold
-	or n_mod_since_analyze > a_threshold
+or n_mod_since_analyze > a_threshold
 order by
 	nspname,
 	relname)
@@ -455,26 +453,26 @@ where
 union all
 -- MEDIUM: Replication slots with high wal retation (90% of max wal)
 (with q as (
-	select
+select
 		slot_name,
 		plugin,
 		database,
 		restart_lsn,
 		case
 			when 'invalidation_reason' is not null then 'invalid'
-			else
+		else
       case
 				when active is true then 'active'
-				else 'inactive'
-			end
-		end as "status",
+			else 'inactive'
+		end
+	end as "status",
 		pg_size_pretty(
     pg_wal_lsn_diff(
       pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
 		pg_size_pretty(safe_wal_size) as "safe_wal_size"
-	from
+from
 		pg_replication_slots
-	where
+where
 		pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) >= (safe_wal_size * 0.9)
 )
 select
@@ -582,7 +580,7 @@ where
 	and pg_relation_size('"' || table_schema || '"."' || table_name || '"') between 53687091200 and 107374182400
 order by
 	size_bytes desc)
-   select
+select
 	'MEDIUM' as severity,
 	'Table Health' as category,
 	'Tables larger than 100GB' as check_name,
@@ -664,6 +662,40 @@ group by
 	8,
 	9
 union all
+-- LOW: Connections IDLE for 1 > hour
+(with ic as (
+select
+	pid,
+	usename,
+	application_name,
+	client_addr,
+	state,
+	state_change,
+	now() - state_change as idle_duration
+from
+	pg_stat_activity
+where
+	state = 'idle'
+	and state_change < now() - interval '1 hour'
+	and pid <> pg_backend_pid()
+)
+select
+	'LOW' as severity,
+	'Connection Health' as category,
+	'Idle Connections Over 1 Hour' as check_name,
+	ic.usename || ' (PID: ' || ic.pid || ')' as object_name,
+	'Connection has been idle for ' ||
+        extract(epoch from ic.idle_duration)::int / 3600 || ' hours ' ||
+        (extract(epoch from ic.idle_duration)::int % 3600) / 60 || ' minutes. ' ||
+        'Application: ' || coalesce(ic.application_name, 'unknown') ||
+        ', Client: ' || coalesce(ic.client_addr::text, 'local') as issue_description,
+	ic.idle_duration::text as current_value,
+	'Review if this connection is still needed. Consider implementing connection pooling (PgBouncer), setting idle_session_timeout, or terminating with pg_terminate_backend(' || ic.pid || ')' as recommended_action,
+	'https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-IDLE-SESSION-TIMEOUT' as documentation_link,
+	4 as severity_order
+from
+	ic)
+union all
 -- INFO: Database size and growth
     select
 	'INFO' as severity,
@@ -720,7 +752,7 @@ union all
 select
 	current_setting('log_directory') as log_directory
     )
-    select
+select
 	'INFO' as severity,
 	'System Info' as category,
 	'Is Logging Enabled' as check_name,

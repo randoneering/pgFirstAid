@@ -65,6 +65,7 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 ### LOW Priority Issues
 
 - **Missing Foreign Key Indexes** - Foreign key constraints without supporting indexes for efficient joins
+- **Idle connections for more than 1 hour** - Grabs connections that have been open and idle for more than 1 hour
 
 ### INFORMATIONAL
 

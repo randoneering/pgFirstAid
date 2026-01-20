@@ -722,6 +722,42 @@ group by
 	7,
 	8,
 	9;
+-- LOW: Connections IDLE for > 1 hour
+    with ic as (
+select
+	pid,
+	usename,
+	application_name,
+	client_addr,
+	state,
+	state_change,
+	now() - state_change as idle_duration
+from
+	pg_stat_activity
+where
+	state = 'idle'
+	and state_change < now() - interval '1 hour'
+	and pid <> pg_backend_pid()
+    )
+    insert
+	into
+	health_results
+    select
+	'LOW' as severity,
+	'Connection Health' as category,
+	'Idle Connections Over 1 Hour' as check_name,
+	ic.usename || ' (PID: ' || ic.pid || ')' as object_name,
+	'Connection has been idle for ' ||
+            extract(epoch from ic.idle_duration)::int / 3600 || ' hours ' ||
+            (extract(epoch from ic.idle_duration)::int % 3600) / 60 || ' minutes. ' ||
+            'Application: ' || coalesce(ic.application_name, 'unknown') ||
+            ', Client: ' || coalesce(ic.client_addr::text, 'local') as issue_description,
+	ic.idle_duration::text as current_value,
+	'Review if this connection is still needed. Consider implementing connection pooling (PgBouncer), setting idle_session_timeout, or terminating with pg_terminate_backend(' || ic.pid || ')' as recommended_action,
+	'https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-IDLE-SESSION-TIMEOUT' as documentation_link,
+	4 as severity_order
+from
+	ic;
 -- INFO: Database size and growth
     insert
 	into
@@ -808,11 +844,11 @@ from
 -- INFO: Log File(s) Size(s)
 begin
 	with ls as (
-	select
+select
 		ROUND(sum(stat.size) / (1024.0 * 1024.0), 2) || ' MB' as size_mb
-	from
+from
 		pg_ls_dir(current_setting('log_directory')) as logs
-	cross join lateral
+cross join lateral
 		      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
 	insert
 		into
@@ -831,11 +867,14 @@ begin
 	         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
 	        ' as documentation_link,
 		5 as severity_order
-	from
+from
 		ls;
+
 exception
-	when insufficient_privilege then
-		insert into health_results
+when insufficient_privilege then
+		insert
+	into
+	health_results
 		select
 			'INFO' as severity,
 			'System Info' as category,

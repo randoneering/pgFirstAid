@@ -1,5 +1,8 @@
-create or replace
-view v_pgfirstAid as
+-- Adding dropping of the view instead of replace because of conversion issues with new health checks.
+-- This way we start with a fresh view.
+drop view if exists v_pgfirstAid;
+
+create view v_pgfirstAid as
 -- CRITICAL: Tables without primary keys
     select
 	'CRITICAL' as severity,
@@ -617,6 +620,56 @@ where
 	state = 'active'
 	and now() - query_start > interval '5 minutes'
 union all
+-- LOW: Roles that have never logged in (with LOGIN rights)
+(WITH ur AS (
+    SELECT
+        r.rolname AS role_name,
+        r.rolcreaterole,
+        r.rolcanlogin,
+        r.rolsuper,
+        r.rolvaliduntil,
+        array_agg(m.rolname) FILTER (WHERE m.rolname IS NOT NULL) AS member_of
+    FROM
+        pg_roles r
+    LEFT JOIN
+        pg_auth_members am ON am.member = r.oid
+    LEFT JOIN
+        pg_roles m ON m.oid = am.roleid
+    WHERE
+        r.rolcanlogin = true
+        AND r.rolname NOT LIKE 'pg_%'
+        AND r.rolname NOT IN ('postgres', 'rds_superuser', 'rdsadmin', 'azure_superuser', 'cloudsqlsuperuser')
+        AND NOT EXISTS (
+            SELECT 1
+            FROM pg_stat_activity psa
+            WHERE psa.usename = r.rolname
+        )
+        AND (
+            SELECT coalesce(max(backend_start), '1970-01-01')
+            FROM pg_stat_activity
+            WHERE usename = r.rolname
+        ) = '1970-01-01'
+    GROUP BY
+        r.rolname, r.rolcreaterole, r.rolcanlogin, r.rolsuper, r.rolvaliduntil
+)
+SELECT
+    'LOW' AS severity,
+    'Security Health' AS category,
+    'Role Never Logged In' AS check_name,
+    ur.role_name AS object_name,
+    'Role has LOGIN privilege but has never connected (since stats reset). ' ||
+        CASE WHEN ur.rolsuper THEN 'WARNING: Has SUPERUSER privilege. ' ELSE '' END ||
+        CASE WHEN ur.rolvaliduntil IS NOT NULL THEN 'Expires: ' || ur.rolvaliduntil::text ELSE 'No expiration set' END AS issue_description,
+    'Member of: ' || coalesce(array_to_string(ur.member_of, ', '), 'none') AS current_value,
+    'Review if this role is still needed. Consider removing LOGIN privilege or dropping the role if unused.' AS recommended_action,
+    'https://www.postgresql.org/docs/current/sql-droprole.html' AS documentation_link,
+    4 AS severity_order
+FROM
+    ur
+ORDER BY
+    ur.rolsuper DESC,
+    ur.role_name)
+union all
 -- LOW: Missing indexes on foreign keys
     select
 	'LOW' as severity,
@@ -661,6 +714,151 @@ group by
 	7,
 	8,
 	9
+union all
+-- LOW: Indexes with low usage
+(WITH lui AS (
+    SELECT
+        quote_ident(schemaname) || '.' || quote_ident(indexrelname) AS index_name,
+        quote_ident(schemaname) || '.' || quote_ident(relname) AS table_name,
+        pg_size_pretty(pg_relation_size(indexrelid)) AS index_size,
+        pg_relation_size(indexrelid) AS index_size_bytes,
+        idx_scan,
+        idx_tup_read,
+        idx_tup_fetch
+    FROM
+        pg_stat_user_indexes
+    WHERE
+        idx_scan > 0
+        AND idx_scan < 100
+        AND pg_relation_size(indexrelid) > 1024 * 1024  -- > 1MB
+)
+SELECT
+    'LOW' AS severity,
+    'Index Health' AS category,
+    'Index With Very Low Usage' AS check_name,
+    lui.index_name AS object_name,
+    'Index on ' || lui.table_name || ' has been scanned only ' || lui.idx_scan ||
+        ' times since stats reset. May not be worth the maintenance overhead.' AS issue_description,
+    'Scans: ' || lui.idx_scan || ', Tuples read: ' || lui.idx_tup_read ||
+        ', Size: ' || lui.index_size AS current_value,
+    'Monitor usage over a full business cycle before removing. Verify index is not used for constraints or infrequent but critical queries.' AS recommended_action,
+    'https://www.postgresql.org/docs/current/monitoring-stats.html' AS documentation_link,
+    4 AS severity_order
+FROM
+    lui
+ORDER BY
+    lui.index_size_bytes desc)
+union all
+-- LOW: Tables with no recent acitivty
+(WITH it AS (
+    SELECT
+        schemaname || '.' || relname AS table_name,
+        pg_size_pretty(pg_total_relation_size(relid)) AS table_size,
+        pg_total_relation_size(relid) AS table_size_bytes,
+        coalesce(seq_scan, 0) + coalesce(idx_scan, 0) AS total_scans,
+        coalesce(n_tup_ins, 0) + coalesce(n_tup_upd, 0) + coalesce(n_tup_del, 0) AS total_writes,
+        greatest(last_vacuum, last_autovacuum, last_analyze, last_autoanalyze) AS last_maintenance
+    FROM
+        pg_stat_user_tables
+    WHERE
+        coalesce(seq_scan, 0) + coalesce(idx_scan, 0) = 0
+        AND coalesce(n_tup_ins, 0) + coalesce(n_tup_upd, 0) + coalesce(n_tup_del, 0) = 0
+)
+SELECT
+    'LOW' AS severity,
+    'Table Health' AS category,
+    'Table With No Activity Since Stats Reset' AS check_name,
+    quote_ident(it.table_name) AS object_name,
+    'Table has had no reads or writes since stats were last reset. Last maintenance: ' ||
+        coalesce(it.last_maintenance::text, 'never') AS issue_description,
+    'Total scans: ' || it.total_scans || ', Total writes: ' || it.total_writes ||
+        ', Size: ' || it.table_size AS current_value,
+    'Review if this table is still needed. Check pg_stat_reset() history to determine stats age. Consider archiving or dropping if no longer in use.' AS recommended_action,
+    'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ALL-TABLES-VIEW' AS documentation_link,
+    4 AS severity_order
+FROM
+    it
+ORDER BY
+    it.table_size_bytes DESC)
+union all
+-- LOW: Check for truely empty tables in the database
+(WITH et AS (
+    SELECT
+        n.nspname || '.' || c.relname AS table_name,
+        pg_size_pretty(pg_total_relation_size(c.oid)) AS table_size,
+        pg_total_relation_size(c.oid) AS table_size_bytes,
+        s.last_vacuum,
+        s.last_analyze,
+        c.reltuples::bigint AS estimated_rows
+    FROM
+        pg_class c
+    JOIN
+        pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN
+        pg_stat_user_tables s ON s.relid = c.oid
+    WHERE
+        c.relkind = 'r'
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+        AND c.reltuples = 0
+        AND s.n_live_tup = 0
+)
+SELECT
+    'LOW' AS severity,
+    'Table Health' AS category,
+    'Empty Table' AS check_name,
+    et.table_name AS object_name,
+    'Table contains no rows. Last vacuum: ' || coalesce(et.last_vacuum::text, 'never') ||
+        ', Last analyze: ' || coalesce(et.last_analyze::text, 'never') AS issue_description,
+    '0 rows, Size: ' || et.table_size AS current_value,
+    'Review if this table is still needed. May be an abandoned table, pending migration, or staging table that was never cleaned up.' AS recommended_action,
+    'https://www.postgresql.org/docs/current/routine-vacuuming.html' AS documentation_link,
+    4 AS severity_order
+FROM
+    et
+ORDER BY
+    et.table_size_bytes desc)
+union all
+-- LOW: Tables with zero or only one column
+(with sct as (
+select
+	pc.oid::regclass::text as table_name,
+	pg_size_pretty(pg_table_size(pc.oid)) as table_size,
+	pg_table_size(pc.oid) as table_size_bytes,
+	count(a.attname) as column_count
+from
+	pg_catalog.pg_class pc
+inner join
+        pg_catalog.pg_namespace nsp on
+	nsp.oid = pc.relnamespace
+left join
+        pg_catalog.pg_attribute a on
+	a.attrelid = pc.oid
+	and a.attnum > 0
+	and not a.attisdropped
+where
+	pc.relkind in ('r', 'p')
+	and not pc.relispartition
+	and nsp.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+group by
+	pc.oid
+having
+	count(a.attname) <= 1
+)
+select
+	'LOW' as severity,
+	'Table Health' as category,
+	'Table With Single Or No Columns' as check_name,
+	quote_ident(sct.table_name) as object_name,
+	'Table has ' || sct.column_count || ' column(s). This may indicate an abandoned table, incomplete migration, or design issue.' as issue_description,
+	sct.column_count || ' column(s), Size: ' || sct.table_size as current_value,
+	'Review if this table is still needed. Consider removing if unused or completing the schema if it was left incomplete.' as recommended_action,
+	'https://www.postgresql.org/docs/current/ddl.html /
+https://github.com/mfvanek/pg-index-health-sql/blob/master/sql/tables_with_zero_or_one_column.sql' as documentation_link,
+	4 as severity_order
+from
+	sct
+order by
+	sct.table_size_bytes desc)
 union all
 -- LOW: Connections IDLE for 1 > hour
 (with ic as (

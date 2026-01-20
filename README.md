@@ -65,7 +65,12 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 ### LOW Priority Issues
 
 - **Missing Foreign Key Indexes** - Foreign key constraints without supporting indexes for efficient joins
-- **Idle connections for more than 1 hour** - Grabs connections that have been open and idle for more than 1 hour
+- **Idle Connections For More Than 1 Hour** - Grabs connections that have been open and idle for more than 1 hour
+- **Tables With Zero or Only One Column** - Identifies tables with one or zero columns
+- **True Empty Table(s) in Database** - Searches for truly empty tables in the database. Checks if there are rows present and the last time vacuum and analyze was ran against the identified table
+- **Tables With No Recent Activity** - Checks for zero activity since the last stats reset. This check works for all versions of Postgres. In 16+, we could use `last_*_timestamp` columns which could tell you WHEN the last activity was as well. However, this would break compatibility for anything older than 16.
+- **Indexes With Low Usage** - Flags indxes with 1MB with 1-99 scans. Zero scans are already caught by the CRITICAL unused indexes check.
+- **Roles That Have Never Logged In** - Excludes system role and managed services roles. This includes users with `LOGIN` rights.
 
 ### INFORMATIONAL
 

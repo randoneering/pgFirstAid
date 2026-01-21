@@ -423,11 +423,7 @@ select
 	when n_dead_tup > v_threshold then 'Run VACUUM'
 	when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
 end as recommended_action,
-<<<<<<< HEAD
-	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM,
-=======
 	'https://www.postgresql.org/docs/current/routine-vacuuming.html,
->>>>>>> feature/low_priority_checks
         https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
 	3 as severity_order
 from
@@ -972,26 +968,16 @@ from
 	ld)
 union all
 -- INFO: Log File(s) Size(s)
-(with ls as (
-select
-	ROUND(sum(stat.size) / (1024.0 * 1024.0), 2) || ' MB' as size_mb
-from
-	pg_ls_dir(current_setting('log_directory')) as logs
-cross join lateral
-	      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
 select
 	'INFO' as severity,
 	'System Info' as category,
 	'Size of ALL Logfiles combined' as check_name,
 	'System' as object_name,
-	'Monitoring your logfile size will prevent from filling up storage (or expanding your storage in cloud managed). This can also lead to the server cashing when the logfile cannot be saved.' as issue_description,
-	ls.size_mb as current_value,
-	'Set log_rotation_age and size for proper rotation of log files. This will prevent runaway log sizes.' as recommended_action,
-	'For self-hosting:https://www.postgresql.org/docs/current/runtime-config-logging.html /
-         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
-         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
-         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
+	'Most managed services do not allow access to pg_ls_dir. See documentation below for how to find your log files' as issue_description,
+	'Cannot view log size-this is a managed service' as current_value,
+	'Check your provider for further documentation on calculating log size' as recommended_action,
+	'For AWS Aurora/RDS: https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-log-files.html  /
+         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/logging /
+         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/cli/azure/postgres/flexible-server/server-logs?view=azure-cli-latest
         ' as documentation_link,
-	5 as severity_order
-from
-	ls);
+	5 as severity_order;

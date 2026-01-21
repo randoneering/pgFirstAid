@@ -1,5 +1,5 @@
 locals {
-  project_id       = ""  # Set your GCP project ID
+  project_id       = "pgfirstaid"
   region           = "us-west1"
   instance_name    = "pgfirstaid-pg16"
   postgres_version = "POSTGRES_16"

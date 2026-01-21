@@ -1096,7 +1096,6 @@ cross join lateral
 		5 as severity_order
 from
 		ls;
-
 exception
 when insufficient_privilege then
 		insert
@@ -1110,16 +1109,10 @@ when insufficient_privilege then
 			'Unable to check log file sizes - insufficient privileges' as issue_description,
 			'Permission denied for pg_ls_dir' as current_value,
 			'If this is a managed instance (ex:AWS RDS), you will not be able to view this information from SQL. For RDS, use AWS CLI: aws rds describe-db-log-files --db-instance-identifier <instance-name>. Otherwise, grant pg_read_server_files role or run as superuser to enable this check.' as recommended_action,
-<<<<<<< HEAD
 			'For AWS Aurora/RDS: https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-log-files.html  /
          For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/logging /
          For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/cli/azure/postgres/flexible-server/server-logs?view=azure-cli-latest
         ' as documentation_link,
-=======
-			'https://www.postgresql.org/docs/current/functions-admin.html /
-			 For AWS RDS: https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-log-files.html /
-			 https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Procedural.Viewing.html' as documentation_link,
->>>>>>> feature/low_priority_checks
 			5 as severity_order;
 end;
 -- Return results ordered by severity

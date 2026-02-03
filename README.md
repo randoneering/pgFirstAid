@@ -2,6 +2,12 @@
 
 Easy-to-deploy, open source PostgreSQL function (and view!) that provides a prioritized list of actions to improve database stability and performance.Inspired by Brent Ozar's [FirstResponderKit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) for SQL Server, **pgFirstAid** is designed for everyone to use—not just DBAs! Get actionable health insights from your PostgreSQL database in seconds.
 
+
+## Quick Thank You To Our Sponsors
+
+This project is supported by:
+[![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?refcode=1255f30016e1&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
+
 ## Features
 
 - **Zero Dependencies** - Single SQL function, no external tools required

@@ -9,6 +9,13 @@ This project is supported by:
 
 [![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?refcode=1255f30016e1&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
 
+DigitalOcean is the cloud provider that doesn't make you wade through a thousand services to spin up a VM or database. You get straightforward VMs (they call them Droplets), managed Postgres/MySQL/Redis, Kubernetes if you need it, and pricing you can actually understand—all with an interface that doesn't require a PhD to navigate. Click the badge above to start your journey with DigitalOcean.
+
+[![Neon Sponsorship](docs/images/neon-logo-dark-color.svg)](https://get.neon.com/5HwTAdh)
+
+Neon gives you serverless PostgreSQL that scales to zero when you're not using it. You get Git-like branching for your database—fork it for testing, preview environments, whatever—and it's actual Postgres, so all your tools and extensions just work. This project uses Neon for testing pgFirstAid for compatibility; so you can use it too! Click the Neon image to get started building your next project.
+
+
 ## Features
 
 - **Zero Dependencies** - Single SQL function, no external tools required

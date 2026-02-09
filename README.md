@@ -6,8 +6,10 @@ Easy-to-deploy, open source PostgreSQL function (and view!) that provides a prio
 ## Quick Thank You To Our Sponsors
 
 This project is supported by:
+
 [![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?refcode=1255f30016e1&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
 
+[![Neon Sponsorship](docs/images/neon-logo-dark-color.svg)](https://get.neon.com/5HwTAdh)
 ## Features
 
 - **Zero Dependencies** - Single SQL function, no external tools required

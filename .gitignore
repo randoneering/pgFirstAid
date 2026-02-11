@@ -11,3 +11,10 @@ terraform.tfstate.backup
 *.pem
 *.key
 credentials.json
+# AI dirs
+.claude
+.agent
+.copilot
+
+# AI Files
+CLAUDE.md

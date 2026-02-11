@@ -40,7 +40,7 @@ SELECT ok(
 
 -- Test 2: View parity structural test
 SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid
+    (SELECT count(*) >= 0 FROM v_pgfirstAid
      WHERE check_name = 'Current Blocked/Blocking Queries'),
     'Blocked/Blocking Queries check executes without error (view)'
 );
@@ -82,7 +82,7 @@ SELECT ok(
 -- Test 4: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Outdated Statistics'
           AND object_name LIKE '%outdated_stats_table%'
     ),
@@ -132,7 +132,7 @@ SELECT ok(
 -- Test 6: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Low Index Efficiency'
           AND object_name LIKE '%idx_low_eff%'
     ),
@@ -152,7 +152,7 @@ SELECT ok(
 
 -- Test 8: View parity
 SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid
+    (SELECT count(*) >= 0 FROM v_pgfirstAid
      WHERE check_name = 'Replication Slots Near Max Wal Size'),
     'Replication Slots Near Max Wal Size check executes without error (view)'
 );
@@ -194,7 +194,7 @@ SELECT ok(
 -- Test 10: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Excessive Sequential Scans'
           AND object_name LIKE '%seq_scan_table%'
     ),
@@ -232,7 +232,7 @@ SELECT ok(
 -- Test 12: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Table with more than 50 columns'
           AND severity = 'MEDIUM'
           AND object_name LIKE '%wide_table_75%'
@@ -290,7 +290,7 @@ SELECT ok(
 -- Test 15: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'High Connection Count'
     ),
     'View detects high connection count'
@@ -331,7 +331,7 @@ SELECT ok(
 -- Test 17: View parity
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Tables larger than 100GB'
           AND severity_order = 3
           AND object_name LIKE '%pgfirstaid_test%'
@@ -374,7 +374,7 @@ SELECT ok(
 -- Test 19: View parity
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Long Running Queries'
           AND current_value LIKE '%pg_sleep(600)%'
     ),

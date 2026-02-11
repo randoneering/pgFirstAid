@@ -32,7 +32,7 @@ SELECT ok(
 -- Test 2: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Missing FK Index'
           AND object_name LIKE '%fk_child_no_idx%'
     ),
@@ -51,7 +51,7 @@ SELECT is(
 
 -- Test 4: View severity matches
 SELECT is(
-    (SELECT severity FROM v_pgfirstaid
+    (SELECT severity FROM v_pgfirstAid
      WHERE check_name = 'Missing FK Index'
        AND object_name LIKE '%fk_child_no_idx%'
      LIMIT 1),
@@ -84,7 +84,7 @@ SELECT ok(
 -- Test 6: View parity
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Missing FK Index'
           AND object_name LIKE '%fk_child_with_idx%'
     ),
@@ -125,7 +125,7 @@ SELECT ok(
 -- Test 8: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Missing FK Index'
           AND object_name LIKE '%fk_child_composite%'
     ),

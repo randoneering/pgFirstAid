@@ -81,11 +81,11 @@ SELECT ok(
 -- =============================================================================
 
 -- Test 9: View exists
-SELECT has_view('public', 'v_pgfirstaid', 'v_pgfirstAid view exists');
+SELECT has_view('public', 'v_pgfirstAid', 'v_pgfirstAid view exists');
 
 -- Test 10: View has correct columns (includes severity_order)
 SELECT columns_are(
-    'public', 'v_pgfirstaid',
+    'public', 'v_pgfirstAid',
     ARRAY['severity','category','check_name','object_name',
           'issue_description','current_value','recommended_action',
           'documentation_link','severity_order'],
@@ -101,7 +101,7 @@ SELECT is(
     (SELECT count(*)::int FROM (
         SELECT check_name FROM pg_firstAid()
         EXCEPT
-        SELECT check_name FROM v_pgfirstaid
+        SELECT check_name FROM v_pgfirstAid
     ) diff),
     0,
     'No check_names in function that are missing from view'
@@ -110,7 +110,7 @@ SELECT is(
 -- Test 12: View has no extra check_names vs function
 SELECT is(
     (SELECT count(*)::int FROM (
-        SELECT check_name FROM v_pgfirstaid
+        SELECT check_name FROM v_pgfirstAid
         EXCEPT
         SELECT check_name FROM pg_firstAid()
     ) diff),
@@ -121,7 +121,7 @@ SELECT is(
 -- Test 13: Row counts match
 SELECT is(
     (SELECT count(*)::int FROM pg_firstAid()),
-    (SELECT count(*)::int FROM v_pgfirstaid),
+    (SELECT count(*)::int FROM v_pgfirstAid),
     'Function and view return same number of rows'
 );
 

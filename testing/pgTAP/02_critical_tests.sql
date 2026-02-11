@@ -41,7 +41,7 @@ SELECT ok(
 -- Test 3: View parity - table without PK detected
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Missing Primary Key'
           AND object_name LIKE '%no_pk_table%'
     ),
@@ -51,7 +51,7 @@ SELECT ok(
 -- Test 4: View parity - table with PK not flagged
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Missing Primary Key'
           AND object_name LIKE '%has_pk_table%'
     ),
@@ -93,7 +93,7 @@ SELECT ok(
 -- Test 6: View parity - large unused index detected
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Unused Large Index'
           AND object_name LIKE '%idx_large_unused%'
     ),
@@ -120,7 +120,7 @@ SELECT ok(
 -- Test 8: Small index not flagged by view
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstaid
+        SELECT 1 FROM v_pgfirstAid
         WHERE check_name = 'Unused Large Index'
           AND object_name LIKE '%small_idx_table%'
     ),

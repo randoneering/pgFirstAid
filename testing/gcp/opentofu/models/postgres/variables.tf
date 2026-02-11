@@ -16,7 +16,7 @@ variable "postgres_version" {
 variable "region" {
   description = "GCP region for the instance"
   type        = string
-  default     = "us-central1"
+  default     = "us-west1"
 }
 
 variable "database_name" {

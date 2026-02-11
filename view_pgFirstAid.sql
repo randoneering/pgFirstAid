@@ -423,11 +423,7 @@ select
 	when n_dead_tup > v_threshold then 'Run VACUUM'
 	when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
 end as recommended_action,
-<<<<<<< HEAD
-	'https://www.postgresql.org/docs/current/routine-vacuuming.html#AUTOVACUUM,
-=======
 	'https://www.postgresql.org/docs/current/routine-vacuuming.html,
->>>>>>> feature/low_priority_checks
         https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
 	3 as severity_order
 from

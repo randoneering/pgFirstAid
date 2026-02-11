@@ -88,7 +88,7 @@ with q as (
 		database,
 		restart_lsn,
 		case
-			when 'invalidation_reason' is not null then 'invalid'
+			when invalidation_reason is not null then 'invalid'
 			else
           case
 				when active is true then 'active'
@@ -102,7 +102,7 @@ with q as (
 	from
 		pg_replication_slots
 	where
-		'status' = 'inactive'
+		active = false
     )
     select
 	'HIGH' as severity,
@@ -507,7 +507,7 @@ with q as (
 		database,
 		restart_lsn,
 		case
-			when 'invalidation_reason' is not null then 'invalid'
+			when invalidation_reason is not null then 'invalid'
 			else
       case
 				when active is true then 'active'

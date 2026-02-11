@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # Default connection parameters
-DB_HOST="10.10.1.216"
+DB_HOST=""
 DB_PORT="5432"
 DB_USER="randoneering"
 DB_NAME="pgFirstAid"

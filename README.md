@@ -15,7 +15,7 @@ DigitalOcean is the cloud provider that doesn't make you wade through a thousand
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/neon-logo-dark-color.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/images/neon-logo-light-color.png">
-    <img alt="Neon Sponsorship" src="docs/images/neon-logo-light-color.png">
+    <img alt="Neon Sponsorship" src="docs/images/neon-logo-light-color.png" width="200">
   </picture>
 </a>
 

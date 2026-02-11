@@ -69,10 +69,13 @@ SELECT ok(
                    WHEN 'INFO' THEN 5
                END as expected_order
         FROM pg_firstAid()
+    ),
+    with_lag AS (
+        SELECT expected_order,
+               LAG(expected_order, 1, 0) OVER (ORDER BY rn) as prev_order
+        FROM ordered
     )
-    SELECT bool_and(
-        expected_order >= LAG(expected_order, 1, 0) OVER (ORDER BY rn)
-    ) FROM ordered),
+    SELECT bool_and(expected_order >= prev_order) FROM with_lag),
     'Function results are ordered by severity (CRITICAL -> HIGH -> MEDIUM -> LOW -> INFO)'
 );
 
@@ -81,15 +84,15 @@ SELECT ok(
 -- =============================================================================
 
 -- Test 9: View exists
-SELECT has_view('public', 'v_pgfirstAid', 'v_pgfirstAid view exists');
+SELECT has_view('public', 'v_pgfirstaid', 'v_pgfirstaid view exists');
 
 -- Test 10: View has correct columns (includes severity_order)
 SELECT columns_are(
-    'public', 'v_pgfirstAid',
+    'public', 'v_pgfirstaid',
     ARRAY['severity','category','check_name','object_name',
           'issue_description','current_value','recommended_action',
           'documentation_link','severity_order'],
-    'v_pgfirstAid view has expected columns (including severity_order)'
+    'v_pgfirstaid view has expected columns (including severity_order)'
 );
 
 -- =============================================================================
@@ -101,7 +104,7 @@ SELECT is(
     (SELECT count(*)::int FROM (
         SELECT check_name FROM pg_firstAid()
         EXCEPT
-        SELECT check_name FROM v_pgfirstAid
+        SELECT check_name FROM v_pgfirstaid
     ) diff),
     0,
     'No check_names in function that are missing from view'
@@ -110,7 +113,7 @@ SELECT is(
 -- Test 12: View has no extra check_names vs function
 SELECT is(
     (SELECT count(*)::int FROM (
-        SELECT check_name FROM v_pgfirstAid
+        SELECT check_name FROM v_pgfirstaid
         EXCEPT
         SELECT check_name FROM pg_firstAid()
     ) diff),
@@ -121,7 +124,7 @@ SELECT is(
 -- Test 13: Row counts match
 SELECT is(
     (SELECT count(*)::int FROM pg_firstAid()),
-    (SELECT count(*)::int FROM v_pgfirstAid),
+    (SELECT count(*)::int FROM v_pgfirstaid),
     'Function and view return same number of rows'
 );
 

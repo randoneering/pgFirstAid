@@ -19,7 +19,7 @@ SELECT ok(
 
 -- Test 2: View parity
 SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstAid
+    (SELECT count(*) >= 0 FROM v_pgfirstaid
      WHERE check_name = 'Inactive Replication Slots'),
     'Inactive Replication Slots check executes without error (view)'
 );
@@ -60,7 +60,7 @@ SELECT ok(
 -- Test 4: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Table Bloat (Detailed)'
           AND object_name LIKE '%bloated_table%'
     ),
@@ -95,7 +95,7 @@ SELECT ok(
 -- Test 6: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Missing Statistics'
           AND object_name LIKE '%no_stats_table%'
     ),
@@ -120,7 +120,7 @@ SELECT ok(
 -- Test 8: View parity
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Tables larger than 100GB'
           AND severity_order = 2
           AND object_name LIKE '%pgfirstaid_test%'
@@ -157,7 +157,7 @@ SELECT ok(
 -- Test 10: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Duplicate Index'
           AND object_name LIKE '%idx_dup_one%'
           AND object_name LIKE '%idx_dup_two%'
@@ -196,7 +196,7 @@ SELECT ok(
 -- Test 12: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Table with more than 200 columns'
           AND severity = 'HIGH'
           AND object_name LIKE '%wide_table_201%'
@@ -217,7 +217,7 @@ SELECT ok(
 -- Test 14: View parity for exclusive range
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Table with more than 50 columns'
           AND object_name LIKE '%wide_table_201%'
     ),

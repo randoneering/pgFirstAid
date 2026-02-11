@@ -61,7 +61,7 @@ select
 		database,
 		restart_lsn,
 		case
-			when 'invalidation_reason' is not null then 'invalid'
+			when invalidation_reason is not null then 'invalid'
 		else
           case
 				when active is true then 'active'
@@ -75,7 +75,7 @@ select
 from
 		pg_replication_slots
 where
-		'status' = 'inactive'
+		active = false
     )
 select
 	'HIGH' as severity,
@@ -88,9 +88,7 @@ select
 	'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
 	2 as severity_order
 from
-	q
-order by
-	slot_name)
+	q)
 union all
 -- credit: https://www.morling.dev/blog/mastering-postgres-replication-slots/ -- Thank you Gunnar Morling!
 -- HIGH: Tables with high bloat
@@ -294,25 +292,31 @@ from
 	ts)
 union all
 -- HIGH: Duplicate or redundant indexes
+-- Compare actual index structure (columns, operator class) not string definitions
     select
 	'HIGH' as severity,
 	'Table Health' as category,
 	'Duplicate Index' as check_name,
-	quote_ident(i1.schemaname) || '.' || i1.indexname || ' & ' || i2.indexname as object_name,
-	'Multiple indexes with identical or overlapping column sets' as issue_description,
-	'Indexes: ' || i1.indexname || ', ' || i2.indexname as current_value,
+	quote_ident(n1.nspname) || '.' || c1.relname || ': ' || i1.relname || ' & ' || i2.relname as object_name,
+	'Multiple indexes with identical column sets and operator classes' as issue_description,
+	'Indexes: ' || i1.relname || ', ' || i2.relname as current_value,
 	'Review and consolidate duplicate indexes and focus on keeping the most efficient one' as recommended_action,
 	'https://www.postgresql.org/docs/current/indexes-multicolumn.html' as documentation_link,
 	2 as severity_order
 from
-	pg_indexes i1
-join pg_indexes i2 on
-	i1.schemaname = i2.schemaname
-	and i1.tablename = i2.tablename
-	and i1.indexname < i2.indexname
-	and i1.indexdef = i2.indexdef
+	pg_index idx1
+join pg_class i1 on idx1.indexrelid = i1.oid
+join pg_class c1 on idx1.indrelid = c1.oid
+join pg_namespace n1 on c1.relnamespace = n1.oid
+join pg_index idx2 on
+	idx1.indrelid = idx2.indrelid  -- same table
+	and idx1.indexrelid < idx2.indexrelid  -- avoid duplicates
+	and idx1.indkey = idx2.indkey  -- same columns
+	and idx1.indclass = idx2.indclass  -- same operator classes
+	and idx1.indoption = idx2.indoption  -- same options
+join pg_class i2 on idx2.indexrelid = i2.oid
 where
-	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+	n1.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 union all
 -- HIGH: Table with more than 200 columns
 (with cc as (
@@ -462,7 +466,7 @@ select
 		database,
 		restart_lsn,
 		case
-			when 'invalidation_reason' is not null then 'invalid'
+			when invalidation_reason is not null then 'invalid'
 		else
       case
 				when active is true then 'active'
@@ -489,9 +493,7 @@ select
 		'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
 		3 as severity_order
 from
-		q
-order by
-		slot_name)
+		q)
 union all
 -- MEDIUM: Large sequential scans
     select
@@ -761,7 +763,8 @@ union all
     FROM
         pg_stat_user_tables
     WHERE
-        coalesce(seq_scan, 0) + coalesce(idx_scan, 0) = 0
+        schemaname NOT LIKE ALL(ARRAY['pg_catalog', 'information_schema', 'pg_toast', 'pg_temp%'])
+        AND coalesce(seq_scan, 0) + coalesce(idx_scan, 0) = 0
         AND coalesce(n_tup_ins, 0) + coalesce(n_tup_upd, 0) + coalesce(n_tup_del, 0) = 0
 )
 SELECT
@@ -856,9 +859,7 @@ select
 https://github.com/mfvanek/pg-index-health-sql/blob/master/sql/tables_with_zero_or_one_column.sql' as documentation_link,
 	4 as severity_order
 from
-	sct
-order by
-	sct.table_size_bytes desc)
+	sct)
 union all
 -- LOW: Connections IDLE for 1 > hour
 (with ic as (

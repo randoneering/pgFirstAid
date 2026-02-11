@@ -28,7 +28,7 @@ SELECT ok(
 -- Test 3: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Database Size'
           AND severity = 'INFO'
     ),
@@ -61,7 +61,7 @@ SELECT ok(
 -- Test 6: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'PostgreSQL Version'
           AND severity = 'INFO'
     ),
@@ -95,7 +95,7 @@ SELECT ok(
 -- Test 9: View parity - pgTAP in extension results
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Installed Extension'
           AND current_value LIKE 'pgtap:%'
     ),
@@ -128,7 +128,7 @@ SELECT ok(
 -- Test 12: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Server Uptime'
           AND severity = 'INFO'
     ),
@@ -152,7 +152,7 @@ SELECT ok(
 -- Test 14: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Is Logging Enabled'
           AND severity = 'INFO'
     ),
@@ -173,7 +173,7 @@ SELECT ok(
 
 -- Test 16: View parity
 SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstAid
+    (SELECT count(*) >= 0 FROM v_pgfirstaid
      WHERE check_name = 'Size of ALL Logfiles combined'),
     'Log file size check executes without error (view)'
 );
@@ -187,7 +187,7 @@ SELECT is(
     (SELECT count(*)::int FROM (
         SELECT DISTINCT check_name FROM pg_firstAid() WHERE severity = 'INFO'
         EXCEPT
-        SELECT DISTINCT check_name FROM v_pgfirstAid WHERE severity = 'INFO'
+        SELECT DISTINCT check_name FROM v_pgfirstaid WHERE severity = 'INFO'
     ) diff),
     0,
     'All INFO check_names from function exist in view'
@@ -196,7 +196,7 @@ SELECT is(
 -- Test 18: All INFO check_names from view exist in function
 SELECT is(
     (SELECT count(*)::int FROM (
-        SELECT DISTINCT check_name FROM v_pgfirstAid WHERE severity = 'INFO'
+        SELECT DISTINCT check_name FROM v_pgfirstaid WHERE severity = 'INFO'
         EXCEPT
         SELECT DISTINCT check_name FROM pg_firstAid() WHERE severity = 'INFO'
     ) diff),

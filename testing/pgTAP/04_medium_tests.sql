@@ -20,8 +20,11 @@ END $$;
 -- =============================================================================
 
 -- Fixture: Table for lock contention testing
-CREATE TABLE pgfirstaid_test.lock_test_table (id integer PRIMARY KEY, data text);
-INSERT INTO pgfirstaid_test.lock_test_table VALUES (1, 'test');
+-- Create via dblink so it's visible to the dblink session
+SELECT dblink_exec('test_conn',
+    'CREATE TABLE pgfirstaid_test.lock_test_table (id integer PRIMARY KEY, data text)');
+SELECT dblink_exec('test_conn',
+    'INSERT INTO pgfirstaid_test.lock_test_table VALUES (1, ''test'')');
 
 -- Start a background transaction that holds a lock via dblink
 SELECT dblink_exec('test_conn', 'BEGIN');
@@ -40,7 +43,7 @@ SELECT ok(
 
 -- Test 2: View parity structural test
 SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstAid
+    (SELECT count(*) >= 0 FROM v_pgfirstaid
      WHERE check_name = 'Current Blocked/Blocking Queries'),
     'Blocked/Blocking Queries check executes without error (view)'
 );
@@ -82,7 +85,7 @@ SELECT ok(
 -- Test 4: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Outdated Statistics'
           AND object_name LIKE '%outdated_stats_table%'
     ),
@@ -132,7 +135,7 @@ SELECT ok(
 -- Test 6: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Low Index Efficiency'
           AND object_name LIKE '%idx_low_eff%'
     ),
@@ -152,7 +155,7 @@ SELECT ok(
 
 -- Test 8: View parity
 SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstAid
+    (SELECT count(*) >= 0 FROM v_pgfirstaid
      WHERE check_name = 'Replication Slots Near Max Wal Size'),
     'Replication Slots Near Max Wal Size check executes without error (view)'
 );
@@ -194,7 +197,7 @@ SELECT ok(
 -- Test 10: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Excessive Sequential Scans'
           AND object_name LIKE '%seq_scan_table%'
     ),
@@ -232,7 +235,7 @@ SELECT ok(
 -- Test 12: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Table with more than 50 columns'
           AND severity = 'MEDIUM'
           AND object_name LIKE '%wide_table_75%'
@@ -290,7 +293,7 @@ SELECT ok(
 -- Test 15: View parity
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'High Connection Count'
     ),
     'View detects high connection count'
@@ -331,7 +334,7 @@ SELECT ok(
 -- Test 17: View parity
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Tables larger than 100GB'
           AND severity_order = 3
           AND object_name LIKE '%pgfirstaid_test%'
@@ -374,7 +377,7 @@ SELECT ok(
 -- Test 19: View parity
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Long Running Queries'
           AND current_value LIKE '%pg_sleep(600)%'
     ),
@@ -431,6 +434,9 @@ SELECT ok(
     ),
     'Table with efficient index not flagged for low efficiency'
 );
+
+-- Clean up lock_test_table created via dblink (not in transaction)
+DROP TABLE IF EXISTS pgfirstaid_test.lock_test_table;
 
 SELECT * FROM finish();
 ROLLBACK;

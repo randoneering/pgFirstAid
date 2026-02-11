@@ -32,7 +32,7 @@ BEGIN
         WHERE viewname = 'v_pgfirstaid'
           AND schemaname = 'public'
     ) THEN
-        RAISE EXCEPTION 'v_pgfirstAid view not found. Run: psql -f view_pgFirstAid.sql';
+        RAISE EXCEPTION 'v_pgfirstaid view not found. Run: psql -f view_pgFirstAid.sql';
     END IF;
 
     RAISE NOTICE 'Setup complete: pgTAP, dblink, pgfirstaid_test schema, pg_firstAid function and view verified.';

@@ -11,6 +11,8 @@ terraform.tfstate.backup
 *.pem
 *.key
 credentials.json
+.pgpass
+pgpass
 # AI dirs
 .claude
 .agent
@@ -18,3 +20,7 @@ credentials.json
 
 # AI Files
 CLAUDE.md
+
+# Test logs
+*.log
+testing/pgTAP/logs/

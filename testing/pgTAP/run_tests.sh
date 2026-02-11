@@ -12,8 +12,21 @@
 
 set -euo pipefail
 
+# Setup logging
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$SCRIPT_DIR/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/run_$(date +%Y%m%d_%H%M%S).log"
+
+# Redirect all output to both console and log file
+exec > >(tee -a "$LOG_FILE")
+exec 2>&1
+
+echo "Logging to: $LOG_FILE"
+echo ""
+
 # Default connection parameters
-DB_HOST=""
+DB_HOST="10.10.1.236"
 DB_PORT="5432"
 DB_USER="randoneering"
 DB_NAME="pgFirstAid"
@@ -36,9 +49,6 @@ PSQL_ARGS=()
 [[ -n "$DB_PORT" ]] && PSQL_ARGS+=("-p" "$DB_PORT")
 [[ -n "$DB_USER" ]] && PSQL_ARGS+=("-U" "$DB_USER")
 [[ -n "$DB_NAME" ]] && PSQL_ARGS+=("-d" "$DB_NAME")
-
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Track results
 TOTAL_PASS=0
@@ -72,8 +82,9 @@ for test_file in "$SCRIPT_DIR"/0[1-9]_*.sql; do
     echo "$output"
 
     # Count pass/fail from TAP output
-    pass_count=$(echo "$output" | grep -c "^ok " || true)
-    fail_count=$(echo "$output" | grep -c "^not ok " || true)
+    # TAP output has leading space before "ok" and "not ok"
+    pass_count=$(echo "$output" | grep -c '^ ok [0-9]' || true)
+    fail_count=$(echo "$output" | grep -c '^ not ok [0-9]' || true)
 
     TOTAL_PASS=$((TOTAL_PASS + pass_count))
     TOTAL_FAIL=$((TOTAL_FAIL + fail_count))
@@ -106,8 +117,12 @@ if [[ $TOTAL_FAIL -gt 0 ]]; then
     done
     echo ""
     echo "  RESULT: FAIL"
+    echo ""
+    echo "Full log saved to: $LOG_FILE"
     exit 1
 else
     echo "  RESULT: PASS"
+    echo ""
+    echo "Full log saved to: $LOG_FILE"
     exit 0
 fi

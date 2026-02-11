@@ -41,7 +41,7 @@ SELECT ok(
 -- Test 3: View parity - table without PK detected
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Missing Primary Key'
           AND object_name LIKE '%no_pk_table%'
     ),
@@ -51,7 +51,7 @@ SELECT ok(
 -- Test 4: View parity - table with PK not flagged
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Missing Primary Key'
           AND object_name LIKE '%has_pk_table%'
     ),
@@ -63,18 +63,19 @@ SELECT ok(
 -- =============================================================================
 
 -- Fixture: Large table with unused index (>100MB)
--- Need ~3 million rows with wide-ish data to push index over 100MB
+-- Need ~5 million rows to push bigint index over 100MB threshold
 CREATE TABLE pgfirstaid_test.large_idx_table (
     id bigint,
     data text
 );
 
 -- Insert enough rows to create a >100MB index
+-- 5M rows of bigint should create ~107MB index
 INSERT INTO pgfirstaid_test.large_idx_table
 SELECT g, md5(g::text) || md5((g+1)::text)
-FROM generate_series(1, 3000000) g;
+FROM generate_series(1, 5000000) g;
 
--- Create index (will be >100MB with 3M rows of bigint)
+-- Create index (will be >100MB with 5M rows of bigint)
 CREATE INDEX idx_large_unused ON pgfirstaid_test.large_idx_table(id);
 
 -- Force stats update so pg_relation_size reports correctly
@@ -93,7 +94,7 @@ SELECT ok(
 -- Test 6: View parity - large unused index detected
 SELECT ok(
     EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Unused Large Index'
           AND object_name LIKE '%idx_large_unused%'
     ),
@@ -120,7 +121,7 @@ SELECT ok(
 -- Test 8: Small index not flagged by view
 SELECT ok(
     NOT EXISTS(
-        SELECT 1 FROM v_pgfirstAid
+        SELECT 1 FROM v_pgfirstaid
         WHERE check_name = 'Unused Large Index'
           AND object_name LIKE '%small_idx_table%'
     ),

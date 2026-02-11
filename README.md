@@ -2,6 +2,26 @@
 
 Easy-to-deploy, open source PostgreSQL function (and view!) that provides a prioritized list of actions to improve database stability and performance.Inspired by Brent Ozar's [FirstResponderKit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) for SQL Server, **pgFirstAid** is designed for everyone to use—not just DBAs! Get actionable health insights from your PostgreSQL database in seconds.
 
+
+## Quick Thank You To Our Sponsors
+
+This project is supported by:
+
+[![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?refcode=1255f30016e1&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
+
+DigitalOcean is the cloud provider that doesn't make you wade through a thousand services to spin up a VM or database. You get straightforward VMs (they call them Droplets), managed Postgres/MySQL/Redis, Kubernetes if you need it, and pricing you can actually understand. All with an interface that doesn't require a PhD to navigate. Click the badge above to start your journey with DigitalOcean.
+
+<a href="https://get.neon.com/5HwTAdh">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/neon-logo-dark-color.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/neon-logo-light-color.png">
+    <img alt="Neon Sponsorship" src="docs/images/neon-logo-light-color.png" width="200">
+  </picture>
+</a>
+
+Neon gives you serverless PostgreSQL that scales to zero when you're not using it. You get Git-like branching for your database; fork it for testing, preview environments, whatever. Plus, it's just Postgres. All your tools and extensions just work. This project uses Neon for testing pgFirstAid for compatibility, which means you can use it too! Click the Neon image to get started building your next project.
+
+
 ## Features
 
 - **Zero Dependencies** - Single SQL function, no external tools required
@@ -38,42 +58,48 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 
 ### CRITICAL Issues
 
-**Missing Primary Keys** - Tables without primary keys that can cause replication issues and poor performance
-**Unused Large Indexes** - Indexes consuming significant disk space but never used (>10MB, 0 scans)
+- **Missing Primary Keys** - Tables without primary keys that can cause replication issues and poor performance
+- **Unused Large Indexes** - Indexes consuming significant disk space but never used (>10MB, 0 scans)
 
 ### HIGH Priority Issues
 
-**Table Bloat** - Tables with >20% bloat affecting performance (tables >100MB)
-**Missing Statistics** - Tables never analyzed, leaving the query planner without statistics
-**Duplicate Indexes** - Multiple indexes with identical or overlapping column sets
-**Inactive Replication Slots** - Identifies replication slots that are inactive and can be removed if no longer needed
-**Tables Larger Than 100GB** - Identifies tables that are larger than 100GB
-**Tables With More Than 200 Columns** - List tables with more than 200 columns. You should probably look into those...
+- **Table Bloat** - Tables with >20% bloat affecting performance (tables >100MB)
+- **Missing Statistics** - Tables never analyzed, leaving the query planner without statistics
+- **Duplicate Indexes** - Multiple indexes with identical or overlapping column sets
+- **Inactive Replication Slots** - Identifies replication slots that are inactive and can be removed if no longer needed
+- **Tables Larger Than 100GB** - Identifies tables that are larger than 100GB
+- **Tables With More Than 200 Columns** - List tables with more than 200 columns. You should probably look into those...
 
 ### MEDIUM Priority Issues
 
-**Outdated Statistics** - Table statistics older than 7 days with significant modifications
-**Low Index Efficiency** - Indexes with poor selectivity (scan-to-tuple ratio >1000)
-**Excessive Sequential Scans** - Tables with high sequential scan activity that may benefit from indexes
-**High Connection Count** - More than 50 active connections potentially impacting performance
-**Replication Slots With High WAL Retention** - Replication slots that have 90% of max wal setting
-**Long Running Queries** - Queries that have been running for 5 minutes or more
-**Blocked and Blocking Queries** - Queries that are currently blocked or blocking other queries at the time you run pg_firstAid
-**Tables With More Than 50 Columns** - List tables with more than 50 columns (but less than 200)
-**Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
+- **Outdated Statistics** - Table statistics older than 7 days with significant modifications
+- **Low Index Efficiency** - Indexes with poor selectivity (scan-to-tuple ratio >1000)
+- **Excessive Sequential Scans** - Tables with high sequential scan activity that may benefit from indexes
+- **High Connection Count** - More than 50 active connections potentially impacting performance
+- **Replication Slots With High WAL Retention** - Replication slots that have 90% of max wal setting
+- **Long Running Queries** - Queries that have been running for 5 minutes or more
+- **Blocked and Blocking Queries** - Queries that are currently blocked or blocking other queries at the time you run pg_firstAid
+- **Tables With More Than 50 Columns** - List tables with more than 50 columns (but less than 200)
+- **Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
 
 ### LOW Priority Issues
 
-**Missing Foreign Key Indexes** - Foreign key constraints without supporting indexes for efficient joins
+- **Missing Foreign Key Indexes** - Foreign key constraints without supporting indexes for efficient joins
+- **Idle Connections For More Than 1 Hour** - Grabs connections that have been open and idle for more than 1 hour
+- **Tables With Zero or Only One Column** - Identifies tables with one or zero columns
+- **True Empty Table(s) in Database** - Searches for truly empty tables in the database. Checks if there are rows present and the last time vacuum and analyze was ran against the identified table
+- **Tables With No Recent Activity** - Checks for zero activity since the last stats reset. This check works for all versions of Postgres. In 16+, we could use `last_*_timestamp` columns which could tell you WHEN the last activity was as well. However, this would break compatibility for anything older than 16.
+- **Indexes With Low Usage** - Flags indxes with 1MB with 1-99 scans. Zero scans are already caught by the CRITICAL unused indexes check.
+- **Roles That Have Never Logged In** - Excludes system role and managed services roles. This includes users with `LOGIN` rights.
 
 ### INFORMATIONAL
 
-**Database Size** - Current database size and growth monitoring
-**PostgreSQL Version** - Version information and configuration details
-**Installed Extensions** - Lists installed extensions on the Server
-**Server Uptime** - Server uptime since last restart
-**Log Directory** - Location of Log File(s). Results will vary for managed services like AWS RDS. (note: need access to AWS/Azure/GCP environments where I can test against!)
-**Log File Sizes** - The size of the log files. Again, this will vary for managed services. 
+- **Database Size** - Current database size and growth monitoring
+- **PostgreSQL Version** - Version information and configuration details
+- **Installed Extensions** - Lists installed extensions on the Server
+- **Server Uptime** - Server uptime since last restart
+- **Log Directory** - Location of Log File(s). Results will vary for managed services like AWS RDS. (note: need access to AWS/Azure/GCP environments where I can test against!)
+- **Log File Sizes** - The size of the log files. Again, this will vary for managed services. 
 
 ## Usage Tips
 

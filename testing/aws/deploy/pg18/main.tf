@@ -16,4 +16,3 @@ module "nonaurora" {
 output "endpoint" {
   value = module.nonaurora.rds_instance_address
 }
-s

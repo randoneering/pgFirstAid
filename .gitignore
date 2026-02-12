@@ -21,6 +21,11 @@ pgpass
 # AI Files
 CLAUDE.md
 
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+
 # Test logs
 *.log
 testing/pgTAP/logs/

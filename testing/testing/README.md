@@ -1,27 +1,20 @@
-# Python Integration Harness for pgFirstAid
+# Python Integration/Validation Tests for pgFirstAid
 
-This test harness runs pgFirstAid integration tests with `pytest`.
-It combines:
+This test harness runs pgFirstAid integration tests with `pytest`. One of the things I wanted to make sure this project does is validate each health check. While these tests might not be perfect, but the aim is to reduce the chances of a health check making its way into `main` and it fails to do its job.
 
-- Python-driven integration tests (`psycopg`) for live runtime behavior
-- Python-driven execution of the pgTAP SQL suite
 
-## What this covers
+It uses:
+
+- Integration tests using (`psycopg`) for live runtime behavior(for checks looking for active connections)
+- Execution of the pgTAP SQL suite sing Python
+
+## What is covered
 
 - pgTAP assertions grouped by severity (`testing/pgTAP/01_*.sql` to `06_*.sql`)
 - Python integration scenarios that need concurrent sessions and timing control
 - Function/view parity assertions
 - A coverage guard test that ensures every `check_name` in `pgFirstAid.sql` is
   referenced by at least one pgTAP assertion
-
-## Prerequisites
-
-- Python 3.11+
-- `uv`
-- A PostgreSQL test database with:
-  - `pg_firstAid()` loaded
-  - `v_pgfirstaid` loaded
-  - permissions to create schema/table/extensions used in `testing/pgTAP/00_setup.sql`
 
 ## Configure connection
 
@@ -48,16 +41,4 @@ export PGFA_TEST_WAIT_TIMEOUT_SECONDS=45
 ```bash
 uv sync
 uv run pytest tests/integration -m integration
-```
-
-Skip the slow connection test:
-
-```bash
-uv run pytest tests/integration -m "integration and not slow"
-```
-
-Run only pgTAP-driven tests:
-
-```bash
-uv run pytest tests/integration/test_pgtap_suite.py -m integration
 ```

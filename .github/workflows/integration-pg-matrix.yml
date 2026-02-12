@@ -1,0 +1,75 @@
+name: Python + pgTAP Integration (PG15-PG18)
+
+on:
+  pull_request:
+    paths:
+      - pgFirstAid.sql
+      - view_pgFirstAid.sql
+      - view_pgFirstAid_managed.sql
+      - testing/integration/**
+      - testing/pgTAP/**
+      - .github/workflows/integration-pg-matrix.yml
+  workflow_dispatch:
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres_version: ["15", "16", "17", "18"]
+
+    name: PG${{ matrix.postgres_version }} integration
+
+    defaults:
+      run:
+        working-directory: testing/integration
+
+    env:
+      PGHOST: ${{ matrix.postgres_version == '15' && secrets.PG15_HOST || matrix.postgres_version == '16' && secrets.PG16_HOST || matrix.postgres_version == '17' && secrets.PG17_HOST || secrets.PG18_HOST }}
+      PGPORT: ${{ matrix.postgres_version == '15' && secrets.PG15_PORT || matrix.postgres_version == '16' && secrets.PG16_PORT || matrix.postgres_version == '17' && secrets.PG17_PORT || secrets.PG18_PORT }}
+      PGUSER: ${{ matrix.postgres_version == '15' && secrets.PG15_USER || matrix.postgres_version == '16' && secrets.PG16_USER || matrix.postgres_version == '17' && secrets.PG17_USER || secrets.PG18_USER }}
+      PGPASSWORD: ${{ matrix.postgres_version == '15' && secrets.PG15_PASSWORD || matrix.postgres_version == '16' && secrets.PG16_PASSWORD || matrix.postgres_version == '17' && secrets.PG17_PASSWORD || secrets.PG18_PASSWORD }}
+      PGDATABASE: ${{ matrix.postgres_version == '15' && secrets.PG15_DATABASE || matrix.postgres_version == '16' && secrets.PG16_DATABASE || matrix.postgres_version == '17' && secrets.PG17_DATABASE || secrets.PG18_DATABASE }}
+      PGSSLMODE: require
+      PGFA_TEST_ACTIVE_CONN_TARGET: "52"
+      PGFA_TEST_ACTIVE_CONN_SLEEP_SECONDS: "20"
+      PGFA_TEST_WAIT_TIMEOUT_SECONDS: "45"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Validate required PG env vars
+        run: |
+          missing=0
+          for var in PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required secret/env: ${var} for PG${{ matrix.postgres_version }}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration -m integration

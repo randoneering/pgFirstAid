@@ -61,13 +61,9 @@ select
 		database,
 		restart_lsn,
 		case
-			when invalidation_reason is not null then 'invalid'
-		else
-          case
-				when active is true then 'active'
+			when active is true then 'active'
 			else 'inactive'
-		end
-	end as "status",
+		end as "status",
 		pg_size_pretty(
         pg_wal_lsn_diff(
           pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
@@ -466,13 +462,9 @@ select
 		database,
 		restart_lsn,
 		case
-			when invalidation_reason is not null then 'invalid'
-		else
-      case
-				when active is true then 'active'
+			when active is true then 'active'
 			else 'inactive'
-		end
-	end as "status",
+		end as "status",
 		pg_size_pretty(
     pg_wal_lsn_diff(
       pg_current_wal_lsn(), restart_lsn)) as "retained_wal",

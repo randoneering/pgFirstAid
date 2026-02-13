@@ -88,12 +88,8 @@ with q as (
 		database,
 		restart_lsn,
 		case
-			when invalidation_reason is not null then 'invalid'
-			else
-          case
-				when active is true then 'active'
-				else 'inactive'
-			end
+			when active is true then 'active'
+			else 'inactive'
 		end as "status",
 		pg_size_pretty(
         pg_wal_lsn_diff(
@@ -513,12 +509,8 @@ with q as (
 		database,
 		restart_lsn,
 		case
-			when invalidation_reason is not null then 'invalid'
-			else
-      case
-				when active is true then 'active'
-				else 'inactive'
-			end
+			when active is true then 'active'
+			else 'inactive'
 		end as "status",
 		pg_size_pretty(
     pg_wal_lsn_diff(

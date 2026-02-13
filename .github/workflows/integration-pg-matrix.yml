@@ -18,7 +18,7 @@ concurrency:
 jobs:
   integration:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, pgfirstaid-ci]
     permissions:
       contents: read
     strategy:
@@ -70,6 +70,15 @@ jobs:
 
       - name: Sync dependencies
         run: uv sync
+
+      - name: Install pgFirstAid function
+        run: |
+          psql -v ON_ERROR_STOP=1 -f ../../pgFirstAid.sql
+
+      - name: Recreate managed view only
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "DROP VIEW IF EXISTS v_pgfirstaid"
+          psql -v ON_ERROR_STOP=1 -f ../../view_pgFirstAid_managed.sql
 
       - name: Run integration tests
         run: uv run pytest tests/integration -m integration

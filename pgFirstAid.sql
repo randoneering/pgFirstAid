@@ -88,12 +88,8 @@ with q as (
 		database,
 		restart_lsn,
 		case
-			when invalidation_reason is not null then 'invalid'
-			else
-          case
-				when active is true then 'active'
-				else 'inactive'
-			end
+			when active is true then 'active'
+			else 'inactive'
 		end as "status",
 		pg_size_pretty(
         pg_wal_lsn_diff(
@@ -326,6 +322,7 @@ order by
 from
 	ts;
 -- HIGH: Duplicate or redundant indexes
+-- Compare actual index structure (columns, operator class) not string definitions
     insert
 	into
 	health_results
@@ -333,21 +330,26 @@ from
 	'HIGH' as severity,
 	'Table Health' as category,
 	'Duplicate Index' as check_name,
-	quote_ident(i1.schemaname) || '.' || i1.indexname || ' & ' || i2.indexname as object_name,
-	'Multiple indexes with identical or overlapping column sets' as issue_description,
-	'Indexes: ' || i1.indexname || ', ' || i2.indexname as current_value,
+	quote_ident(n1.nspname) || '.' || c1.relname || ': ' || i1.relname || ' & ' || i2.relname as object_name,
+	'Multiple indexes with identical column sets and operator classes' as issue_description,
+	'Indexes: ' || i1.relname || ', ' || i2.relname as current_value,
 	'Review and consolidate duplicate indexes and focus on keeping the most efficient one' as recommended_action,
 	'https://www.postgresql.org/docs/current/indexes-multicolumn.html' as documentation_link,
 	2 as severity_order
 from
-	pg_indexes i1
-join pg_indexes i2 on
-	i1.schemaname = i2.schemaname
-	and i1.tablename = i2.tablename
-	and i1.indexname < i2.indexname
-	and i1.indexdef = i2.indexdef
+	pg_index idx1
+join pg_class i1 on idx1.indexrelid = i1.oid
+join pg_class c1 on idx1.indrelid = c1.oid
+join pg_namespace n1 on c1.relnamespace = n1.oid
+join pg_index idx2 on
+	idx1.indrelid = idx2.indrelid  -- same table
+	and idx1.indexrelid < idx2.indexrelid  -- avoid duplicates
+	and idx1.indkey = idx2.indkey  -- same columns
+	and idx1.indclass = idx2.indclass  -- same operator classes
+	and idx1.indoption = idx2.indoption  -- same options
+join pg_class i2 on idx2.indexrelid = i2.oid
 where
-	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%']);
+	n1.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%']);
 -- HIGH: Table with more than 200 columns
 with cc as (
 select
@@ -507,12 +509,8 @@ with q as (
 		database,
 		restart_lsn,
 		case
-			when invalidation_reason is not null then 'invalid'
-			else
-      case
-				when active is true then 'active'
-				else 'inactive'
-			end
+			when active is true then 'active'
+			else 'inactive'
 		end as "status",
 		pg_size_pretty(
     pg_wal_lsn_diff(
@@ -666,8 +664,9 @@ from
         ) as object_name,
 	'The following query has been running for more than 5 minutes. Might be helpful to see if this is expected behavior' as issue_description,
 	query as current_value,
-	'Review query using EXPLAIN ANALYZE to identify any bottlenecks, such as full table scans, missing indexes, etc' as recommendation_action,
-	'https://www.postgresql.org/docs/current/using-explain.html' as documentation_link
+	'Review query using EXPLAIN ANALYZE to identify any bottlenecks, such as full table scans, missing indexes, etc' as recommended_action,
+	'https://www.postgresql.org/docs/current/using-explain.html' as documentation_link,
+	3 as severity_order
 from
 	pg_stat_activity pgs
 where
@@ -814,8 +813,9 @@ select
 from
 	pg_stat_user_tables
 where
-	coalesce(seq_scan, 0) + coalesce(idx_scan, 0) = 0
-		and coalesce(n_tup_ins, 0) + coalesce(n_tup_upd, 0) + coalesce(n_tup_del, 0) = 0
+	schemaname not like all(array['pg_catalog', 'information_schema', 'pg_toast', 'pg_temp%'])
+	and coalesce(seq_scan, 0) + coalesce(idx_scan, 0) = 0
+	and coalesce(n_tup_ins, 0) + coalesce(n_tup_upd, 0) + coalesce(n_tup_del, 0) = 0
 )
 insert
 	into

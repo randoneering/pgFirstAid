@@ -11,3 +11,21 @@ terraform.tfstate.backup
 *.pem
 *.key
 credentials.json
+.pgpass
+pgpass
+# AI dirs
+.claude
+.agent
+.copilot
+
+# AI Files
+CLAUDE.md
+
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Test logs
+*.log
+testing/pgTAP/logs/

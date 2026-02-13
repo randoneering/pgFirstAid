@@ -1,0 +1,19 @@
+[project]
+name = "pgfirstaid-python-tests"
+version = "0.1.0"
+description = "Python integration harness for pgFirstAid health checks"
+requires-python = ">=3.11"
+dependencies = [
+  "psycopg[binary]>=3.2.0",
+  "pytest>=8.3.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "integration: integration tests against a live PostgreSQL instance",
+  "slow: tests that open many connections or sleep",
+]
+
+[tool.ruff]
+line-length = 88

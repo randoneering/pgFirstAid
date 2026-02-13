@@ -61,13 +61,9 @@ select
 		database,
 		restart_lsn,
 		case
-			when 'invalidation_reason' is not null then 'invalid'
-		else
-          case
-				when active is true then 'active'
+			when active is true then 'active'
 			else 'inactive'
-		end
-	end as "status",
+		end as "status",
 		pg_size_pretty(
         pg_wal_lsn_diff(
           pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
@@ -75,7 +71,7 @@ select
 from
 		pg_replication_slots
 where
-		'status' = 'inactive'
+		active = false
     )
 select
 	'HIGH' as severity,
@@ -88,9 +84,7 @@ select
 	'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
 	2 as severity_order
 from
-	q
-order by
-	slot_name)
+	q)
 union all
 -- credit: https://www.morling.dev/blog/mastering-postgres-replication-slots/ -- Thank you Gunnar Morling!
 -- HIGH: Tables with high bloat
@@ -462,13 +456,9 @@ select
 		database,
 		restart_lsn,
 		case
-			when 'invalidation_reason' is not null then 'invalid'
-		else
-      case
-				when active is true then 'active'
+			when active is true then 'active'
 			else 'inactive'
-		end
-	end as "status",
+		end as "status",
 		pg_size_pretty(
     pg_wal_lsn_diff(
       pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
@@ -489,9 +479,7 @@ select
 		'https://www.morling.dev/blog/mastering-postgres-replication-slots' as documentation_link,
 		3 as severity_order
 from
-		q
-order by
-		slot_name)
+		q)
 union all
 -- MEDIUM: Large sequential scans
     select
@@ -856,9 +844,7 @@ select
 https://github.com/mfvanek/pg-index-health-sql/blob/master/sql/tables_with_zero_or_one_column.sql' as documentation_link,
 	4 as severity_order
 from
-	sct
-order by
-	sct.table_size_bytes desc)
+	sct)
 union all
 -- LOW: Connections IDLE for 1 > hour
 (with ic as (

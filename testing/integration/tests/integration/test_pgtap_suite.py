@@ -100,11 +100,21 @@ def _extract_check_names_from_pgtap(sql_text: str) -> set[str]:
 
 def _view_sql_files() -> list[Path]:
     root = _repo_root()
-    return [root / "view_pgFirstAid.sql", root / "view_pgFirstAid_managed.sql"]
+    all_views = [root / "view_pgFirstAid.sql", root / "view_pgFirstAid_managed.sql"]
+    mode = os.getenv("PGFA_TEST_VIEW_MODE", "both").strip().lower()
+    if mode == "managed":
+        return [root / "view_pgFirstAid_managed.sql"]
+    if mode in {"self_hosted", "self-hosted"}:
+        return [root / "view_pgFirstAid.sql"]
+    return all_views
 
 
 def _default_view_sql() -> Path:
-    return _repo_root() / "view_pgFirstAid.sql"
+    root = _repo_root()
+    mode = os.getenv("PGFA_TEST_VIEW_MODE", "both").strip().lower()
+    if mode == "managed":
+        return root / "view_pgFirstAid_managed.sql"
+    return root / "view_pgFirstAid.sql"
 
 
 @pytest.mark.integration
@@ -154,7 +164,7 @@ def test_view_variant_matches_function_check_names(
             SELECT check_name FROM v_pgfirstaid
             """
         )
-        missing_in_view = sorted(row[0] for row in cur.fetchall())
+        missing_in_view = sorted(str(row[0]) for row in cur.fetchall())
 
         cur.execute(
             """
@@ -163,7 +173,7 @@ def test_view_variant_matches_function_check_names(
             SELECT check_name FROM pg_firstAid()
             """
         )
-        extra_in_view = sorted(row[0] for row in cur.fetchall())
+        extra_in_view = sorted(str(row[0]) for row in cur.fetchall())
 
     assert not missing_in_view, (
         f"{view_sql.name} missing check_name entries from pg_firstAid(): "
@@ -189,7 +199,7 @@ def test_view_parity_for_all_health_checks(
             SELECT check_name FROM v_pgfirstaid
             """
         )
-        missing_in_view = sorted(row[0] for row in cur.fetchall())
+        missing_in_view = sorted(str(row[0]) for row in cur.fetchall())
 
         cur.execute(
             """
@@ -198,7 +208,7 @@ def test_view_parity_for_all_health_checks(
             SELECT check_name FROM pg_firstAid()
             """
         )
-        extra_in_view = sorted(row[0] for row in cur.fetchall())
+        extra_in_view = sorted(str(row[0]) for row in cur.fetchall())
 
     assert not missing_in_view, (
         "These checks exist in pg_firstAid() but are missing in v_pgfirstaid: "

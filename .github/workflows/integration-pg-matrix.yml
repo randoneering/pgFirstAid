@@ -39,6 +39,7 @@ jobs:
       PGPASSWORD: ${{ matrix.postgres_version == '15' && secrets.PG15_PASSWORD || matrix.postgres_version == '16' && secrets.PG16_PASSWORD || matrix.postgres_version == '17' && secrets.PG17_PASSWORD || secrets.PG18_PASSWORD }}
       PGDATABASE: ${{ matrix.postgres_version == '15' && secrets.PG15_DATABASE || matrix.postgres_version == '16' && secrets.PG16_DATABASE || matrix.postgres_version == '17' && secrets.PG17_DATABASE || secrets.PG18_DATABASE }}
       PGSSLMODE: require
+      PGFA_TEST_VIEW_MODE: managed
       PGFA_TEST_ACTIVE_CONN_TARGET: "52"
       PGFA_TEST_ACTIVE_CONN_SLEEP_SECONDS: "20"
       PGFA_TEST_WAIT_TIMEOUT_SECONDS: "45"
@@ -68,6 +69,14 @@ jobs:
             exit 1
           fi
 
+      - name: Verify PostgreSQL client is installed
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            echo "::error::psql not found on runner. Install postgresql-client on the self-hosted VM."
+            exit 1
+          fi
+          psql --version
+
       - name: Sync dependencies
         run: uv sync
 
@@ -81,4 +90,4 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f ../../view_pgFirstAid_managed.sql
 
       - name: Run integration tests
-        run: uv run pytest tests/integration -m integration
+        run: uv run python -m pytest tests/integration -m integration

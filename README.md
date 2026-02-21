@@ -21,6 +21,15 @@ DigitalOcean is the cloud provider that doesn't make you wade through a thousand
 
 Neon gives you serverless PostgreSQL that scales to zero when you're not using it. You get Git-like branching for your database; fork it for testing, preview environments, whatever. Plus, it's just Postgres. All your tools and extensions just work. This project uses Neon for testing pgFirstAid for compatibility, which means you can use it too! Click the Neon image to get started building your next project.
 
+<a href="https://osuosl.org/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/osllogo-white_dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/osllogo-web_light.png">
+    <img alt="OSU Sponsorship" src="docs/images/osllogo-web_light.png" width="200">
+  </picture>
+</a>
+
+Thank you OSUOSL for providing hosting for our testing infrastructure and CI/CD pipelines! OSU Open Source Lab (osuosl.org) is a nonprofit at Oregon State University that supports the open source community by providing hosting, infrastructure, and systems engineering services for open source projects.
 
 ## Features
 

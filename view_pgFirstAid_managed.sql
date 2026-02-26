@@ -906,6 +906,62 @@ order by
 	(pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)) desc
 limit 10
 union all
+-- MEDIUM: Top queries by WAL bytes per call (PG16+)
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Top Queries by WAL Bytes Per Call' as check_name,
+	'queryid: ' || pss.queryid::text as object_name,
+	'High WAL generation per execution can indicate heavy write amplification and expensive update patterns' as issue_description,
+	'calls: ' || pss.calls || ', wal_bytes_per_call: ' || round(
+		((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)),
+		2
+	) || ', wal_bytes_total: ' || round((to_jsonb(pss)->>'wal_bytes')::numeric, 2) ||
+	', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+	', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+	'Reduce row churn, batch writes where possible, and review index maintenance cost for heavy write queries' as recommended_action,
+	'https://www.postgresql.org/docs/current/pgstatstatements.html \
+	 https://www.postgresql.org/docs/current/wal-intro.html \
+	 https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_statements pss
+where
+	pss.calls >= 20
+	and coalesce((to_jsonb(pss)->>'wal_bytes')::numeric, 0) > 0
+	and ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) > 1048576
+order by
+	((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) desc
+limit 10
+union all
+-- MEDIUM: Idle in transaction over 5 minutes
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Idle In Transaction Over 5 Minutes' as check_name,
+	concat_ws(' | ',
+		'pid: ' || psa.pid::text,
+		'usename: ' || psa.usename,
+		'datname: ' || psa.datname,
+		'client_address: ' || coalesce(psa.client_addr::text, 'local'),
+		'idle_duration: ' || to_char(now() - psa.state_change, 'HH24:MI:SS')
+	) as object_name,
+	'Sessions left idle in transaction hold snapshots and locks longer than necessary, which can hurt query performance and vacuum progress' as issue_description,
+	left(regexp_replace(psa.query, E'[\n\r\t]+', ' ', 'g'), 500) as current_value,
+	'Commit or rollback promptly and move application processing outside transaction boundaries' as recommended_action,
+	'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW \
+	 https://www.postgresql.org/docs/current/routine-vacuuming.html' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_activity psa
+where
+	psa.state = 'idle in transaction'
+	and psa.state_change is not null
+	and now() - psa.state_change > interval '5 minutes'
+	and psa.pid <> pg_backend_pid()
+order by
+	now() - psa.state_change desc
+union all
 -- LOW: Roles that have never logged in (with LOGIN rights)
 (WITH ur AS (
     SELECT

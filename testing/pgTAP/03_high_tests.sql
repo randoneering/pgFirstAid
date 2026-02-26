@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(36);
+SELECT plan(40);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Current Blocked/Blocking Queries'),
@@ -134,6 +134,24 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Shared Block Reads Per Call Queries'),
     'View executes High Shared Block Reads Per Call Queries check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Top Queries by WAL Bytes Per Call'),
+    'Function executes Top Queries by WAL Bytes Per Call check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Top Queries by WAL Bytes Per Call'),
+    'View executes Top Queries by WAL Bytes Per Call check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Idle In Transaction Over 5 Minutes'),
+    'Function executes Idle In Transaction Over 5 Minutes check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Idle In Transaction Over 5 Minutes'),
+    'View executes Idle In Transaction Over 5 Minutes check'
 );
 
 SELECT ok(

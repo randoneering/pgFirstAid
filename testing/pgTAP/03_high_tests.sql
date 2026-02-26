@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(30);
+SELECT plan(36);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Current Blocked/Blocking Queries'),
@@ -107,6 +107,33 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Lock-Wait-Heavy Active Queries'),
     'View executes Lock-Wait-Heavy Active Queries check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Calls Low Value Queries'),
+    'Function executes High Calls Low Value Queries check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Calls Low Value Queries'),
+    'View executes High Calls Low Value Queries check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Rows Per Call Queries'),
+    'Function executes High Rows Per Call Queries check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Rows Per Call Queries'),
+    'View executes High Rows Per Call Queries check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Shared Block Reads Per Call Queries'),
+    'Function executes High Shared Block Reads Per Call Queries check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Shared Block Reads Per Call Queries'),
+    'View executes High Shared Block Reads Per Call Queries check'
 );
 
 SELECT ok(

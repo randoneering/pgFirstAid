@@ -913,6 +913,85 @@ select
 	3 as severity_order
 from
 	lw;
+-- MEDIUM: High calls low value queries
+insert
+	into
+	health_results
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'High Calls Low Value Queries' as check_name,
+	'queryid: ' || pss.queryid::text as object_name,
+	'Very high call volume with low per-call value can create avoidable overhead and crowd out expensive work' as issue_description,
+	'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 3) ||
+	', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+	', rows_per_call: ' || round((pss.rows::numeric / NULLIF(pss.calls, 0)), 2) ||
+	', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+	'Batch repeated requests, cache stable lookups, and reduce N+1 query patterns in the application layer' as recommended_action,
+	'https://www.postgresql.org/docs/current/pgstatstatements.html \
+	 https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_statements pss
+where
+	pss.calls >= 5000
+	and pss.mean_exec_time <= 2
+	and (pss.rows::numeric / NULLIF(pss.calls, 0)) <= 2
+order by
+	pss.calls desc
+limit 10;
+-- MEDIUM: High rows per call queries
+insert
+	into
+	health_results
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'High Rows Per Call Queries' as check_name,
+	'queryid: ' || pss.queryid::text as object_name,
+	'High rows returned per execution often indicates over-fetching or missing selective filters' as issue_description,
+	'calls: ' || pss.calls || ', rows_per_call: ' || round((pss.rows::numeric / NULLIF(pss.calls, 0)), 2) ||
+	', total_rows: ' || pss.rows || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+	', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+	'Add tighter predicates, pagination, and narrower SELECT lists to reduce unnecessary row transfer' as recommended_action,
+	'https://www.postgresql.org/docs/current/pgstatstatements.html \
+	 https://www.postgresql.org/docs/current/queries-limit.html \
+	 https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_statements pss
+where
+	pss.calls >= 20
+	and (pss.rows::numeric / NULLIF(pss.calls, 0)) > 10000
+order by
+	(pss.rows::numeric / NULLIF(pss.calls, 0)) desc
+limit 10;
+-- MEDIUM: High shared block reads per call queries
+insert
+	into
+	health_results
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'High Shared Block Reads Per Call Queries' as check_name,
+	'queryid: ' || pss.queryid::text as object_name,
+	'High shared block reads per call usually points to heavy table or index scans and poor locality' as issue_description,
+	'calls: ' || pss.calls || ', shared_blks_read_per_call: ' || round((pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)), 2) ||
+	', shared_blks_read: ' || pss.shared_blks_read || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+	', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+	'Use EXPLAIN (ANALYZE, BUFFERS) to add selective indexes and reduce pages read per execution' as recommended_action,
+	'https://www.postgresql.org/docs/current/pgstatstatements.html \
+	 https://www.postgresql.org/docs/current/using-explain.html \
+	 https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_statements pss
+where
+	pss.calls >= 20
+	and (pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)) > 1000
+order by
+	(pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)) desc
+limit 10;
 -- LOW: Missing indexes on foreign keys
      insert
 	into

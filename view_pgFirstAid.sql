@@ -1,3 +1,272 @@
+create or replace
+function pgfirstaid_pg_stat_statements_checks()
+returns table (
+    severity TEXT,
+    category TEXT,
+    check_name TEXT,
+    object_name TEXT,
+    issue_description TEXT,
+    current_value TEXT,
+    recommended_action TEXT,
+    documentation_link TEXT,
+    severity_order INTEGER
+) as $$
+begin
+    if not exists (
+    select
+        1
+    from
+        pg_extension
+    where
+        extname = 'pg_stat_statements') then
+        return;
+    end if;
+
+    return query
+with pss as (
+    select
+        queryid,
+        query,
+        calls,
+        total_exec_time,
+        mean_exec_time,
+        rows
+    from
+        pg_stat_statements
+    where
+        calls > 0
+    order by
+        total_exec_time desc
+    limit 10)
+    select
+        'MEDIUM' as severity,
+        'Query Health' as category,
+        'Top 10 Queries by Total Execution Time' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'Queries with the highest total execution time are usually the best optimization targets for overall workload improvement' as issue_description,
+        'calls: ' || pss.calls || ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+        ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) || ', rows: ' || pss.rows ||
+        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Run EXPLAIN (ANALYZE, BUFFERS) and focus on reducing total runtime for these fingerprints first' as recommended_action,
+        'https://www.postgresql.org/docs/current/pgstatstatements.html \
+         https://www.postgresql.org/docs/current/using-explain.html \
+         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+        3 as severity_order
+    from
+        pss;
+
+    return query
+    select
+        'MEDIUM' as severity,
+        'Query Health' as category,
+        'High Mean Execution Time Queries' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'Queries with high average runtime and enough call volume are underperforming and likely user-visible' as issue_description,
+        'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+        ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Add or improve indexes and rewrite query predicates to reduce per-execution latency' as recommended_action,
+        'https://www.postgresql.org/docs/current/pgstatstatements.html \
+         https://www.postgresql.org/docs/current/using-explain.html \
+         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+        3 as severity_order
+    from
+        pg_stat_statements pss
+    where
+        pss.calls >= 20
+        and pss.mean_exec_time > 100
+    order by
+        pss.mean_exec_time desc
+    limit 10;
+
+    return query
+with pss as (
+    select
+        queryid,
+        query,
+        calls,
+        temp_blks_read,
+        temp_blks_written,
+        total_exec_time
+    from
+        pg_stat_statements
+    where
+        (temp_blks_read + temp_blks_written) > 0
+    order by
+        (temp_blks_read + temp_blks_written) desc
+    limit 10)
+    select
+        'MEDIUM' as severity,
+        'Query Health' as category,
+        'Top 10 Queries by Temp Block Spills' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'Frequent temp block usage points to sort or hash operations spilling to disk and causing avoidable latency' as issue_description,
+        'calls: ' || pss.calls || ', temp_blks_read: ' || pss.temp_blks_read ||
+        ', temp_blks_written: ' || pss.temp_blks_written || ', total_exec_time_ms: ' ||
+        round(pss.total_exec_time::numeric, 2) || ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Reduce row width, improve index support for sort or group patterns, and tune work_mem cautiously' as recommended_action,
+        'https://www.postgresql.org/docs/current/pgstatstatements.html \
+         https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM \
+         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+        3 as severity_order
+    from
+        pss;
+
+    return query
+    select
+        'MEDIUM' as severity,
+        'Query Health' as category,
+        'Low Cache Hit Ratio Queries' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'Low buffer cache hit ratio indicates heavy physical reads and likely missing indexes or poor filtering' as issue_description,
+        'calls: ' || pss.calls || ', cache_hit_pct: ' || round(
+            100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0),
+            2
+        ) || ', shared_blks_read: ' || pss.shared_blks_read || ', shared_blks_hit: ' || pss.shared_blks_hit ||
+        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Prioritize index tuning and query filtering to reduce disk reads for these statements' as recommended_action,
+        'https://www.postgresql.org/docs/current/pgstatstatements.html \
+         https://www.postgresql.org/docs/current/using-explain.html \
+         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+        3 as severity_order
+    from
+        pg_stat_statements pss
+    where
+        pss.calls >= 20
+        and (pss.shared_blks_hit + pss.shared_blks_read) > 0
+        and (100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0)) < 90
+    order by
+        (100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0)) asc
+    limit 10;
+
+    return query
+    select
+        'MEDIUM' as severity,
+        'Query Health' as category,
+        'High Runtime Variance Queries' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'High runtime variance can indicate plan instability, skewed data distribution, or parameter sensitivity' as issue_description,
+        'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+        ', stddev_exec_time_ms: ' || round(pss.stddev_exec_time::numeric, 2) ||
+        ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) || ', query: ' ||
+        left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Check plan stability with EXPLAIN (ANALYZE, BUFFERS), update statistics, and review parameterized execution paths' as recommended_action,
+        'https://www.postgresql.org/docs/current/pgstatstatements.html \
+         https://www.postgresql.org/docs/current/routine-vacuuming.html \
+         https://www.postgresql.org/docs/current/using-explain.html' as documentation_link,
+        3 as severity_order
+    from
+        pg_stat_statements pss
+    where
+        pss.calls >= 20
+        and pss.stddev_exec_time > pss.mean_exec_time
+    order by
+        pss.stddev_exec_time desc
+    limit 10;
+
+    return query
+    select
+        'MEDIUM' as severity,
+        'Query Health' as category,
+        'High Calls Low Value Queries' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'Very high call volume with low per-call value can create avoidable overhead and crowd out expensive work' as issue_description,
+        'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 3) ||
+        ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+        ', rows_per_call: ' || round((pss.rows::numeric / NULLIF(pss.calls, 0)), 2) ||
+        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Batch repeated requests, cache stable lookups, and reduce N+1 query patterns in the application layer' as recommended_action,
+        'https://www.postgresql.org/docs/current/pgstatstatements.html \
+         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+        3 as severity_order
+    from
+        pg_stat_statements pss
+    where
+        pss.calls >= 5000
+        and pss.mean_exec_time <= 2
+        and (pss.rows::numeric / NULLIF(pss.calls, 0)) <= 2
+    order by
+        pss.calls desc
+    limit 10;
+
+    return query
+    select
+        'MEDIUM' as severity,
+        'Query Health' as category,
+        'High Rows Per Call Queries' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'High rows returned per execution often indicates over-fetching or missing selective filters' as issue_description,
+        'calls: ' || pss.calls || ', rows_per_call: ' || round((pss.rows::numeric / NULLIF(pss.calls, 0)), 2) ||
+        ', total_rows: ' || pss.rows || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Add tighter predicates, pagination, and narrower SELECT lists to reduce unnecessary row transfer' as recommended_action,
+        'https://www.postgresql.org/docs/current/pgstatstatements.html \
+         https://www.postgresql.org/docs/current/queries-limit.html \
+         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+        3 as severity_order
+    from
+        pg_stat_statements pss
+    where
+        pss.calls >= 20
+        and (pss.rows::numeric / NULLIF(pss.calls, 0)) > 10000
+    order by
+        (pss.rows::numeric / NULLIF(pss.calls, 0)) desc
+    limit 10;
+
+    return query
+    select
+        'MEDIUM' as severity,
+        'Query Health' as category,
+        'High Shared Block Reads Per Call Queries' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'High shared block reads per call usually points to heavy table or index scans and poor locality' as issue_description,
+        'calls: ' || pss.calls || ', shared_blks_read_per_call: ' || round((pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)), 2) ||
+        ', shared_blks_read: ' || pss.shared_blks_read || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Use EXPLAIN (ANALYZE, BUFFERS) to add selective indexes and reduce pages read per execution' as recommended_action,
+        'https://www.postgresql.org/docs/current/pgstatstatements.html \
+         https://www.postgresql.org/docs/current/using-explain.html \
+         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+        3 as severity_order
+    from
+        pg_stat_statements pss
+    where
+        pss.calls >= 20
+        and (pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)) > 1000
+    order by
+        (pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)) desc
+    limit 10;
+
+    return query
+    select
+        'MEDIUM' as severity,
+        'Query Health' as category,
+        'Top Queries by WAL Bytes Per Call' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'High WAL generation per execution can indicate heavy write amplification and expensive update patterns' as issue_description,
+        'calls: ' || pss.calls || ', wal_bytes_per_call: ' || round(
+            ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)),
+            2
+        ) || ', wal_bytes_total: ' || round((to_jsonb(pss)->>'wal_bytes')::numeric, 2) ||
+        ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Reduce row churn, batch writes where possible, and review index maintenance cost for heavy write queries' as recommended_action,
+        'https://www.postgresql.org/docs/current/pgstatstatements.html \
+         https://www.postgresql.org/docs/current/wal-intro.html \
+         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+        3 as severity_order
+    from
+        pg_stat_statements pss
+    where
+        pss.calls >= 20
+        and coalesce((to_jsonb(pss)->>'wal_bytes')::numeric, 0) > 0
+        and ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) > 1048576
+    order by
+        ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) desc
+    limit 10;
+end;
+$$ language plpgsql;
+
 -- Adding dropping of the view instead of replace because of conversion issues with new health checks.
 -- This way we start with a fresh view.
 drop view if exists v_pgfirstAid;
@@ -637,6 +906,12 @@ where
 	where
 		extname = 'pg_stat_statements'
 	)
+union all
+-- MEDIUM: pg_stat_statements dependent checks
+(select
+	*
+from
+	pgfirstaid_pg_stat_statements_checks())
 union all
 -- MEDIUM: Top 10 expensive active queries by runtime
 (with eq as (

@@ -608,6 +608,46 @@ where
 	state = 'active'
 	and now() - query_start > interval '5 minutes'
 union all
+-- MEDIUM: Top 10 expensive active queries by runtime
+(with eq as (
+select
+	pgs.pid,
+	pgs.usename,
+	pgs.datname,
+	pgs.client_addr,
+	now() - pgs.query_start as runtime,
+	pgs.query
+from
+	pg_stat_activity pgs
+where
+	pgs.state = 'active'
+	and pgs.query_start is not null
+	and pgs.pid <> pg_backend_pid()
+	and now() - pgs.query_start > interval '30 seconds'
+order by
+	runtime desc
+limit 10)
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Top 10 Expensive Active Queries' as check_name,
+	concat_ws(' | ',
+		'pid: ' || eq.pid::text,
+		'usename: ' || eq.usename,
+		'datname: ' || eq.datname,
+		'client_address: ' || coalesce(eq.client_addr::text, 'local'),
+		'runtime: ' || to_char(eq.runtime, 'HH24:MI:SS')
+	) as object_name,
+	'Top 10 active queries running longer than 30 seconds, ordered by runtime. Long-running active queries can signal lock waits, missing indexes, or inefficient plans' as issue_description,
+	left(regexp_replace(eq.query, E'[\n\r\t]+', ' ', 'g'), 500) as current_value,
+	'Review these queries with EXPLAIN (ANALYZE, BUFFERS) and reduce lock waits or full scans' as recommended_action,
+	'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW \
+	 https://www.postgresql.org/docs/current/using-explain.html \
+	 https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+	3 as severity_order
+from
+	eq)
+union all
 -- LOW: Roles that have never logged in (with LOGIN rights)
 (WITH ur AS (
     SELECT

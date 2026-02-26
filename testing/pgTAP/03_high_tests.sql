@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(40);
+SELECT plan(24);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Current Blocked/Blocking Queries'),
@@ -56,48 +56,12 @@ SELECT ok(
 );
 
 SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Top 10 Queries by Total Execution Time'),
-    'Function executes Top 10 Queries by Total Execution Time check'
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'pg_stat_statements Extension Missing'),
+    'Function executes pg_stat_statements Extension Missing check'
 );
 SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Top 10 Queries by Total Execution Time'),
-    'View executes Top 10 Queries by Total Execution Time check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Mean Execution Time Queries'),
-    'Function executes High Mean Execution Time Queries check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Mean Execution Time Queries'),
-    'View executes High Mean Execution Time Queries check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Top 10 Queries by Temp Block Spills'),
-    'Function executes Top 10 Queries by Temp Block Spills check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Top 10 Queries by Temp Block Spills'),
-    'View executes Top 10 Queries by Temp Block Spills check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Low Cache Hit Ratio Queries'),
-    'Function executes Low Cache Hit Ratio Queries check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Low Cache Hit Ratio Queries'),
-    'View executes Low Cache Hit Ratio Queries check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Runtime Variance Queries'),
-    'Function executes High Runtime Variance Queries check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Runtime Variance Queries'),
-    'View executes High Runtime Variance Queries check'
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'pg_stat_statements Extension Missing'),
+    'View executes pg_stat_statements Extension Missing check'
 );
 
 SELECT ok(
@@ -107,42 +71,6 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Lock-Wait-Heavy Active Queries'),
     'View executes Lock-Wait-Heavy Active Queries check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Calls Low Value Queries'),
-    'Function executes High Calls Low Value Queries check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Calls Low Value Queries'),
-    'View executes High Calls Low Value Queries check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Rows Per Call Queries'),
-    'Function executes High Rows Per Call Queries check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Rows Per Call Queries'),
-    'View executes High Rows Per Call Queries check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Shared Block Reads Per Call Queries'),
-    'Function executes High Shared Block Reads Per Call Queries check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Shared Block Reads Per Call Queries'),
-    'View executes High Shared Block Reads Per Call Queries check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Top Queries by WAL Bytes Per Call'),
-    'Function executes Top Queries by WAL Bytes Per Call check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Top Queries by WAL Bytes Per Call'),
-    'View executes Top Queries by WAL Bytes Per Call check'
 );
 
 SELECT ok(

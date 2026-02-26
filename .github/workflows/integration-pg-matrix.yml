@@ -2,7 +2,7 @@ name: Python + pgTAP Integration (PG15-PG18)
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, synchronize]
     paths:
       - pgFirstAid.sql
       - view_pgFirstAid.sql

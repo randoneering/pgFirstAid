@@ -744,6 +744,101 @@ select
 from
 	pss)
 union all
+-- MEDIUM: Low cache hit ratio queries
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Low Cache Hit Ratio Queries' as check_name,
+	'queryid: ' || pss.queryid::text as object_name,
+	'Low buffer cache hit ratio indicates heavy physical reads and likely missing indexes or poor filtering' as issue_description,
+	'calls: ' || pss.calls || ', cache_hit_pct: ' || round(
+		100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0),
+		2
+	) || ', shared_blks_read: ' || pss.shared_blks_read || ', shared_blks_hit: ' || pss.shared_blks_hit ||
+	', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+	'Prioritize index tuning and query filtering to reduce disk reads for these statements' as recommended_action,
+	'https://www.postgresql.org/docs/current/pgstatstatements.html \
+	 https://www.postgresql.org/docs/current/using-explain.html \
+	 https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_statements pss
+where
+	pss.calls >= 20
+	and (pss.shared_blks_hit + pss.shared_blks_read) > 0
+	and (100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0)) < 90
+order by
+	(100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0)) asc
+limit 10
+union all
+-- MEDIUM: High runtime variance queries
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'High Runtime Variance Queries' as check_name,
+	'queryid: ' || pss.queryid::text as object_name,
+	'High runtime variance can indicate plan instability, skewed data distribution, or parameter sensitivity' as issue_description,
+	'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+	', stddev_exec_time_ms: ' || round(pss.stddev_exec_time::numeric, 2) ||
+	', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) || ', query: ' ||
+	left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+	'Check plan stability with EXPLAIN (ANALYZE, BUFFERS), update statistics, and review parameterized execution paths' as recommended_action,
+	'https://www.postgresql.org/docs/current/pgstatstatements.html \
+	 https://www.postgresql.org/docs/current/routine-vacuuming.html \
+	 https://www.postgresql.org/docs/current/using-explain.html' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_statements pss
+where
+	pss.calls >= 20
+	and pss.stddev_exec_time > pss.mean_exec_time
+order by
+	pss.stddev_exec_time desc
+limit 10
+union all
+-- MEDIUM: Lock-wait-heavy active queries
+(with lw as (
+select
+	pid,
+	usename,
+	datname,
+	client_addr,
+	wait_event,
+	query_start,
+	now() - query_start as runtime,
+	query
+from
+	pg_stat_activity
+where
+	state = 'active'
+	and wait_event_type = 'Lock'
+	and query_start is not null
+	and now() - query_start > interval '30 seconds'
+	and pid <> pg_backend_pid()
+order by
+	runtime desc
+limit 10)
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Lock-Wait-Heavy Active Queries' as check_name,
+	concat_ws(' | ',
+		'pid: ' || lw.pid::text,
+		'usename: ' || lw.usename,
+		'datname: ' || lw.datname,
+		'client_address: ' || coalesce(lw.client_addr::text, 'local'),
+		'wait_event: ' || coalesce(lw.wait_event, 'unknown'),
+		'runtime: ' || to_char(lw.runtime, 'HH24:MI:SS')
+	) as object_name,
+	'Active queries waiting on locks for extended time can block throughput and cause cascading latency' as issue_description,
+	left(regexp_replace(lw.query, E'[\n\r\t]+', ' ', 'g'), 500) as current_value,
+	'Reduce transaction duration, enforce consistent lock ordering, and investigate blockers first' as recommended_action,
+	'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW \
+	 https://www.postgresql.org/docs/current/explicit-locking.html' as documentation_link,
+	3 as severity_order
+from
+	lw)
+union all
 -- LOW: Roles that have never logged in (with LOGIN rights)
 (WITH ur AS (
     SELECT

@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(24);
+SELECT plan(30);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Current Blocked/Blocking Queries'),
@@ -80,6 +80,33 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Top 10 Queries by Temp Block Spills'),
     'View executes Top 10 Queries by Temp Block Spills check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Low Cache Hit Ratio Queries'),
+    'Function executes Low Cache Hit Ratio Queries check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Low Cache Hit Ratio Queries'),
+    'View executes Low Cache Hit Ratio Queries check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Runtime Variance Queries'),
+    'Function executes High Runtime Variance Queries check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Runtime Variance Queries'),
+    'View executes High Runtime Variance Queries check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Lock-Wait-Heavy Active Queries'),
+    'Function executes Lock-Wait-Heavy Active Queries check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Lock-Wait-Heavy Active Queries'),
+    'View executes Lock-Wait-Heavy Active Queries check'
 );
 
 SELECT ok(

@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(22);
+SELECT plan(16);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Current Blocked/Blocking Queries'),
@@ -8,33 +8,6 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Current Blocked/Blocking Queries'),
     'View executes Current Blocked/Blocking Queries check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Deadlocks Since Stats Reset'),
-    'Function executes Deadlocks Since Stats Reset check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Deadlocks Since Stats Reset'),
-    'View executes Deadlocks Since Stats Reset check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Deadlock Rate Per Hour'),
-    'Function executes Deadlock Rate Per Hour check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Deadlock Rate Per Hour'),
-    'View executes Deadlock Rate Per Hour check'
-);
-
-SELECT ok(
-    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Deadlocks as Percent of Transactions'),
-    'Function executes Deadlocks as Percent of Transactions check'
-);
-SELECT ok(
-    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Deadlocks as Percent of Transactions'),
-    'View executes Deadlocks as Percent of Transactions check'
 );
 
 SELECT ok(

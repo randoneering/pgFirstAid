@@ -2,6 +2,7 @@ name: Python + pgTAP Integration (PG15-PG18)
 
 on:
   pull_request:
+    types: [opened]
     paths:
       - pgFirstAid.sql
       - view_pgFirstAid.sql
@@ -9,7 +10,6 @@ on:
       - testing/integration/**
       - testing/pgTAP/**
       - .github/workflows/integration-pg-matrix.yml
-  workflow_dispatch:
 
 concurrency:
   group: integration-${{ github.ref }}

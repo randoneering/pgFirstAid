@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(18);
+SELECT plan(24);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Current Blocked/Blocking Queries'),
@@ -53,6 +53,33 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Top 10 Expensive Active Queries'),
     'View executes Top 10 Expensive Active Queries check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Top 10 Queries by Total Execution Time'),
+    'Function executes Top 10 Queries by Total Execution Time check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Top 10 Queries by Total Execution Time'),
+    'View executes Top 10 Queries by Total Execution Time check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'High Mean Execution Time Queries'),
+    'Function executes High Mean Execution Time Queries check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'High Mean Execution Time Queries'),
+    'View executes High Mean Execution Time Queries check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Top 10 Queries by Temp Block Spills'),
+    'Function executes Top 10 Queries by Temp Block Spills check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Top 10 Queries by Temp Block Spills'),
+    'View executes Top 10 Queries by Temp Block Spills check'
 );
 
 SELECT ok(

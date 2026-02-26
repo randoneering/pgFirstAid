@@ -654,6 +654,96 @@ select
 from
 	eq)
 union all
+-- MEDIUM: Top 10 queries by total execution time
+(with pss as (
+select
+	queryid,
+	query,
+	calls,
+	total_exec_time,
+	mean_exec_time,
+	rows
+from
+	pg_stat_statements
+where
+	calls > 0
+order by
+	total_exec_time desc
+limit 10)
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Top 10 Queries by Total Execution Time' as check_name,
+	'queryid: ' || pss.queryid::text as object_name,
+	'Queries with the highest total execution time are usually the best optimization targets for overall workload improvement' as issue_description,
+	'calls: ' || pss.calls || ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+	', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) || ', rows: ' || pss.rows ||
+	', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+	'Run EXPLAIN (ANALYZE, BUFFERS) and focus on reducing total runtime for these fingerprints first' as recommended_action,
+	'https://www.postgresql.org/docs/current/pgstatstatements.html \
+	 https://www.postgresql.org/docs/current/using-explain.html \
+	 https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+	3 as severity_order
+from
+	pss)
+union all
+-- MEDIUM: High mean execution time queries
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'High Mean Execution Time Queries' as check_name,
+	'queryid: ' || pss.queryid::text as object_name,
+	'Queries with high average runtime and enough call volume are underperforming and likely user-visible' as issue_description,
+	'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+	', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+	', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+	'Add or improve indexes and rewrite query predicates to reduce per-execution latency' as recommended_action,
+	'https://www.postgresql.org/docs/current/pgstatstatements.html \
+	 https://www.postgresql.org/docs/current/using-explain.html \
+	 https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_statements pss
+where
+	pss.calls >= 20
+	and pss.mean_exec_time > 100
+order by
+	pss.mean_exec_time desc
+limit 10
+union all
+-- MEDIUM: Top 10 queries with temp block spills
+(with pss as (
+select
+	queryid,
+	query,
+	calls,
+	temp_blks_read,
+	temp_blks_written,
+	total_exec_time
+from
+	pg_stat_statements
+where
+	(temp_blks_read + temp_blks_written) > 0
+order by
+	(temp_blks_read + temp_blks_written) desc
+limit 10)
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Top 10 Queries by Temp Block Spills' as check_name,
+	'queryid: ' || pss.queryid::text as object_name,
+	'Frequent temp block usage points to sort or hash operations spilling to disk and causing avoidable latency' as issue_description,
+	'calls: ' || pss.calls || ', temp_blks_read: ' || pss.temp_blks_read ||
+	', temp_blks_written: ' || pss.temp_blks_written || ', total_exec_time_ms: ' ||
+	round(pss.total_exec_time::numeric, 2) || ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+	'Reduce row width, improve index support for sort or group patterns, and tune work_mem cautiously' as recommended_action,
+	'https://www.postgresql.org/docs/current/pgstatstatements.html \
+	 https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM \
+	 https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+	3 as severity_order
+from
+	pss)
+union all
 -- LOW: Roles that have never logged in (with LOGIN rights)
 (WITH ur AS (
     SELECT

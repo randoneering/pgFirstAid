@@ -421,6 +421,74 @@ select
 	3 as severity_order
 from
 	bq;
+-- MEDIUM: Deadlocks since stats reset
+insert
+	into
+	health_results
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Deadlocks Since Stats Reset' as check_name,
+	psd.datname as object_name,
+	'Deadlocks have been detected since the last PostgreSQL statistics reset' as issue_description,
+	'Deadlocks: ' || psd.deadlocks || ', Stats reset: ' || psd.stats_reset as current_value,
+	'Capture deadlock details in logs and review transaction ordering to reduce lock cycles' as recommended_action,
+	'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-DATABASE-VIEW \
+	 https://pganalyze.com/blog/postgresql-log-monitoring-101-deadlocks-checkpoints-blocked-queries' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_database psd
+where
+	psd.datname not in ('template0', 'template1')
+	and psd.deadlocks > 0;
+-- MEDIUM: Deadlock rate per hour
+insert
+	into
+	health_results
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Deadlock Rate Per Hour' as check_name,
+	psd.datname as object_name,
+	'Deadlocks are occurring often relative to time since stats reset' as issue_description,
+	'Deadlocks/hour: ' || round(
+		psd.deadlocks / GREATEST(EXTRACT(EPOCH FROM (now() - psd.stats_reset)) / 3600.0, 1),
+		3
+	) || ', Deadlocks: ' || psd.deadlocks as current_value,
+	'Investigate recent lock contention and reduce transaction overlap on the same rows' as recommended_action,
+	'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-DATABASE-VIEW \
+	 https://pganalyze.com/blog/postgresql-log-monitoring-101-deadlocks-checkpoints-blocked-queries' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_database psd
+where
+	psd.datname not in ('template0', 'template1')
+	and psd.deadlocks > 0;
+-- MEDIUM: Deadlocks compared to transaction volume
+insert
+	into
+	health_results
+select
+	'MEDIUM' as severity,
+	'Query Health' as category,
+	'Deadlocks as Percent of Transactions' as check_name,
+	psd.datname as object_name,
+	'Deadlocks are impacting a measurable share of transaction volume' as issue_description,
+	'Deadlocks: ' || psd.deadlocks || ', Total transactions: ' || (psd.xact_commit + psd.xact_rollback) ||
+	', Deadlock percent: ' || round(
+		100.0 * psd.deadlocks / NULLIF(psd.xact_commit + psd.xact_rollback, 0),
+		4
+	) || '%' as current_value,
+	'Review application retry logic and lock acquisition patterns for frequently conflicting transactions' as recommended_action,
+	'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-DATABASE-VIEW \
+	 https://pganalyze.com/blog/postgresql-log-monitoring-101-deadlocks-checkpoints-blocked-queries' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_database psd
+where
+	psd.datname not in ('template0', 'template1')
+	and psd.deadlocks > 0
+	and (psd.xact_commit + psd.xact_rollback) > 0;
 -- MEDIUM: Tables with outdated statistics
 insert
 	into

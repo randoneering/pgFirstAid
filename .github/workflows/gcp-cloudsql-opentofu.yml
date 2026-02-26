@@ -1,0 +1,111 @@
+name: GCP Cloud SQL OpenTofu
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "OpenTofu action"
+        required: true
+        type: choice
+        default: plan
+        options:
+          - plan
+          - apply
+          - destroy
+      postgres_version:
+        description: "Target PostgreSQL version"
+        required: true
+        type: choice
+        default: pg18
+        options:
+          - pg15
+          - pg16
+          - pg17
+          - pg18
+      personal_ip:
+        description: "IP or CIDR allowed to connect (example: 203.0.113.10/32). Leave blank to use GCP_PERSONAL_IP secret."
+        required: false
+        type: string
+
+concurrency:
+  group: gcp-cloudsql-${{ inputs.postgres_version }}
+  cancel-in-progress: false
+
+jobs:
+  opentofu:
+    name: ${{ inputs.action }} ${{ inputs.postgres_version }}
+    runs-on: [self-hosted, linux, pgfirstaid-ci]
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: testing/gcp/deploy/${{ inputs.postgres_version }}
+
+    env:
+      TF_IN_AUTOMATION: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Authenticate to Google Cloud (OIDC)
+        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Google Cloud (service account key)
+        if: ${{ !(secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '') }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+
+      - name: Resolve personal IP
+        shell: bash
+        run: |
+          PERSONAL_IP="${{ inputs.personal_ip }}"
+          if [ -z "$PERSONAL_IP" ]; then
+            PERSONAL_IP="${{ secrets.GCP_PERSONAL_IP }}"
+          fi
+
+          if [ -z "$PERSONAL_IP" ]; then
+            echo "::error::No personal IP provided. Set input 'personal_ip' or secret 'GCP_PERSONAL_IP'."
+            exit 1
+          fi
+
+          echo "TF_VAR_personal_ip=$PERSONAL_IP" >> "$GITHUB_ENV"
+
+      - name: OpenTofu init
+        run: tofu init -input=false
+
+      - name: OpenTofu validate
+        run: tofu validate
+
+      - name: OpenTofu plan
+        if: ${{ inputs.action == 'plan' || inputs.action == 'apply' }}
+        run: tofu plan -input=false -out=tfplan
+
+      - name: OpenTofu apply
+        if: ${{ inputs.action == 'apply' }}
+        run: tofu apply -input=false -auto-approve tfplan
+
+      - name: Show connection details
+        if: ${{ inputs.action == 'apply' }}
+        run: |
+          echo "Instance: $(tofu output -raw instance_name)"
+          echo "Connection: $(tofu output -raw instance_connection_name)"
+          echo "Public IP: $(tofu output -raw public_ip_address)"
+
+      - name: OpenTofu destroy
+        if: ${{ inputs.action == 'destroy' }}
+        run: tofu destroy -input=false -auto-approve

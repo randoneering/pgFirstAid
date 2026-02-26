@@ -1,0 +1,114 @@
+name: AWS RDS OpenTofu
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "OpenTofu action"
+        required: true
+        type: choice
+        default: plan
+        options:
+          - plan
+          - apply
+          - destroy
+      postgres_version:
+        description: "Target PostgreSQL version"
+        required: true
+        type: choice
+        default: pg18
+        options:
+          - pg15
+          - pg16
+          - pg17
+          - pg18
+      allowed_cidr_block:
+        description: "CIDR allowed to connect (example: 203.0.113.10/32). Leave blank to use AWS_ALLOWED_CIDR_BLOCK secret."
+        required: false
+        type: string
+      aws_region:
+        description: "AWS region"
+        required: true
+        type: string
+        default: us-west-2
+
+concurrency:
+  group: aws-rds-${{ inputs.postgres_version }}
+  cancel-in-progress: false
+
+jobs:
+  opentofu:
+    name: ${{ inputs.action }} ${{ inputs.postgres_version }}
+    runs-on: [self-hosted, linux, pgfirstaid-ci]
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: testing/aws/deploy/${{ inputs.postgres_version }}
+
+    env:
+      TF_IN_AUTOMATION: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+
+      - name: Configure AWS credentials (OIDC role)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Configure AWS credentials (access keys)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Resolve allowed CIDR
+        shell: bash
+        run: |
+          CIDR="${{ inputs.allowed_cidr_block }}"
+          if [ -z "$CIDR" ]; then
+            CIDR="${{ secrets.AWS_ALLOWED_CIDR_BLOCK }}"
+          fi
+
+          if [ -z "$CIDR" ]; then
+            echo "::error::No allowed CIDR provided. Set input 'allowed_cidr_block' or secret 'AWS_ALLOWED_CIDR_BLOCK'."
+            exit 1
+          fi
+
+          echo "TF_VAR_allowed_cidr_block=$CIDR" >> "$GITHUB_ENV"
+
+      - name: OpenTofu init
+        run: tofu init -input=false
+
+      - name: OpenTofu validate
+        run: tofu validate
+
+      - name: OpenTofu plan
+        if: ${{ inputs.action == 'plan' || inputs.action == 'apply' }}
+        run: tofu plan -input=false -out=tfplan
+
+      - name: OpenTofu apply
+        if: ${{ inputs.action == 'apply' }}
+        run: tofu apply -input=false -auto-approve tfplan
+
+      - name: Show endpoint
+        if: ${{ inputs.action == 'apply' }}
+        run: |
+          echo "RDS endpoint: $(tofu output -raw endpoint)"
+
+      - name: OpenTofu destroy
+        if: ${{ inputs.action == 'destroy' }}
+        run: tofu destroy -input=false -auto-approve

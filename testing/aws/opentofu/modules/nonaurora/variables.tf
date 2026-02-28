@@ -23,12 +23,6 @@ variable "vpc_security_group_ids" {
   default     = []
 }
 
-variable "allowed_cidr_block" {
-  description = "CIDR block allowed to access the RDS instance"
-  type        = string
-  default     = ""
-}
-
 variable "instance_class" {
   description = "Instance type to use"
   type        = string

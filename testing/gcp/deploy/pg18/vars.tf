@@ -1,4 +1,7 @@
-variable "personal_ip" {
-  description = "Personal IP to allow access to the instance"
-  type        = string
+variable "authorized_networks" {
+  description = "Authorized networks for Cloud SQL"
+  type = list(object({
+    name  = string
+    value = string
+  }))
 }

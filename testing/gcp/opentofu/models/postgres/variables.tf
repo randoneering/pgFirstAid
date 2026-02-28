@@ -36,3 +36,12 @@ variable "personal_ip" {
   type = string
   default = "0.0.0.0"
 }
+
+variable "authorized_networks" {
+  description = "List of authorized networks for Cloud SQL"
+  type = list(object({
+    name  = string
+    value = string
+  }))
+  default = []
+}

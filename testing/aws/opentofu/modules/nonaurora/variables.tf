@@ -23,12 +23,6 @@ variable "vpc_security_group_ids" {
   default     = []
 }
 
-variable "allowed_cidr_block" {
-  description = "CIDR block allowed to access the RDS instance"
-  type        = string
-  default     = ""
-}
-
 variable "instance_class" {
   description = "Instance type to use"
   type        = string
@@ -45,6 +39,13 @@ variable "username" {
   description = "Master DB username"
   type        = string
   default     = "randoneering"
+}
+
+variable "db_password" {
+  description = "Master DB password. If empty, a random password is generated"
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "skip_final_snapshot" {

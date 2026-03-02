@@ -10,6 +10,7 @@ module "postgres" {
   location         = local.location
   database_name    = local.database_name
   db_user          = local.db_user
+  db_password      = var.db_password
   personal_ip      = var.personal_ip
 }
 

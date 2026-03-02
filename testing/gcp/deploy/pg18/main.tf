@@ -11,7 +11,8 @@ module "postgres" {
   region           = local.region
   database_name    = local.database_name
   db_user          = local.db_user
-  personal_ip      = var.personal_ip
+  authorized_networks = var.authorized_networks
+  db_password      = var.db_password
 }
 
 output "instance_name" {

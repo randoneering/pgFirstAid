@@ -1,0 +1,171 @@
+name: Managed DB Validate
+
+on:
+  workflow_call:
+    inputs:
+      cloud_provider:
+        required: false
+        type: string
+        default: direct
+      pg_host:
+        required: false
+        type: string
+        default: ""
+      pg_port:
+        required: false
+        type: string
+        default: "5432"
+      pg_user:
+        required: true
+        type: string
+      pg_database:
+        required: true
+        type: string
+      pg_sslmode:
+        required: false
+        type: string
+        default: require
+      test_view_mode:
+        required: false
+        type: string
+        default: managed
+      aws_region:
+        required: false
+        type: string
+        default: us-west-2
+      aws_db_identifier:
+        required: false
+        type: string
+        default: ""
+      gcp_project_id:
+        required: false
+        type: string
+        default: ""
+      gcp_instance_name:
+        required: false
+        type: string
+        default: ""
+    secrets:
+      pg_password:
+        required: true
+      aws_access_key_id:
+        required: false
+      aws_secret_access_key:
+        required: false
+      gcp_sa_key:
+        required: false
+
+jobs:
+  validate:
+    runs-on: [self-hosted, linux, pgfirstaid-ci]
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: testing/integration
+    env:
+      PGHOST: ${{ inputs.pg_host }}
+      PGPORT: ${{ inputs.pg_port }}
+      PGUSER: ${{ inputs.pg_user }}
+      PGPASSWORD: ${{ secrets.pg_password }}
+      PGDATABASE: ${{ inputs.pg_database }}
+      PGSSLMODE: ${{ inputs.pg_sslmode }}
+      PGFA_TEST_VIEW_MODE: ${{ inputs.test_view_mode }}
+      PGFA_TEST_ACTIVE_CONN_TARGET: "52"
+      PGFA_TEST_ACTIVE_CONN_SLEEP_SECONDS: "20"
+      PGFA_TEST_WAIT_TIMEOUT_SECONDS: "45"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        if: ${{ inputs.cloud_provider == 'aws' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.aws_access_key_id }}
+          aws-secret-access-key: ${{ secrets.aws_secret_access_key }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Authenticate to Google Cloud
+        if: ${{ inputs.cloud_provider == 'gcp' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.gcp_sa_key }}
+
+      - name: Setup gcloud
+        if: ${{ inputs.cloud_provider == 'gcp' }}
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve PostgreSQL host
+        shell: bash
+        run: |
+          host="${PGHOST}"
+
+          if [ -z "$host" ] && [ "${{ inputs.cloud_provider }}" = "aws" ]; then
+            if [ -z "${{ inputs.aws_db_identifier }}" ]; then
+              echo "::error::aws_db_identifier is required when cloud_provider=aws and pg_host is not set"
+              exit 1
+            fi
+
+            host="$(aws rds describe-db-instances --db-instance-identifier "${{ inputs.aws_db_identifier }}" --query 'DBInstances[0].Endpoint.Address' --output text)"
+          fi
+
+          if [ -z "$host" ] && [ "${{ inputs.cloud_provider }}" = "gcp" ]; then
+            if [ -z "${{ inputs.gcp_project_id }}" ] || [ -z "${{ inputs.gcp_instance_name }}" ]; then
+              echo "::error::gcp_project_id and gcp_instance_name are required when cloud_provider=gcp and pg_host is not set"
+              exit 1
+            fi
+
+            host="$(gcloud sql instances describe "${{ inputs.gcp_instance_name }}" --project "${{ inputs.gcp_project_id }}" --format='value(ipAddresses[0].ipAddress)')"
+          fi
+
+          if [ -z "$host" ]; then
+            echo "::error::Could not determine PGHOST. Provide pg_host or cloud discovery inputs."
+            exit 1
+          fi
+
+          echo "PGHOST=$host" >> "$GITHUB_ENV"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Validate required PG env vars
+        run: |
+          missing=0
+          for var in PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required secret/env: ${var}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Verify PostgreSQL client is installed
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            echo "::error::psql not found on runner. Install postgresql-client on the self-hosted VM."
+            exit 1
+          fi
+          psql --version
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Install pgFirstAid function
+        run: psql -v ON_ERROR_STOP=1 -f ../../pgFirstAid.sql
+
+      - name: Recreate managed view only
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "DROP VIEW IF EXISTS v_pgfirstaid"
+          psql -v ON_ERROR_STOP=1 -f ../../view_pgFirstAid_managed.sql
+
+      - name: Run integration tests (includes pgTAP suite)
+        run: uv run python -m pytest tests/integration -m integration

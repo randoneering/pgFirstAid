@@ -3,6 +3,15 @@ resource "random_password" "password" {
   special = false
 }
 
+locals {
+  resolved_authorized_networks = length(var.authorized_networks) > 0 ? var.authorized_networks : [
+    {
+      name  = "allow-personal"
+      value = var.personal_ip
+    }
+  ]
+}
+
 resource "google_sql_database_instance" "postgres" {
   name             = var.instance_name
   database_version = var.postgres_version
@@ -18,9 +27,13 @@ resource "google_sql_database_instance" "postgres" {
     ip_configuration {
       ipv4_enabled = true
 
-      authorized_networks {
-        name  = "allow-personal"
-        value = var.personal_ip
+      dynamic "authorized_networks" {
+        for_each = local.resolved_authorized_networks
+
+        content {
+          name  = authorized_networks.value.name
+          value = authorized_networks.value.value
+        }
       }
     }
 
@@ -40,5 +53,5 @@ resource "google_sql_database" "database" {
 resource "google_sql_user" "user" {
   name     = var.db_user
   instance = google_sql_database_instance.postgres.name
-  password = random_password.password.result
+  password = var.db_password != "" ? var.db_password : random_password.password.result
 }

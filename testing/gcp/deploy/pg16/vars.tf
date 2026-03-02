@@ -5,3 +5,9 @@ variable "authorized_networks" {
     value = string
   }))
 }
+
+variable "db_password" {
+  description = "Database user password"
+  type        = string
+  sensitive   = true
+}

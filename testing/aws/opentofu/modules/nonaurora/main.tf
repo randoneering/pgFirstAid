@@ -23,7 +23,7 @@ resource "aws_db_instance" "rds_instance" {
   engine_version              = var.engine_version
   db_name                     = var.database_name
   username                    = local.username
-  password                    = random_password.password.result
+  password                    = var.db_password != "" ? var.db_password : random_password.password.result
   instance_class              = local.instance_class
   parameter_group_name        = aws_db_parameter_group.param_group.name
   publicly_accessible         = true

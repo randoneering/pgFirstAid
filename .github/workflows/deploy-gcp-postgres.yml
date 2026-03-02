@@ -73,6 +73,8 @@ jobs:
 
       - name: Resolve deploy arguments
         id: args
+        env:
+          DEPLOY_PERSONAL_IP_CIDR: ${{ secrets.DEPLOY_PERSONAL_IP_CIDR }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             target="${{ inputs.target }}"
@@ -132,8 +134,8 @@ jobs:
 
           if [ -n "${personal_ip_input}" ]; then
             personal_ip_cidr="${personal_ip_input}"
-          elif [ -n "${{ secrets.DEPLOY_PERSONAL_IP_CIDR }}" ]; then
-            personal_ip_cidr="${{ secrets.DEPLOY_PERSONAL_IP_CIDR }}"
+          elif [ -n "$DEPLOY_PERSONAL_IP_CIDR" ]; then
+            personal_ip_cidr="$DEPLOY_PERSONAL_IP_CIDR"
           else
             echo "::error::Set input personal_ip_cidr or repository secret DEPLOY_PERSONAL_IP_CIDR"
             exit 1
@@ -201,6 +203,18 @@ jobs:
         with:
           tofu_version: latest
 
+      - name: Resolve OpenTofu variables
+        env:
+          GCP_DB_PASSWORD: ${{ secrets.GCP_DB_PASSWORD }}
+        run: |
+          if [ -z "$GCP_DB_PASSWORD" ]; then
+            echo "::error::Missing secret GCP_DB_PASSWORD"
+            exit 1
+          fi
+
+          echo "::add-mask::$GCP_DB_PASSWORD"
+          echo "TF_VAR_db_password=$GCP_DB_PASSWORD" >> "$GITHUB_ENV"
+
       - name: OpenTofu init
         working-directory: testing/gcp/deploy/${{ matrix.postgres_version }}
         run: tofu init -input=false
@@ -247,3 +261,25 @@ jobs:
             echo "- Instance: ${instance_name}"
             echo "- Public IP: ${public_ip_address}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  validate:
+    if: needs.resolve.outputs.command == 'apply'
+    name: validate ${{ matrix.postgres_version }}
+    needs: [resolve, deploy]
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres_version: ${{ fromJSON(needs.resolve.outputs.versions_json) }}
+    uses: ./.github/workflows/managed-db-validate.yml
+    with:
+      cloud_provider: gcp
+      gcp_project_id: pgfirstaid
+      gcp_instance_name: ${{ format('pgfirstaid-{0}', matrix.postgres_version) }}
+      pg_port: "5432"
+      pg_user: randoneering
+      pg_database: pgFirstAid
+      pg_sslmode: require
+      test_view_mode: managed
+    secrets:
+      pg_password: ${{ secrets.GCP_DB_PASSWORD }}
+      gcp_sa_key: ${{ secrets.GCP_SA_KEY }}

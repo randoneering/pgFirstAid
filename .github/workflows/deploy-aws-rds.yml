@@ -179,6 +179,25 @@ jobs:
         with:
           tofu_version: latest
 
+      - name: Resolve OpenTofu variables
+        env:
+          AWS_ALLOWED_CIDR_BLOCK: ${{ secrets.AWS_ALLOWED_CIDR_BLOCK }}
+          AWS_DB_PASSWORD: ${{ secrets.AWS_DB_PASSWORD }}
+        run: |
+          if [ -z "$AWS_ALLOWED_CIDR_BLOCK" ]; then
+            echo "::error::Missing secret AWS_ALLOWED_CIDR_BLOCK"
+            exit 1
+          fi
+
+          if [ -z "$AWS_DB_PASSWORD" ]; then
+            echo "::error::Missing secret AWS_DB_PASSWORD"
+            exit 1
+          fi
+
+          echo "::add-mask::$AWS_DB_PASSWORD"
+          echo "TF_VAR_allowed_cidr_block=$AWS_ALLOWED_CIDR_BLOCK" >> "$GITHUB_ENV"
+          echo "TF_VAR_db_password=$AWS_DB_PASSWORD" >> "$GITHUB_ENV"
+
       - name: OpenTofu init
         working-directory: testing/aws/deploy/${{ matrix.postgres_version }}
         run: tofu init -input=false
@@ -213,3 +232,26 @@ jobs:
             echo "- Version: ${{ matrix.postgres_version }}"
             echo "- Endpoint: ${endpoint}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  validate:
+    if: needs.resolve.outputs.command == 'apply'
+    name: validate ${{ matrix.postgres_version }}
+    needs: [resolve, deploy]
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres_version: ${{ fromJSON(needs.resolve.outputs.versions_json) }}
+    uses: ./.github/workflows/managed-db-validate.yml
+    with:
+      cloud_provider: aws
+      aws_region: us-west-2
+      aws_db_identifier: ${{ matrix.postgres_version }}
+      pg_port: "5432"
+      pg_user: randoneering
+      pg_database: pgFirstAid
+      pg_sslmode: require
+      test_view_mode: managed
+    secrets:
+      pg_password: ${{ secrets.AWS_DB_PASSWORD }}
+      aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

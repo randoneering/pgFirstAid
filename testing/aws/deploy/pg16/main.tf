@@ -10,8 +10,18 @@ module "nonaurora" {
   engine_version      = local.engine_version
   family              = local.engine_family
   db_parameter_group  = local.db_parameter_group
+  allowed_cidr_block  = var.allowed_cidr_block
+  db_password         = var.db_password
 }
 
 output "endpoint" {
   value = module.nonaurora.rds_instance_address
+}
+
+output "database_name" {
+  value = local.database_name
+}
+
+output "db_user" {
+  value = "randoneering"
 }

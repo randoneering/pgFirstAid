@@ -53,5 +53,5 @@ resource "google_sql_database" "database" {
 resource "google_sql_user" "user" {
   name     = var.db_user
   instance = google_sql_database_instance.postgres.name
-  password = random_password.password.result
+  password = var.db_password != "" ? var.db_password : random_password.password.result
 }

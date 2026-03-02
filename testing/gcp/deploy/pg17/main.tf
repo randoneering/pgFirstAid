@@ -12,6 +12,7 @@ module "postgres" {
   database_name    = local.database_name
   db_user          = local.db_user
   authorized_networks = var.authorized_networks
+  db_password      = var.db_password
 }
 
 output "instance_name" {

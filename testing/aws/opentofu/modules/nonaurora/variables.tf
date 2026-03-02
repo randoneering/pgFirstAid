@@ -41,6 +41,13 @@ variable "username" {
   default     = "randoneering"
 }
 
+variable "db_password" {
+  description = "Master DB password. If empty, a random password is generated"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "skip_final_snapshot" {
   description = "Should a final snapshot be created on instance destroy"
   type        = bool

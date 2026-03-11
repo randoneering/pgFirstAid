@@ -15,15 +15,13 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   version             = var.postgres_version
 
   administrator_login    = var.db_user
-  administrator_password = random_password.password.result
+  administrator_password = var.db_password != "" ? var.db_password : random_password.password.result
 
   sku_name   = "B_Standard_B1ms"
   storage_mb = 32768
 
   backup_retention_days = 7
   geo_redundant_backup_enabled = false
-
-  zone = "1"
 
   lifecycle {
     ignore_changes = [

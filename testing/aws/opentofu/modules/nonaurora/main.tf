@@ -12,35 +12,6 @@ data "aws_vpc" "default" {
   default = true
 }
 
-resource "aws_security_group" "rds_sg" {
-  name        = "${var.service}-rds-sg"
-  description = "Security group for ${var.service} RDS instance"
-  vpc_id      = data.aws_vpc.default.id
-
-  ingress {
-    description = "PostgreSQL access from public IP"
-    from_port   = var.port
-    to_port     = var.port
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_cidr_block]
-  }
-
-  egress {
-    description = "Allow all outbound traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(
-    var.required_tags,
-    {
-      Name = "${var.service}-rds-sg"
-    }
-  )
-}
-
 resource "random_password" "password" {
   length  = 20
   special = false
@@ -52,11 +23,11 @@ resource "aws_db_instance" "rds_instance" {
   engine_version              = var.engine_version
   db_name                     = var.database_name
   username                    = local.username
-  password                    = random_password.password.result
+  password                    = var.db_password != "" ? var.db_password : random_password.password.result
   instance_class              = local.instance_class
   parameter_group_name        = aws_db_parameter_group.param_group.name
   publicly_accessible         = true
-  vpc_security_group_ids      = [aws_security_group.rds_sg.id]
+  vpc_security_group_ids      = ["sg-0333981e44680b34b"]
   allocated_storage           = local.allocated_storage
   apply_immediately           = var.apply_immediately
   skip_final_snapshot         = true

@@ -31,8 +31,24 @@ variable "db_user" {
   default     = "randoneering"
 }
 
+variable "db_password" {
+  description = "Database user password. If empty, a random password is generated"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "personal_ip" {
   description = "Personal IP to allow connections from"
   type = string
   default = "0.0.0.0"
+}
+
+variable "authorized_networks" {
+  description = "List of authorized networks for Cloud SQL"
+  type = list(object({
+    name  = string
+    value = string
+  }))
+  default = []
 }

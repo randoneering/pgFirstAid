@@ -31,6 +31,13 @@ variable "db_user" {
   default     = "randoneering"
 }
 
+variable "db_password" {
+  description = "Database admin password. If empty, a random password is generated"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "personal_ip" {
   description = "Personal IP to allow connections from (format: x.x.x.x)"
   type        = string

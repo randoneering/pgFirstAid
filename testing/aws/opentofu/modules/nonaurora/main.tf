@@ -5,11 +5,40 @@ locals {
   allocated_storage   = var.allocated_storage == "" ? 20 : var.allocated_storage
   iops                = var.allocated_storage >= 100 ? 3000 : null
   storage_type        = var.storage_type == "" ? "gp2" : var.storage_type
+  vpc_security_group_ids = concat(
+    var.vpc_security_group_ids,
+    aws_security_group.rds_access[*].id,
+  )
 
 }
 
 data "aws_vpc" "default" {
   default = true
+}
+
+resource "aws_security_group" "rds_access" {
+  count = var.allowed_cidr_block == null ? 0 : 1
+
+  name_prefix = "${var.service}-rds-access-"
+  description = "Allow PostgreSQL access to ${var.service}"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress {
+    description = "PostgreSQL"
+    from_port   = tonumber(var.port)
+    to_port     = tonumber(var.port)
+    protocol    = "tcp"
+    cidr_blocks = [var.allowed_cidr_block]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = var.required_tags
 }
 
 resource "random_password" "password" {
@@ -27,7 +56,7 @@ resource "aws_db_instance" "rds_instance" {
   instance_class              = local.instance_class
   parameter_group_name        = aws_db_parameter_group.param_group.name
   publicly_accessible         = true
-  vpc_security_group_ids      = ["sg-0333981e44680b34b"]
+  vpc_security_group_ids      = local.vpc_security_group_ids
   allocated_storage           = local.allocated_storage
   apply_immediately           = var.apply_immediately
   skip_final_snapshot         = true

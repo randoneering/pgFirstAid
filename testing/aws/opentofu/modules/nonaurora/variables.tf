@@ -23,6 +23,12 @@ variable "vpc_security_group_ids" {
   default     = []
 }
 
+variable "allowed_cidr_block" {
+  description = "CIDR block allowed to access the RDS instance. When set, the module creates a security group rule for the database port."
+  type        = string
+  default     = null
+}
+
 variable "instance_class" {
   description = "Instance type to use"
   type        = string

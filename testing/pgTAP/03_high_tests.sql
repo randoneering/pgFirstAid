@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(42);
+SELECT plan(44);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Current Blocked/Blocking Queries'),
@@ -170,6 +170,15 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Table with more than 50 columns'),
     'View executes Table with more than 50 columns check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Tables larger than 50GB'),
+    'Function executes Tables larger than 50GB check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Tables larger than 50GB'),
+    'View executes Tables larger than 50GB check'
 );
 
 SELECT ok(

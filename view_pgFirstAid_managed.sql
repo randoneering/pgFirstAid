@@ -843,7 +843,7 @@ order by
 select
 	'MEDIUM' as severity,
 	'Table Health' as category,
-	'Tables larger than 100GB' as check_name,
+	'Tables larger than 50GB' as check_name,
 	ts.table_schema || '"."' || ts.table_name as object_name,
 	'The following table' as description,
 	 ts.size_pretty as current_value,

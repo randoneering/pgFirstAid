@@ -1,7 +1,7 @@
 provider "google" {
   project = local.project_id
   region  = local.region
-}
+} 
 
 module "postgres" {
   source = "../../opentofu/models/postgres"
@@ -11,7 +11,7 @@ module "postgres" {
   region           = local.region
   database_name    = local.database_name
   db_user          = local.db_user
-  authorized_networks = var.authorized_networks
+  personal_ip      = var.personal_ip
   db_password      = var.db_password
 }
 

@@ -2,7 +2,7 @@ locals {
       service             = "pg18"
       database_name       = "pgFirstAid"
       engine              = "postgres"
-      engine_version      = ""
+      engine_version      = "18.3"
       engine_family       = "postgres18"
       db_parameter_group = [
         {

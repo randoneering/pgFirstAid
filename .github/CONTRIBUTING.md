@@ -16,13 +16,7 @@ This project follows the [Contributor Covenant](https://www.contributor-covenant
 
 ## Development Setup
 
-The `testing/` directory contains OpenTofu modules for provisioning PostgreSQL instances on major cloud providers (AWS RDS, Aurora, GCP Cloud SQL, Azure). Use these to validate your changes against real managed database environments.
-
-```bash
-cd testing/<provider>
-tofu init
-tofu apply
-```
+The `testing/` directory contains integration and pgTAP coverage used to validate pgFirstAid against live PostgreSQL environments. You can run the test suite against any database you control by setting the standard PostgreSQL connection environment variables described in `testing/integration/README.md`.
 
 ## Testing Requirements
 

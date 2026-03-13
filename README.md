@@ -38,6 +38,7 @@ Thank you OSUOSL for providing hosting for our testing infrastructure and CI/CD 
 - **Prioritized Results** - Issues ranked by severity (CRITICAL → HIGH → MEDIUM → LOW → INFO)
 - **Actionable Recommendations** - Each issue includes specific remediation steps
 - **Documentation Links** - Direct links to official PostgreSQL documentation for deeper learning
+- **Optional `pg_stat_statements` Checks** - Runs additional query workload checks when `pg_stat_statements` is installed
 
 ## Quick Start
 
@@ -88,6 +89,19 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 - **Replication Slots With High WAL Retention** - Replication slots that have 90% of max wal setting
 - **Long Running Queries** - Queries that have been running for 5 minutes or more
 - **Blocked and Blocking Queries** - Queries that are currently blocked or blocking other queries at the time you run pg_firstAid
+- **Top 10 Expensive Active Queries** - Active queries running longer than 30 seconds, ordered by runtime
+- **Lock-Wait-Heavy Active Queries** - Active queries waiting on locks for more than 30 seconds
+- **Idle In Transaction Over 5 Minutes** - Sessions left idle in transaction for over 5 minutes
+- **pg_stat_statements Extension Missing** - Reports when extension-based workload checks are unavailable and points to setup steps
+- **Top 10 Queries by Total Execution Time** *(pg_stat_statements)*
+- **High Mean Execution Time Queries** *(pg_stat_statements)*
+- **Top 10 Queries by Temp Block Spills** *(pg_stat_statements)*
+- **Low Cache Hit Ratio Queries** *(pg_stat_statements)*
+- **High Runtime Variance Queries** *(pg_stat_statements)*
+- **High Calls Low Value Queries** *(pg_stat_statements)*
+- **High Rows Per Call Queries** *(pg_stat_statements)*
+- **High Shared Block Reads Per Call Queries** *(pg_stat_statements)*
+- **Top Queries by WAL Bytes Per Call** *(pg_stat_statements)*
 - **Tables With More Than 50 Columns** - List tables with more than 50 columns (but less than 200)
 - **Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
 
@@ -173,6 +187,13 @@ ORDER BY MIN(CASE severity
 - Requires read access to system catalogs (`pg_catalog`)
 - Works with standard user permissions for most checks
 - Some checks may return fewer results for non-superuser accounts
+
+**Optional: Enable pg_stat_statements For Deeper Query Checks**
+- pgFirstAid keeps running without this extension and reports a setup action when it is missing.
+- Self-hosted PostgreSQL: set `shared_preload_libraries = 'pg_stat_statements'`, restart PostgreSQL, then run `CREATE EXTENSION pg_stat_statements;`
+- AWS RDS for PostgreSQL: add `pg_stat_statements` to the DB parameter group `shared_preload_libraries`, reboot, then run `CREATE EXTENSION pg_stat_statements;`
+- GCP Cloud SQL for PostgreSQL: enable `cloudsql.enable_pg_stat_statements`, restart if required, then run `CREATE EXTENSION pg_stat_statements;`
+- Azure Database for PostgreSQL: add `pg_stat_statements` to `shared_preload_libraries`, restart, then run `CREATE EXTENSION pg_stat_statements;`
 
 ## Performance Impact
 

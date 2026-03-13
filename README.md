@@ -203,11 +203,18 @@ pgFirstAid is designed to be lightweight and safe to run on production systems:
 - Typical execution time: <1 second on most databases
 - No locking or blocking of user queries
 
+## Testing
+
+- Query and health-check coverage is validated with pgTAP assertions grouped by severity.
+- Integration tests cover live runtime behavior, function/view parity, and checks that need concurrent sessions or timing control.
+- A coverage guard ensures every `check_name` in `pgFirstAid.sql` is referenced by at least one pgTAP assertion.
+- Managed database validation is exercised through the reusable workflow in `.github/workflows/managed-db-validate.yml`.
+
 ## Compatibility
 
-- **PostgreSQL 10+** - Fully supported, but only testing on 15+. This will change as versions are deprecated
+- **PostgreSQL 10+** - Supported, with active automated validation focused on PostgreSQL 15-18
 - **PostgreSQL 9.x** - Most features work (minor syntax adjustments may be needed)
-- Works with all PostgreSQL-compatible databases (Amazon RDS, Aurora, Azure Database, etc.)
+- Works with PostgreSQL-compatible databases, including Amazon RDS, Aurora, Azure Database for PostgreSQL, GCP Cloud SQL, and self-hosted PostgreSQL
 
 ## Contributing
 

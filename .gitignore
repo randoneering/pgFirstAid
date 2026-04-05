@@ -14,13 +14,15 @@ credentials.json
 .pgpass
 pgpass
 # AI dirs
-.claude
 .agent
 .copilot
 
-# AI Files
-CLAUDE.md
+# AI files
 AGENTS.md
+
+# Local docs
+docs/superpowers/plans/
+
 # Python
 __pycache__/
 .pytest_cache/

@@ -1401,4 +1401,29 @@ select
     'Set shared_buffers to approximately 25% of total system RAM (e.g., 2GB on an 8GB server). Requires a PostgreSQL restart.' as recommended_action,
     'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS' as documentation_link,
     2 as severity_order
-where pg_size_bytes(current_setting('shared_buffers')) = pg_size_bytes('128MB');
+where pg_size_bytes(current_setting('shared_buffers')) = pg_size_bytes('128MB')
+union all
+-- INFO: work_mem current value
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'work_mem Setting' as check_name,
+    'System' as object_name,
+    'Current value of work_mem. Allocated per sort/hash operation per session — multiply by max_connections and parallel workers to estimate peak memory consumption.' as issue_description,
+    current_setting('work_mem') || ' (max_connections: ' || current_setting('max_connections') || ')' as current_value,
+    'For OLTP workloads, 16-32MB is a common starting point. Monitor pg_stat_statements for temp file spills to determine if higher is warranted. Use SET work_mem per-session for large one-off queries rather than setting globally.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
+    5 as severity_order
+union all
+-- MEDIUM: work_mem still at 4MB PostgreSQL default
+select
+    'MEDIUM' as severity,
+    'System Health' as category,
+    'work_mem At Default' as check_name,
+    'System' as object_name,
+    'work_mem is set to the PostgreSQL default of 4MB. On modern hardware this often causes unnecessary sort and hash spills to disk.' as issue_description,
+    current_setting('work_mem') as current_value,
+    'Consider raising work_mem to 16-32MB for OLTP workloads. Be aware that work_mem is allocated per operation per session — high concurrency multiplies total memory usage.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
+    3 as severity_order
+where pg_size_bytes(current_setting('work_mem')) = pg_size_bytes('4MB');

@@ -1393,4 +1393,29 @@ select
         ' as documentation_link,
 	5 as severity_order
 from
-	ls);
+	ls)
+union all
+-- INFO: shared_buffers current value
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'shared_buffers Setting' as check_name,
+    'System' as object_name,
+    'Current value of shared_buffers. Recommended: ~25% of total system RAM for dedicated database servers.' as issue_description,
+    current_setting('shared_buffers') as current_value,
+    'No action needed if already tuned. For dedicated DB servers with 8GB+ RAM, target 25% of total RAM. Changes require a PostgreSQL restart.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS' as documentation_link,
+    5 as severity_order
+union all
+-- HIGH: shared_buffers still at 128MB PostgreSQL default
+select
+    'HIGH' as severity,
+    'System Health' as category,
+    'shared_buffers At Default' as check_name,
+    'System' as object_name,
+    'shared_buffers is set to the PostgreSQL default of 128MB. On any real workload this is almost certainly too low.' as issue_description,
+    current_setting('shared_buffers') as current_value,
+    'Set shared_buffers to approximately 25% of total system RAM (e.g., 2GB on an 8GB server). Requires a PostgreSQL restart.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS' as documentation_link,
+    2 as severity_order
+where pg_size_bytes(current_setting('shared_buffers')) = pg_size_bytes('128MB');

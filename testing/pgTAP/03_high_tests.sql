@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(44);
+SELECT plan(46);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'Current Blocked/Blocking Queries'),
@@ -197,6 +197,15 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'Long Running Queries'),
     'View executes Long Running Queries check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM pg_firstAid() WHERE check_name = 'shared_buffers At Default'),
+    'Function executes shared_buffers At Default check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM v_pgfirstaid WHERE check_name = 'shared_buffers At Default'),
+    'View executes shared_buffers At Default check'
 );
 
 SELECT * FROM finish();

@@ -16,10 +16,10 @@ pgpass
 # AI dirs
 .agent
 .copilot
-
+.claude
 # AI files
 AGENTS.md
-
+CLAUDE.md
 # Local docs
 docs/superpowers/plans/
 

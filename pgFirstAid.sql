@@ -1552,6 +1552,22 @@ select
 from
     pg_stat_bgwriter;
 
+-- INFO: Server role (primary vs standby)
+insert into health_results
+select
+    'INFO' as severity,
+    'System Info' as category,
+    'Server Role' as check_name,
+    'System' as object_name,
+    'Whether this server is operating as a primary or standby replica. Context for interpreting other checks — some checks are only relevant on standbys.' as issue_description,
+    case
+        when pg_is_in_recovery() then 'Standby (replica)'
+        else 'Primary'
+    end as current_value,
+    'No action needed — informational.' as recommended_action,
+    'https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-RECOVERY-INFO-TABLE' as documentation_link,
+    5 as severity_order;
+
 -- INFO: Installed Extensions
    insert
 	into

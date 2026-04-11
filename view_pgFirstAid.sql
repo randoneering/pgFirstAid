@@ -1518,4 +1518,19 @@ select
     end as current_value,
     'No action needed — informational.' as recommended_action,
     'https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-RECOVERY-INFO-TABLE' as documentation_link,
-    5 as severity_order;
+    5 as severity_order
+union all
+-- INFO: Connection utilization
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'Connection Utilization' as check_name,
+    'System' as object_name,
+    'Current connection usage as a percentage of max_connections. Includes all connection states, not just active queries.' as issue_description,
+    count(*)::text || ' total / ' || current_setting('max_connections') || ' max (' ||
+    round(100.0 * count(*) / current_setting('max_connections')::int, 1)::text || '% used)' as current_value,
+    'If consistently above 80%, consider a connection pooler such as PgBouncer. Reserve headroom for superuser connections (superuser_reserved_connections).' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-connection.html' as documentation_link,
+    5 as severity_order
+from
+    pg_stat_activity;

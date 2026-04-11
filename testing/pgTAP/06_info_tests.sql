@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(18);
+SELECT plan(20);
 
 SELECT ok((SELECT count(*) >= 0 FROM pg_firstAid()), 'pg_firstAid() executes');
 SELECT ok((SELECT count(*) >= 0 FROM v_pgfirstaid), 'v_pgfirstaid executes');
@@ -75,6 +75,15 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 1 FROM v_pgfirstaid WHERE check_name = 'Server Role'),
     'View executes Server Role check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 1 FROM pg_firstAid() WHERE check_name = 'Connection Utilization'),
+    'Function executes Connection Utilization check'
+);
+SELECT ok(
+    (SELECT count(*) >= 1 FROM v_pgfirstaid WHERE check_name = 'Connection Utilization'),
+    'View executes Connection Utilization check'
 );
 
 SELECT * FROM finish();

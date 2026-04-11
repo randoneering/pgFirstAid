@@ -1467,4 +1467,20 @@ select
     current_setting('maintenance_work_mem') as current_value,
     'Consider 256MB-1GB on modern hardware. Higher values speed up index builds and autovacuum on large tables. Changes take effect immediately for new sessions.' as recommended_action,
     'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-MAINTENANCE-WORK-MEM' as documentation_link,
-    5 as severity_order;
+    5 as severity_order
+union all
+-- INFO: Transaction ID wraparound risk per database
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'Transaction ID Wraparound Risk' as check_name,
+    datname as object_name,
+    'Age of the oldest unfrozen transaction ID in this database. PostgreSQL must freeze XIDs before reaching ~2.1 billion to prevent data loss from wraparound.' as issue_description,
+    datname || ': XID age ' || age(datfrozenxid)::text as current_value,
+    'Run VACUUM FREEZE on databases approaching high XID age. Ensure autovacuum is enabled and not blocked. Monitor databases with age > 500,000,000.' as recommended_action,
+    'https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND' as documentation_link,
+    5 as severity_order
+from
+    pg_database
+where
+    datallowconn = true;

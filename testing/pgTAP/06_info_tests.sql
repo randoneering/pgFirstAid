@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(8);
+SELECT plan(10);
 
 SELECT ok((SELECT count(*) >= 0 FROM pg_firstAid()), 'pg_firstAid() executes');
 SELECT ok((SELECT count(*) >= 0 FROM v_pgfirstaid), 'v_pgfirstaid executes');
@@ -30,6 +30,15 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 1 FROM v_pgfirstaid WHERE check_name = 'work_mem Setting'),
     'View executes work_mem Setting check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 1 FROM pg_firstAid() WHERE check_name = 'effective_cache_size Setting'),
+    'Function executes effective_cache_size Setting check'
+);
+SELECT ok(
+    (SELECT count(*) >= 1 FROM v_pgfirstaid WHERE check_name = 'effective_cache_size Setting'),
+    'View executes effective_cache_size Setting check'
 );
 
 SELECT * FROM finish();

@@ -1486,6 +1486,19 @@ select
     3 as severity_order
 where pg_size_bytes(current_setting('work_mem')) = pg_size_bytes('4MB');
 
+-- INFO: effective_cache_size current value
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'effective_cache_size Setting' as check_name,
+    'System' as object_name,
+    'Current value of effective_cache_size. Tells the query planner how much memory is available for disk caching. Does not allocate memory — purely advisory.' as issue_description,
+    current_setting('effective_cache_size') as current_value,
+    'Set to ~50-75% of total system RAM (shared_buffers + expected OS page cache). Underestimates cause the planner to prefer nested loops over index scans.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE' as documentation_link,
+    5 as severity_order;
+
 -- INFO: Installed Extensions
    insert
 	into

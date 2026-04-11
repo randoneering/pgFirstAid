@@ -1443,4 +1443,16 @@ select
     'Consider raising work_mem to 16-32MB for OLTP workloads. Be aware that work_mem is allocated per operation per session — high concurrency multiplies total memory usage.' as recommended_action,
     'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
     3 as severity_order
-where pg_size_bytes(current_setting('work_mem')) = pg_size_bytes('4MB');
+where pg_size_bytes(current_setting('work_mem')) = pg_size_bytes('4MB')
+union all
+-- INFO: effective_cache_size current value
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'effective_cache_size Setting' as check_name,
+    'System' as object_name,
+    'Current value of effective_cache_size. Tells the query planner how much memory is available for disk caching. Does not allocate memory — purely advisory.' as issue_description,
+    current_setting('effective_cache_size') as current_value,
+    'Set to ~50-75% of total system RAM (shared_buffers + expected OS page cache). Underestimates cause the planner to prefer nested loops over index scans.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE' as documentation_link,
+    5 as severity_order;

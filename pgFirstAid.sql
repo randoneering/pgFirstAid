@@ -1499,6 +1499,19 @@ select
     'https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE' as documentation_link,
     5 as severity_order;
 
+-- INFO: maintenance_work_mem current value
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'maintenance_work_mem Setting' as check_name,
+    'System' as object_name,
+    'Current value of maintenance_work_mem. Used by VACUUM, CREATE INDEX, ALTER TABLE, and each autovacuum worker.' as issue_description,
+    current_setting('maintenance_work_mem') as current_value,
+    'Consider 256MB-1GB on modern hardware. Higher values speed up index builds and autovacuum on large tables. Changes take effect immediately for new sessions.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-MAINTENANCE-WORK-MEM' as documentation_link,
+    5 as severity_order;
+
 -- INFO: Installed Extensions
    insert
 	into

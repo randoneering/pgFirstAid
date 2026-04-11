@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(14);
+SELECT plan(16);
 
 SELECT ok((SELECT count(*) >= 0 FROM pg_firstAid()), 'pg_firstAid() executes');
 SELECT ok((SELECT count(*) >= 0 FROM v_pgfirstaid), 'v_pgfirstaid executes');
@@ -57,6 +57,15 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 1 FROM v_pgfirstaid WHERE check_name = 'Transaction ID Wraparound Risk'),
     'View executes Transaction ID Wraparound Risk check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 1 FROM pg_firstAid() WHERE check_name = 'Checkpoint Stats'),
+    'Function executes Checkpoint Stats check'
+);
+SELECT ok(
+    (SELECT count(*) >= 1 FROM v_pgfirstaid WHERE check_name = 'Checkpoint Stats'),
+    'View executes Checkpoint Stats check'
 );
 
 SELECT * FROM finish();

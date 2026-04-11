@@ -1531,6 +1531,27 @@ where
 order by
     age(datfrozenxid) desc;
 
+-- INFO: Checkpoint statistics from pg_stat_bgwriter
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'Checkpoint Stats' as check_name,
+    'System' as object_name,
+    'Checkpoint activity since stats last reset. Forced checkpoints (checkpoints_req) occur when WAL fills up before the scheduled interval — high ratios suggest max_wal_size may be too small.' as issue_description,
+    'timed: ' || checkpoints_timed::text ||
+    ', forced: ' || checkpoints_req::text ||
+    ', forced ratio: ' ||
+    case
+        when checkpoints_timed + checkpoints_req = 0 then '0%'
+        else round(100.0 * checkpoints_req / (checkpoints_timed + checkpoints_req), 1)::text || '%'
+    end as current_value,
+    'If forced checkpoints are consistently above 50% of total, consider increasing max_wal_size. Reset stats with: SELECT pg_stat_reset_shared(''bgwriter'').' as recommended_action,
+    'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-BGWRITER-VIEW' as documentation_link,
+    5 as severity_order
+from
+    pg_stat_bgwriter;
+
 -- INFO: Installed Extensions
    insert
 	into

@@ -272,6 +272,17 @@ $$ language plpgsql;
 drop view if exists v_pgfirstAid;
 
 create view v_pgfirstAid as
+select
+    health_results.severity,
+    health_results.category,
+    health_results.check_name,
+    health_results.object_name,
+    health_results.issue_description,
+    health_results.current_value,
+    health_results.recommended_action,
+    health_results.documentation_link,
+    health_results.severity_order
+from (
 -- CRITICAL: Tables without primary keys
     select
 	'CRITICAL' as severity,
@@ -557,25 +568,31 @@ from
 	ts)
 union all
 -- HIGH: Duplicate or redundant indexes
+-- Compare actual index structure (columns, operator class) not string definitions
     select
 	'HIGH' as severity,
 	'Table Health' as category,
 	'Duplicate Index' as check_name,
-	quote_ident(i1.schemaname) || '.' || i1.indexname || ' & ' || i2.indexname as object_name,
-	'Multiple indexes with identical or overlapping column sets' as issue_description,
-	'Indexes: ' || i1.indexname || ', ' || i2.indexname as current_value,
+	quote_ident(n1.nspname) || '.' || c1.relname || ': ' || i1.relname || ' & ' || i2.relname as object_name,
+	'Multiple indexes with identical column sets and operator classes' as issue_description,
+	'Indexes: ' || i1.relname || ', ' || i2.relname as current_value,
 	'Review and consolidate duplicate indexes and focus on keeping the most efficient one' as recommended_action,
 	'https://www.postgresql.org/docs/current/indexes-multicolumn.html' as documentation_link,
 	2 as severity_order
 from
-	pg_indexes i1
-join pg_indexes i2 on
-	i1.schemaname = i2.schemaname
-	and i1.tablename = i2.tablename
-	and i1.indexname < i2.indexname
-	and i1.indexdef = i2.indexdef
+	pg_index idx1
+join pg_class i1 on idx1.indexrelid = i1.oid
+join pg_class c1 on idx1.indrelid = c1.oid
+join pg_namespace n1 on c1.relnamespace = n1.oid
+join pg_index idx2 on
+	idx1.indrelid = idx2.indrelid
+	and idx1.indexrelid < idx2.indexrelid
+	and idx1.indkey = idx2.indkey
+	and idx1.indclass = idx2.indclass
+	and idx1.indoption = idx2.indoption
+join pg_class i2 on idx2.indexrelid = i2.oid
 where
-	i1.schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+	n1.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 union all
 -- HIGH: Table with more than 200 columns
 (with cc as (
@@ -1459,7 +1476,11 @@ select
     'Transaction ID Wraparound Risk' as check_name,
     datname as object_name,
     'Age of the oldest unfrozen transaction ID in this database. PostgreSQL must freeze XIDs before reaching ~2.1 billion to prevent data loss from wraparound.' as issue_description,
-    datname || ': XID age ' || age(datfrozenxid)::text as current_value,
+    datname || ': XID age ' || trim(to_char(age(datfrozenxid), 'FM999,999,999,990')) ||
+    ' (' || round(age(datfrozenxid)::numeric * 100 / 2000000000, 1)::text ||
+    '% of wraparound window, ~' ||
+    trim(to_char(greatest(2000000000::bigint - age(datfrozenxid)::bigint, 0), 'FM999,999,999,990')) ||
+    ' remaining)' as current_value,
     'Run VACUUM FREEZE on databases approaching high XID age. Ensure autovacuum is enabled and not blocked. Monitor databases with age > 500,000,000.' as recommended_action,
     'https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND' as documentation_link,
     5 as severity_order
@@ -1508,4 +1529,9 @@ select
     'https://www.postgresql.org/docs/current/runtime-config-connection.html' as documentation_link,
     5 as severity_order
 from
-    pg_stat_activity;
+    pg_stat_activity
+) health_results
+order by
+    health_results.severity_order,
+    health_results.category,
+    health_results.check_name;

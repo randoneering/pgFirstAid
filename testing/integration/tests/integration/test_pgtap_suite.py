@@ -242,3 +242,62 @@ def test_view_parity_for_all_health_checks(
         "These checks exist in v_pgfirstaid but are missing in pg_firstAid(): "
         + ", ".join(extra_in_view)
     )
+
+
+@pytest.mark.integration
+def test_view_matches_function_row_order(
+    db_conn: PgConnection,
+) -> None:
+    with db_conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT severity, category, check_name
+            FROM pg_firstAid()
+            """
+        )
+        function_rows = [tuple(str(value) for value in row) for row in cur.fetchall()]
+
+        cur.execute(
+            """
+            SELECT severity, category, check_name
+            FROM v_pgfirstaid
+            """
+        )
+        view_rows = [tuple(str(value) for value in row) for row in cur.fetchall()]
+
+    assert function_rows == view_rows
+
+
+@pytest.mark.integration
+def test_wraparound_risk_current_value_is_human_readable(
+    db_conn: PgConnection,
+) -> None:
+    expected_pattern = re.compile(
+        r"^[^:]+: XID age [\d,]+ \([\d.]+% of wraparound window, ~[\d,]+ remaining\)$"
+    )
+
+    with db_conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT current_value
+            FROM pg_firstAid()
+            WHERE check_name = 'Transaction ID Wraparound Risk'
+            """
+        )
+        function_values = [str(row[0]) for row in cur.fetchall()]
+
+        cur.execute(
+            """
+            SELECT current_value
+            FROM v_pgfirstaid
+            WHERE check_name = 'Transaction ID Wraparound Risk'
+            """
+        )
+        view_values = [str(row[0]) for row in cur.fetchall()]
+
+    assert function_values, "Expected wraparound risk rows from pg_firstAid()"
+    assert view_values, "Expected wraparound risk rows from v_pgfirstaid"
+    assert all(expected_pattern.match(value) for value in function_values), (
+        function_values
+    )
+    assert all(expected_pattern.match(value) for value in view_values), view_values

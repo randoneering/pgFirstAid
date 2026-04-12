@@ -20,6 +20,14 @@ def _pgtap_dir() -> Path:
     return _repo_root() / "testing" / "pgTAP"
 
 
+def _pgtap_setup_sql() -> Path:
+    return _pgtap_dir() / "00_setup.sql"
+
+
+def _pgtap_teardown_sql() -> Path:
+    return _pgtap_dir() / "99_teardown.sql"
+
+
 def _pgtap_test_files() -> list[Path]:
     return sorted(_pgtap_dir().glob("0[1-9]_*.sql"))
 
@@ -86,6 +94,22 @@ def test_pgtap_sql_file_passes(
         + "\n".join(failures)
         + f"\n\nFull output:\n{output}"
     )
+
+
+@pytest.mark.integration
+def test_session_teardown_handles_installed_objects(db_conn: PgConnection) -> None:
+    # The shared teardown runs at session end, after pg_firstAid() and v_pgfirstaid
+    # have been installed for the integration suite.
+    execute_sql_file(db_conn, _pgtap_setup_sql())
+    execute_sql_file(db_conn, _repo_root() / "pgFirstAid.sql")
+    execute_sql_file(db_conn, _default_view_sql())
+
+    try:
+        execute_sql_file(db_conn, _pgtap_teardown_sql())
+    finally:
+        execute_sql_file(db_conn, _pgtap_setup_sql())
+        execute_sql_file(db_conn, _repo_root() / "pgFirstAid.sql")
+        execute_sql_file(db_conn, _default_view_sql())
 
 
 def _extract_check_names_from_source(sql_text: str) -> set[str]:

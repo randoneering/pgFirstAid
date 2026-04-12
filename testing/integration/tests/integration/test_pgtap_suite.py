@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import subprocess
 
-import psycopg
+from psycopg2.extensions import connection as PgConnection
 import pytest
 
 from pgfirstaid_pytest import TestConfig as PgConfig
@@ -69,7 +69,7 @@ def _tap_failures(output: str) -> list[str]:
 def test_pgtap_sql_file_passes(
     config: PgConfig,
     prepared_database: None,
-    db_conn: psycopg.Connection[tuple[object, ...]],
+    db_conn: PgConnection,
     pgtap_file: Path,
 ) -> None:
     _ = prepared_database
@@ -151,7 +151,7 @@ def test_both_view_sql_files_cover_all_health_checks() -> None:
 @pytest.mark.integration
 @pytest.mark.parametrize("view_sql", _view_sql_files())
 def test_view_variant_matches_function_check_names(
-    db_conn: psycopg.Connection[tuple[object, ...]],
+    db_conn: PgConnection,
     view_sql: Path,
 ) -> None:
     execute_sql_file(db_conn, view_sql)
@@ -189,7 +189,7 @@ def test_view_variant_matches_function_check_names(
 
 @pytest.mark.integration
 def test_view_parity_for_all_health_checks(
-    db_conn: psycopg.Connection[tuple[object, ...]],
+    db_conn: PgConnection,
 ) -> None:
     with db_conn.cursor() as cur:
         cur.execute(

@@ -2,7 +2,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import time
 
-import psycopg
+import psycopg2
+from psycopg2.extensions import connection as PgConnection
 import pytest
 
 from pgfirstaid_pytest import TestConfig as PgConfig
@@ -27,13 +28,13 @@ def _start_active_connection(
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_sleep(%s)", (sleep_seconds,))
             return True
-    except psycopg.Error:
+    except psycopg2.Error:
         return False
 
 
 @pytest.mark.integration
 def test_outdated_statistics_detected(
-    db_conn: psycopg.Connection[tuple[object, ...]],
+    db_conn: PgConnection,
     test_schema: str,
     config: PgConfig,
 ) -> None:
@@ -106,7 +107,7 @@ def test_outdated_statistics_detected(
 @pytest.mark.integration
 @pytest.mark.slow
 def test_high_connection_count_detected(
-    db_conn: psycopg.Connection[tuple[object, ...]],
+    db_conn: PgConnection,
     config: PgConfig,
 ) -> None:
     start_event = threading.Event()

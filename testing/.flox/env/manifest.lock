@@ -1,0 +1,680 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "schema-version": "1.10.0",
+    "install": {
+      "pip": {
+        "pkg-path": "python312Packages.pip"
+      },
+      "psycopg2": {
+        "pkg-path": "python312Packages.psycopg2"
+      },
+      "pytest": {
+        "pkg-path": "python312Packages.pytest"
+      },
+      "python312Full": {
+        "pkg-path": "python312Full"
+      },
+      "uv": {
+        "pkg-path": "uv"
+      }
+    },
+    "hook": {},
+    "profile": {},
+    "options": {}
+  },
+  "packages": [
+    {
+      "attr_path": "python312Packages.pip",
+      "broken": false,
+      "derivation": "/nix/store/6c3vk1w26pz96c6jphzpn9yf0ik301y8-python3.12-pip-25.0.1.drv",
+      "description": "PyPA recommended tool for installing Python packages",
+      "install_id": "pip",
+      "license": "[ MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-pip-25.0.1",
+      "pname": "pip",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:26:18.931395Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "25.0.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/hj7j2kzxm8s04qj271s8yvdwlcrbr74d-python3.12-pip-25.0.1-dist",
+        "man": "/nix/store/nyajlkrlkl85d8m1vpnv7axvskphica3-python3.12-pip-25.0.1-man",
+        "out": "/nix/store/1r9wk052v005r2fd2awaw47ryqrb045n-python3.12-pip-25.0.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.pip",
+      "broken": false,
+      "derivation": "/nix/store/biv5zjq9fxr7vvh5gynjikbvsb5xzzj1-python3.12-pip-25.0.1.drv",
+      "description": "PyPA recommended tool for installing Python packages",
+      "install_id": "pip",
+      "license": "[ MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-pip-25.0.1",
+      "pname": "pip",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:35:05.188700Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "25.0.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/m7h2qkisxfq784wx69s6qzyhqkgiqf7a-python3.12-pip-25.0.1-dist",
+        "man": "/nix/store/xham2r3yqfvz512mp8wqz9mi78x8a546-python3.12-pip-25.0.1-man",
+        "out": "/nix/store/y3jnqnyni83z59ca9fd1sfn1llvcxahw-python3.12-pip-25.0.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.pip",
+      "broken": false,
+      "derivation": "/nix/store/jhygj5afchyy0l41mpzdppjfvp59x785-python3.12-pip-25.0.1.drv",
+      "description": "PyPA recommended tool for installing Python packages",
+      "install_id": "pip",
+      "license": "[ MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-pip-25.0.1",
+      "pname": "pip",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:44:10.811511Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "25.0.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/0dhn33kvy534p6290di1akrr1ry0k9yg-python3.12-pip-25.0.1-dist",
+        "man": "/nix/store/vpklfd7g7zlg16kf6z10fhaxz6vc10qa-python3.12-pip-25.0.1-man",
+        "out": "/nix/store/hriq8hl1ckrl1mrvkx281k4n2y7wq1ga-python3.12-pip-25.0.1"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.pip",
+      "broken": false,
+      "derivation": "/nix/store/1yixssx3y6nkh99xskx0lk7lzaq7s3j2-python3.12-pip-25.0.1.drv",
+      "description": "PyPA recommended tool for installing Python packages",
+      "install_id": "pip",
+      "license": "[ MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-pip-25.0.1",
+      "pname": "pip",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:52:05.076504Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "25.0.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/ybqryzn42pga752yf9agl0m97p0rvglc-python3.12-pip-25.0.1-dist",
+        "man": "/nix/store/492i2sc237lp36i7y0hn6da25fsq5flf-python3.12-pip-25.0.1-man",
+        "out": "/nix/store/jcxmz9bq3ds1x6f0l8lkp8s0nsh1n9h6-python3.12-pip-25.0.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.psycopg2",
+      "broken": false,
+      "derivation": "/nix/store/90q9xmchbvmrscp02q9ixbgaiyq1p8mv-python3.12-psycopg2-2.9.10.drv",
+      "description": "PostgreSQL database adapter for the Python programming language",
+      "install_id": "psycopg2",
+      "license": "[ LGPL-3.0-or-later, ZPL-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-psycopg2-2.9.10",
+      "pname": "psycopg2",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:26:19.185249Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3.12-psycopg2-2.9.10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/4f7ixm4hczh4jvkp0y84am8ajw49v5c8-python3.12-psycopg2-2.9.10-dist",
+        "doc": "/nix/store/vbv3cy5dhsg0bha0d1vlvbqf33g52ppr-python3.12-psycopg2-2.9.10-doc",
+        "out": "/nix/store/w6y5kl7j705a7cb8ry4giisgd0298xh1-python3.12-psycopg2-2.9.10"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.psycopg2",
+      "broken": false,
+      "derivation": "/nix/store/p44l3nm3k7ygp02zhaiw1xh14js321vc-python3.12-psycopg2-2.9.10.drv",
+      "description": "PostgreSQL database adapter for the Python programming language",
+      "install_id": "psycopg2",
+      "license": "[ LGPL-3.0-or-later, ZPL-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-psycopg2-2.9.10",
+      "pname": "psycopg2",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:35:05.651141Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3.12-psycopg2-2.9.10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/lz5fqp8qc1vlf0sazsj7bkl7p85kmv84-python3.12-psycopg2-2.9.10-dist",
+        "doc": "/nix/store/sf26mddkwxyqcfaz6y0yrpvd50ijgrs1-python3.12-psycopg2-2.9.10-doc",
+        "out": "/nix/store/l8vklqnplarlf7b6vsdvy7iq4wpkmqm2-python3.12-psycopg2-2.9.10"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.psycopg2",
+      "broken": false,
+      "derivation": "/nix/store/5gdfasp58xjh2wvjk9w414z79pmzy7qx-python3.12-psycopg2-2.9.10.drv",
+      "description": "PostgreSQL database adapter for the Python programming language",
+      "install_id": "psycopg2",
+      "license": "[ LGPL-3.0-or-later, ZPL-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-psycopg2-2.9.10",
+      "pname": "psycopg2",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:44:11.065286Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3.12-psycopg2-2.9.10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/1vz0mc2dzf8m6lv2flpzng6zw8yc4rdm-python3.12-psycopg2-2.9.10-dist",
+        "doc": "/nix/store/5rgy6355rg0qfxh9gmgdlp9rm63chk7j-python3.12-psycopg2-2.9.10-doc",
+        "out": "/nix/store/50cks2kladwn6glaqxp98i9j7760y9x6-python3.12-psycopg2-2.9.10"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.psycopg2",
+      "broken": false,
+      "derivation": "/nix/store/1igd397cnlj9z0ksn381sqghrmhglp49-python3.12-psycopg2-2.9.10.drv",
+      "description": "PostgreSQL database adapter for the Python programming language",
+      "install_id": "psycopg2",
+      "license": "[ LGPL-3.0-or-later, ZPL-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-psycopg2-2.9.10",
+      "pname": "psycopg2",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:52:05.470710Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3.12-psycopg2-2.9.10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/jk2gg3r12pdq9nfcnqqjklrdis1il2yx-python3.12-psycopg2-2.9.10-dist",
+        "doc": "/nix/store/q69nfvcl9y6j0s57qfz4xlp842kiqlk3-python3.12-psycopg2-2.9.10-doc",
+        "out": "/nix/store/g4hf7rhbm43qza92v3ln46zhdn6gx006-python3.12-psycopg2-2.9.10"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.pytest",
+      "broken": false,
+      "derivation": "/nix/store/4hjqzk5sakb5xfmvzjg671kgci1rknck-python3.12-pytest-8.4.1.drv",
+      "description": "Framework for writing tests",
+      "install_id": "pytest",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-pytest-8.4.1",
+      "pname": "pytest",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:26:20.302363Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "8.4.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/9n5scdgf4ri1mxk90zabpy9jv88h27z4-python3.12-pytest-8.4.1-dist",
+        "out": "/nix/store/5imkz6mw3936s8wawn71i1iinq4zxh4l-python3.12-pytest-8.4.1",
+        "testout": "/nix/store/vyp6788wds35pp2rq01wl4dskhs3gcdj-python3.12-pytest-8.4.1-testout"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.pytest",
+      "broken": false,
+      "derivation": "/nix/store/i6nz6zb54lji5i1ivnky4c1ya3m048s6-python3.12-pytest-8.4.1.drv",
+      "description": "Framework for writing tests",
+      "install_id": "pytest",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-pytest-8.4.1",
+      "pname": "pytest",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:35:07.574632Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "8.4.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/fk10nyiwsaxpqyi9wf13i3156r10awb1-python3.12-pytest-8.4.1-dist",
+        "out": "/nix/store/hqsrkwskfh8q9zc6l9bggy7zahfa9y6w-python3.12-pytest-8.4.1",
+        "testout": "/nix/store/dahn4x0ji0rl95c617bz6rjhd6sjiyrb-python3.12-pytest-8.4.1-testout"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.pytest",
+      "broken": false,
+      "derivation": "/nix/store/bf5k292in4zd6wp2iib3xgz3jdrga9fz-python3.12-pytest-8.4.1.drv",
+      "description": "Framework for writing tests",
+      "install_id": "pytest",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-pytest-8.4.1",
+      "pname": "pytest",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:44:12.173575Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "8.4.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/wla07j5gfrvzyv4s53dw509c9c85fk76-python3.12-pytest-8.4.1-dist",
+        "out": "/nix/store/nc05alv8nnydj0rc2pc7k6y7y03jcvxk-python3.12-pytest-8.4.1",
+        "testout": "/nix/store/81n7kzi6zglzhl4hslvd7bxixl9mpc30-python3.12-pytest-8.4.1-testout"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Packages.pytest",
+      "broken": false,
+      "derivation": "/nix/store/xsjw0p8899g5j7y6bhm8pgds58c92ipw-python3.12-pytest-8.4.1.drv",
+      "description": "Framework for writing tests",
+      "install_id": "pytest",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3.12-pytest-8.4.1",
+      "pname": "pytest",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:52:07.254188Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "8.4.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/2q6nfg0df9p5fr44s9m30h7l6pm2yb94-python3.12-pytest-8.4.1-dist",
+        "out": "/nix/store/ggk45c8i53zyrs8w9vy7l4bqmmsjjjlc-python3.12-pytest-8.4.1",
+        "testout": "/nix/store/21giixazd8iyl84w6n097gw5rflsz0rc-python3.12-pytest-8.4.1-testout"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Full",
+      "broken": false,
+      "derivation": "/nix/store/x6c9qj50npdybsz6hp59xmki89jafj6d-python3-3.12.11.drv",
+      "description": "High-level dynamically-typed programming language",
+      "install_id": "python312Full",
+      "license": "Python-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3-3.12.11",
+      "pname": "python312Full",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:26:13.141205Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3-3.12.11",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/03p3nrkwhpzjr55dfcxhjq1hd3cg4pwy-python3-3.12.11"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Full",
+      "broken": false,
+      "derivation": "/nix/store/5siqr82ark2r66lhq3wxymgij7sl3s68-python3-3.12.11.drv",
+      "description": "High-level dynamically-typed programming language",
+      "install_id": "python312Full",
+      "license": "Python-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3-3.12.11",
+      "pname": "python312Full",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:34:54.887531Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3-3.12.11",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/q70n8zbzknvnaqp4l0bwx5y3kazwwnj2-python3-3.12.11-debug",
+        "out": "/nix/store/jij9z6imnjl6ns2x3fr0cgfssy3j273d-python3-3.12.11"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Full",
+      "broken": false,
+      "derivation": "/nix/store/axj8r2hnwjj941y08qn3jq5rrxcvczvl-python3-3.12.11.drv",
+      "description": "High-level dynamically-typed programming language",
+      "install_id": "python312Full",
+      "license": "Python-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3-3.12.11",
+      "pname": "python312Full",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:44:04.927920Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3-3.12.11",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/y3z25yr49hyabwjgjxn45v8i97wrgi25-python3-3.12.11"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python312Full",
+      "broken": false,
+      "derivation": "/nix/store/hhjkb1fmbi3h9kn1jpqjd7gmq2jbfrw3-python3-3.12.11.drv",
+      "description": "High-level dynamically-typed programming language",
+      "install_id": "python312Full",
+      "license": "Python-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "python3-3.12.11",
+      "pname": "python312Full",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:51:55.789109Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3-3.12.11",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/xv76sfvnw9zi996yxbz8jyk6dj0ijk29-python3-3.12.11-debug",
+        "out": "/nix/store/a4vblf4lkfvdrysnzh7ir9m61irk70d0-python3-3.12.11"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "uv",
+      "broken": false,
+      "derivation": "/nix/store/g2kfc67p7fg7q5zpri6432d36ak1bsj3-uv-0.8.6.drv",
+      "description": "Extremely fast Python package installer and resolver, written in Rust",
+      "install_id": "uv",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "uv-0.8.6",
+      "pname": "uv",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:27:20.423821Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "0.8.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/hxazvw40v90nic1yjx23cdkj6hqqlywa-uv-0.8.6"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "uv",
+      "broken": false,
+      "derivation": "/nix/store/5m6laj37dkg7jpxmr69dnb3q2m422d1a-uv-0.8.6.drv",
+      "description": "Extremely fast Python package installer and resolver, written in Rust",
+      "install_id": "uv",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "uv-0.8.6",
+      "pname": "uv",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:36:40.649674Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "0.8.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/li6y1v2mjj30fd5prwkawidq5lcn9ja9-uv-0.8.6"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "uv",
+      "broken": false,
+      "derivation": "/nix/store/324hhmwqzqphn6vq37i4zkv3glamr2vg-uv-0.8.6.drv",
+      "description": "Extremely fast Python package installer and resolver, written in Rust",
+      "install_id": "uv",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "uv-0.8.6",
+      "pname": "uv",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:45:11.571680Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "0.8.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/l37rdvvgc46jpydmyrwlxfhrslbfcnpm-uv-0.8.6"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "uv",
+      "broken": false,
+      "derivation": "/nix/store/fsv3g2p4y7c04678a0bpk6yparh2ysb7-uv-0.8.6.drv",
+      "description": "Extremely fast Python package installer and resolver, written in Rust",
+      "install_id": "uv",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "name": "uv-0.8.6",
+      "pname": "uv",
+      "rev": "8a6d5427d99ec71c64f0b93d45778c889005d9c2",
+      "rev_count": 852432,
+      "rev_date": "2025-08-27T03:49:43Z",
+      "scrape_date": "2025-08-28T03:53:31.236928Z",
+      "stabilities": [
+        "unstable",
+        "staging",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "0.8.6",
+      "outputs_to_install": [
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/hxvcjq4a053l4gm8asl4ynjyhlz2azib-uv-0.8.6"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    }
+  ]
+}

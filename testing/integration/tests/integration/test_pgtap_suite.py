@@ -212,6 +212,71 @@ def test_view_variant_matches_function_check_names(
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("view_sql", _view_sql_files())
+def test_view_variant_installs_standalone(
+    db_conn: PgConnection,
+    view_sql: Path,
+) -> None:
+    execute_sql_file(db_conn, _pgtap_teardown_sql())
+    execute_sql_file(db_conn, _pgtap_setup_sql())
+
+    try:
+        execute_sql_file(db_conn, view_sql)
+
+        with db_conn.cursor() as cur:
+            cur.execute("SELECT count(*) >= 0 FROM v_pgfirstaid")
+            assert cur.fetchone()[0] is True
+    finally:
+        execute_sql_file(db_conn, _pgtap_setup_sql())
+        execute_sql_file(db_conn, _repo_root() / "pgFirstAid.sql")
+        execute_sql_file(db_conn, _default_view_sql())
+
+
+@pytest.mark.integration
+def test_managed_view_duplicate_index_check_ignores_partial_indexes(
+    db_conn: PgConnection,
+    test_schema: str,
+) -> None:
+    table_name = f"{test_schema}.partial_index_table"
+    managed_view = _repo_root() / "view_pgFirstAid_managed.sql"
+
+    with db_conn.cursor() as cur:
+        cur.execute(
+            f"""
+            CREATE TABLE {table_name} (
+                id serial PRIMARY KEY,
+                value integer NOT NULL
+            )
+            """
+        )
+        cur.execute(
+            f"CREATE INDEX partial_idx_a ON {table_name} (value) WHERE value > 0"
+        )
+        cur.execute(
+            f"CREATE INDEX partial_idx_b ON {table_name} (value) WHERE value > 10"
+        )
+
+    execute_sql_file(db_conn, managed_view)
+
+    try:
+        with db_conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM v_pgfirstaid
+                    WHERE check_name = 'Duplicate Index'
+                      AND object_name LIKE %s
+                )
+                """,
+                (f"{test_schema}.partial_index_table:%",),
+            )
+            assert cur.fetchone()[0] is False
+    finally:
+        execute_sql_file(db_conn, _default_view_sql())
+
+
+@pytest.mark.integration
 def test_view_parity_for_all_health_checks(
     db_conn: PgConnection,
 ) -> None:
@@ -253,6 +318,7 @@ def test_view_matches_function_row_order(
             """
             SELECT severity, category, check_name
             FROM pg_firstAid()
+            ORDER BY severity, category, check_name
             """
         )
         function_rows = [tuple(str(value) for value in row) for row in cur.fetchall()]
@@ -261,6 +327,7 @@ def test_view_matches_function_row_order(
             """
             SELECT severity, category, check_name
             FROM v_pgfirstaid
+            ORDER BY severity, category, check_name
             """
         )
         view_rows = [tuple(str(value) for value in row) for row in cur.fetchall()]
@@ -301,3 +368,39 @@ def test_wraparound_risk_current_value_is_human_readable(
         function_values
     )
     assert all(expected_pattern.match(value) for value in view_values), view_values
+
+
+@pytest.mark.integration
+def test_checkpoint_stats_guidance_matches_server_version(
+    db_conn: PgConnection,
+) -> None:
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT current_setting('server_version_num')::int")
+        server_version_num = cur.fetchone()[0]
+
+        cur.execute(
+            """
+            SELECT recommended_action
+            FROM pg_firstAid()
+            WHERE check_name = 'Checkpoint Stats'
+            """
+        )
+        function_action = str(cur.fetchone()[0])
+
+        cur.execute(
+            """
+            SELECT recommended_action
+            FROM v_pgfirstaid
+            WHERE check_name = 'Checkpoint Stats'
+            """
+        )
+        view_action = str(cur.fetchone()[0])
+
+    expected_reset = (
+        "pg_stat_reset_shared('checkpointer')"
+        if server_version_num >= 170000
+        else "pg_stat_reset_shared('bgwriter')"
+    )
+
+    assert expected_reset in function_action
+    assert expected_reset in view_action

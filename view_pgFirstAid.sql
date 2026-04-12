@@ -271,6 +271,36 @@ $$ language plpgsql;
 -- This way we start with a fresh view.
 drop view if exists v_pgfirstAid;
 
+create or replace
+function _pg_firstaid_checkpoint_stats()
+returns text
+language plpgsql
+stable
+as $$
+declare
+    v_timed bigint;
+    v_forced bigint;
+begin
+    if current_setting('server_version_num')::int >= 170000 then
+        select num_timed, num_requested
+        into v_timed, v_forced
+        from pg_stat_checkpointer;
+    else
+        select checkpoints_timed, checkpoints_req
+        into v_timed, v_forced
+        from pg_stat_bgwriter;
+    end if;
+
+    return 'timed: ' || v_timed::text ||
+           ', forced: ' || v_forced::text ||
+           ', forced ratio: ' ||
+           case
+               when v_timed + v_forced = 0 then '0%'
+               else round(100.0 * v_forced / (v_timed + v_forced), 1)::text || '%'
+           end;
+end;
+$$;
+
 create view v_pgfirstAid as
 select
     health_results.severity,
@@ -1506,9 +1536,14 @@ select
     'System Health' as category,
     'Checkpoint Stats' as check_name,
     'System' as object_name,
-    'Checkpoint activity since stats last reset. Forced checkpoints (checkpoints_req) occur when WAL fills up before the scheduled interval — high ratios suggest max_wal_size may be too small.' as issue_description,
+    'Checkpoint activity since stats last reset. Forced checkpoints occur when WAL fills up before the scheduled interval — high ratios suggest max_wal_size may be too small. PG15/16 reads from pg_stat_bgwriter; PG17+ reads from pg_stat_checkpointer.' as issue_description,
     _pg_firstaid_checkpoint_stats() as current_value,
-    'If forced checkpoints are consistently above 50% of total, consider increasing max_wal_size. Reset stats with: SELECT pg_stat_reset_shared(''bgwriter'').' as recommended_action,
+    'If forced checkpoints are consistently above 50% of total, consider increasing max_wal_size. Reset stats with: SELECT pg_stat_reset_shared(''' ||
+    case
+        when current_setting('server_version_num')::int >= 170000 then 'checkpointer'
+        else 'bgwriter'
+    end ||
+    ''').' as recommended_action,
     'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-BGWRITER-VIEW' as documentation_link,
     5 as severity_order
 union all

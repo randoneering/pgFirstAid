@@ -271,6 +271,36 @@ $$ language plpgsql;
 -- This way we start with a fresh view.
 drop view if exists v_pgfirstAid;
 
+create or replace
+function _pg_firstaid_checkpoint_stats()
+returns text
+language plpgsql
+stable
+as $$
+declare
+    v_timed bigint;
+    v_forced bigint;
+begin
+    if current_setting('server_version_num')::int >= 170000 then
+        select num_timed, num_requested
+        into v_timed, v_forced
+        from pg_stat_checkpointer;
+    else
+        select checkpoints_timed, checkpoints_req
+        into v_timed, v_forced
+        from pg_stat_bgwriter;
+    end if;
+
+    return 'timed: ' || v_timed::text ||
+           ', forced: ' || v_forced::text ||
+           ', forced ratio: ' ||
+           case
+               when v_timed + v_forced = 0 then '0%'
+               else round(100.0 * v_forced / (v_timed + v_forced), 1)::text || '%'
+           end;
+end;
+$$;
+
 create view v_pgfirstAid as
 select
     health_results.severity,
@@ -573,7 +603,7 @@ union all
 	'HIGH' as severity,
 	'Table Health' as category,
 	'Duplicate Index' as check_name,
-	quote_ident(n1.nspname) || '.' || c1.relname || ': ' || i1.relname || ' & ' || i2.relname as object_name,
+	quote_ident(n1.nspname) || '.' || quote_ident(c1.relname) || ': ' || quote_ident(i1.relname) || ' & ' || quote_ident(i2.relname) as object_name,
 	'Multiple indexes with identical column sets and operator classes' as issue_description,
 	'Indexes: ' || i1.relname || ', ' || i2.relname as current_value,
 	'Review and consolidate duplicate indexes and focus on keeping the most efficient one' as recommended_action,
@@ -590,6 +620,8 @@ join pg_index idx2 on
 	and idx1.indkey = idx2.indkey
 	and idx1.indclass = idx2.indclass
 	and idx1.indoption = idx2.indoption
+	and idx1.indpred is not distinct from idx2.indpred
+	and idx1.indexprs is not distinct from idx2.indexprs
 join pg_class i2 on idx2.indexrelid = i2.oid
 where
 	n1.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
@@ -1495,9 +1527,14 @@ select
     'System Health' as category,
     'Checkpoint Stats' as check_name,
     'System' as object_name,
-    'Checkpoint activity since stats last reset. Forced checkpoints (checkpoints_req) occur when WAL fills up before the scheduled interval — high ratios suggest max_wal_size may be too small.' as issue_description,
+    'Checkpoint activity since stats last reset. Forced checkpoints occur when WAL fills up before the scheduled interval — high ratios suggest max_wal_size may be too small. PG15/16 reads from pg_stat_bgwriter; PG17+ reads from pg_stat_checkpointer.' as issue_description,
     _pg_firstaid_checkpoint_stats() as current_value,
-    'If forced checkpoints are consistently above 50% of total, consider increasing max_wal_size. Reset stats with: SELECT pg_stat_reset_shared(''bgwriter'').' as recommended_action,
+    'If forced checkpoints are consistently above 50% of total, consider increasing max_wal_size. Reset stats with: SELECT pg_stat_reset_shared(''' ||
+    case
+        when current_setting('server_version_num')::int >= 170000 then 'checkpointer'
+        else 'bgwriter'
+    end ||
+    ''').' as recommended_action,
     'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-BGWRITER-VIEW' as documentation_link,
     5 as severity_order
 union all

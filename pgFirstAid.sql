@@ -1527,9 +1527,7 @@ select
 from
     pg_database
 where
-    datallowconn = true
-order by
-    age(datfrozenxid) desc;
+    datallowconn = true;
 
 -- INFO: Checkpoint statistics from pg_stat_bgwriter
 insert into health_results

@@ -18,8 +18,12 @@ class TestConfig:
     wait_timeout_seconds: int
 
     @classmethod
+    def missing_env_vars(cls) -> tuple[str, ...]:
+        return tuple(name for name in _REQUIRED_ENV_VARS if not os.getenv(name))
+
+    @classmethod
     def from_env(cls) -> "TestConfig":
-        missing = [name for name in _REQUIRED_ENV_VARS if not os.getenv(name)]
+        missing = cls.missing_env_vars()
         if missing:
             missing_list = ", ".join(missing)
             raise ValueError(

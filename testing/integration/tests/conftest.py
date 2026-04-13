@@ -25,6 +25,15 @@ def _teardown_sql_path() -> Path:
 
 @pytest.fixture(scope="session")
 def config() -> TestConfig:
+    missing = TestConfig.missing_env_vars()
+    if missing:
+        missing_list = ", ".join(missing)
+        pytest.skip(
+            "Missing required PostgreSQL environment variables: "
+            f"{missing_list}. Set the standard PG* connection variables before "
+            "running integration tests."
+        )
+
     return TestConfig.from_env()
 
 

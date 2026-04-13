@@ -122,6 +122,21 @@ def _extract_check_names_from_pgtap(sql_text: str) -> set[str]:
     return set(re.findall(r"check_name\s*=\s*'([^']+)'", sql_text, flags=re.IGNORECASE))
 
 
+def _extract_function_body(sql_text: str, func_name: str) -> str | None:
+    # Match the dollar-quoted body of a named PL/pgSQL function.
+    # Use [$] character classes for literal $ because \$ loses the backslash
+    # in Python raw strings when $ is not a recognised escape sequence.
+    match = re.search(
+        rf"function\s+{re.escape(func_name)}\b[^$]*[$][$](.*?)[$][$]",
+        sql_text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if match is None:
+        return None
+    # Normalise whitespace so trivial formatting differences don't cause false diffs.
+    return "\n".join(line.strip() for line in match.group(1).strip().splitlines())
+
+
 def _view_sql_files() -> list[Path]:
     root = _repo_root()
     all_views = [root / "view_pgFirstAid.sql", root / "view_pgFirstAid_managed.sql"]
@@ -169,6 +184,38 @@ def test_both_view_sql_files_cover_all_health_checks() -> None:
         missing = sorted(expected_checks - view_checks)
         assert not missing, (
             f"Missing check_name coverage in {view_file.name}: " + ", ".join(missing)
+        )
+
+
+@pytest.mark.integration
+def test_checkpoint_stats_helper_body_matches_across_install_scripts() -> None:
+    # _pg_firstaid_checkpoint_stats() is duplicated in all three install scripts so
+    # they each remain standalone.  This test catches accidental divergence.
+    root = _repo_root()
+    scripts = [
+        root / "pgFirstAid.sql",
+        root / "view_pgFirstAid.sql",
+        root / "view_pgFirstAid_managed.sql",
+    ]
+
+    bodies: dict[str, str] = {}
+    for script in scripts:
+        body = _extract_function_body(
+            script.read_text(encoding="utf-8"),
+            "_pg_firstaid_checkpoint_stats",
+        )
+        assert body is not None, (
+            f"_pg_firstaid_checkpoint_stats() not found in {script.name} — "
+            "was it renamed or removed?"
+        )
+        bodies[script.name] = body
+
+    reference_name = scripts[0].name
+    for script in scripts[1:]:
+        assert bodies[script.name] == bodies[reference_name], (
+            f"_pg_firstaid_checkpoint_stats() in {script.name} differs from "
+            f"{reference_name} — keep these identical so the checkpoint stats "
+            "check produces consistent results regardless of install path."
         )
 
 

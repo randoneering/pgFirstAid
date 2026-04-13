@@ -15,6 +15,17 @@ def test_from_env_requires_connection_variables(
         TestConfig.from_env()
 
 
+def test_missing_env_vars_reports_unset_connection_variables(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PGHOST", "db.example.test")
+    monkeypatch.delenv("PGPORT", raising=False)
+    monkeypatch.delenv("PGUSER", raising=False)
+    monkeypatch.setenv("PGDATABASE", "appdb")
+
+    assert TestConfig.missing_env_vars() == ("PGPORT", "PGUSER")
+
+
 def test_from_env_reads_standard_pg_variables(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PGHOST", "db.example.test")
     monkeypatch.setenv("PGPORT", "6543")

@@ -267,6 +267,38 @@ with pss as (
 end;
 $$ language plpgsql;
 
+-- Helper: returns formatted checkpoint stats compatible with PG15/16 (pg_stat_bgwriter)
+-- and PG17+ (pg_stat_checkpointer, which replaced the checkpoint columns in pg_stat_bgwriter)
+create or replace
+function _pg_firstaid_checkpoint_stats()
+returns text
+language plpgsql
+stable
+as $$
+declare
+    v_timed bigint;
+    v_forced bigint;
+begin
+    if current_setting('server_version_num')::int >= 170000 then
+        select num_timed, num_requested
+        into v_timed, v_forced
+        from pg_stat_checkpointer;
+    else
+        select checkpoints_timed, checkpoints_req
+        into v_timed, v_forced
+        from pg_stat_bgwriter;
+    end if;
+
+    return 'timed: ' || v_timed::text ||
+           ', forced: ' || v_forced::text ||
+           ', forced ratio: ' ||
+           case
+               when v_timed + v_forced = 0 then '0%'
+               else round(100.0 * v_forced / (v_timed + v_forced), 1)::text || '%'
+           end;
+end;
+$$;
+
 create or replace
 function pg_firstAid()
 returns table (
@@ -1433,6 +1465,156 @@ order by
 	'Keep PostgreSQL updated and review configuration settings' as recommended_action,
 	'https://www.postgresql.org/docs/current/upgrading.html' as documentation_link,
 	5 as severity_order;
+-- INFO: shared_buffers current value
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'shared_buffers Setting' as check_name,
+    'System' as object_name,
+    'Current value of shared_buffers. Recommended: ~25% of total system RAM for dedicated database servers.' as issue_description,
+    current_setting('shared_buffers') as current_value,
+    'No action needed if already tuned. For dedicated DB servers with 8GB+ RAM, target 25% of total RAM. Changes require a PostgreSQL restart.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS' as documentation_link,
+    5 as severity_order;
+-- HIGH: shared_buffers still at 128MB PostgreSQL default
+insert into health_results
+select
+    'HIGH' as severity,
+    'System Health' as category,
+    'shared_buffers At Default' as check_name,
+    'System' as object_name,
+    'shared_buffers is set to the PostgreSQL default of 128MB. On any real workload this is almost certainly too low.' as issue_description,
+    current_setting('shared_buffers') as current_value,
+    'Set shared_buffers to approximately 25% of total system RAM (e.g., 2GB on an 8GB server). Requires a PostgreSQL restart.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS' as documentation_link,
+    2 as severity_order
+where pg_size_bytes(current_setting('shared_buffers')) = pg_size_bytes('128MB');
+
+-- INFO: work_mem current value
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'work_mem Setting' as check_name,
+    'System' as object_name,
+    'Current value of work_mem. Allocated per sort/hash operation per session — multiply by max_connections and parallel workers to estimate peak memory consumption.' as issue_description,
+    current_setting('work_mem') || ' (max_connections: ' || current_setting('max_connections') || ')' as current_value,
+    'For OLTP workloads, 16-32MB is a common starting point. Monitor pg_stat_statements for temp file spills to determine if higher is warranted. Use SET work_mem per-session for large one-off queries rather than setting globally.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
+    5 as severity_order;
+
+-- MEDIUM: work_mem still at 4MB PostgreSQL default
+insert into health_results
+select
+    'MEDIUM' as severity,
+    'System Health' as category,
+    'work_mem At Default' as check_name,
+    'System' as object_name,
+    'work_mem is set to the PostgreSQL default of 4MB. On modern hardware this often causes unnecessary sort and hash spills to disk.' as issue_description,
+    current_setting('work_mem') as current_value,
+    'Consider raising work_mem to 16-32MB for OLTP workloads. Be aware that work_mem is allocated per operation per session — high concurrency multiplies total memory usage.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
+    3 as severity_order
+where pg_size_bytes(current_setting('work_mem')) = pg_size_bytes('4MB');
+
+-- INFO: effective_cache_size current value
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'effective_cache_size Setting' as check_name,
+    'System' as object_name,
+    'Current value of effective_cache_size. Tells the query planner how much memory is available for disk caching. Does not allocate memory — purely advisory.' as issue_description,
+    current_setting('effective_cache_size') as current_value,
+    'Set to ~50-75% of total system RAM (shared_buffers + expected OS page cache). Underestimates cause the planner to prefer nested loops over index scans.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE' as documentation_link,
+    5 as severity_order;
+
+-- INFO: maintenance_work_mem current value
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'maintenance_work_mem Setting' as check_name,
+    'System' as object_name,
+    'Current value of maintenance_work_mem. Used by VACUUM, CREATE INDEX, ALTER TABLE, and each autovacuum worker.' as issue_description,
+    current_setting('maintenance_work_mem') as current_value,
+    'Consider 256MB-1GB on modern hardware. Higher values speed up index builds and autovacuum on large tables. Changes take effect immediately for new sessions.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-MAINTENANCE-WORK-MEM' as documentation_link,
+    5 as severity_order;
+
+-- INFO: Transaction ID wraparound risk per database
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'Transaction ID Wraparound Risk' as check_name,
+    datname as object_name,
+    'Age of the oldest unfrozen transaction ID in this database. PostgreSQL must freeze XIDs before reaching ~2.1 billion to prevent data loss from wraparound.' as issue_description,
+    datname || ': XID age ' || trim(to_char(age(datfrozenxid), 'FM999,999,999,990')) ||
+    ' (' || round(age(datfrozenxid)::numeric * 100 / 2000000000, 1)::text ||
+    '% of wraparound window, ~' ||
+    trim(to_char(greatest(2000000000::bigint - age(datfrozenxid)::bigint, 0), 'FM999,999,999,990')) ||
+    ' remaining)' as current_value,
+    'Run VACUUM FREEZE on databases approaching high XID age. Ensure autovacuum is enabled and not blocked. Monitor databases with age > 500,000,000.' as recommended_action,
+    'https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND' as documentation_link,
+    5 as severity_order
+from
+    pg_database
+where
+    datallowconn = true;
+
+-- INFO: Checkpoint statistics (PG15/16: pg_stat_bgwriter, PG17+: pg_stat_checkpointer)
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'Checkpoint Stats' as check_name,
+    'System' as object_name,
+    'Checkpoint activity since stats last reset. Forced checkpoints occur when WAL fills up before the scheduled interval — high ratios suggest max_wal_size may be too small. PG15/16 reads from pg_stat_bgwriter; PG17+ reads from pg_stat_checkpointer.' as issue_description,
+    _pg_firstaid_checkpoint_stats() as current_value,
+    'If forced checkpoints are consistently above 50% of total, consider increasing max_wal_size. Reset stats with: SELECT pg_stat_reset_shared(''' ||
+    case
+        when current_setting('server_version_num')::int >= 170000 then 'checkpointer'
+        else 'bgwriter'
+    end ||
+    ''').' as recommended_action,
+    'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-BGWRITER-VIEW' as documentation_link,
+    5 as severity_order;
+
+-- INFO: Server role (primary vs standby)
+insert into health_results
+select
+    'INFO' as severity,
+    'System Info' as category,
+    'Server Role' as check_name,
+    'System' as object_name,
+    'Whether this server is operating as a primary or standby replica. Context for interpreting other checks — some checks are only relevant on standbys.' as issue_description,
+    case
+        when pg_is_in_recovery() then 'Standby (replica)'
+        else 'Primary'
+    end as current_value,
+    'No action needed — informational.' as recommended_action,
+    'https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-RECOVERY-INFO-TABLE' as documentation_link,
+    5 as severity_order;
+
+-- INFO: Connection utilization
+insert into health_results
+select
+    'INFO' as severity,
+    'System Health' as category,
+    'Connection Utilization' as check_name,
+    'System' as object_name,
+    'Current connection usage as a percentage of max_connections. Includes all connection states, not just active queries.' as issue_description,
+    count(*)::text || ' total / ' || current_setting('max_connections') || ' max (' ||
+    round(100.0 * count(*) / current_setting('max_connections')::int, 1)::text || '% used)' as current_value,
+    'If consistently above 80%, consider a connection pooler such as PgBouncer. Reserve headroom for superuser connections (superuser_reserved_connections).' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-connection.html' as documentation_link,
+    5 as severity_order
+from
+    pg_stat_activity;
+
 -- INFO: Installed Extensions
    insert
 	into

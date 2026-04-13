@@ -1,8 +1,10 @@
 from pathlib import Path
 import sys
 from typing import Iterator
+
 import pytest
-import psycopg
+import psycopg2
+from psycopg2.extensions import connection as PgConnection
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -23,6 +25,15 @@ def _teardown_sql_path() -> Path:
 
 @pytest.fixture(scope="session")
 def config() -> TestConfig:
+    missing = TestConfig.missing_env_vars()
+    if missing:
+        missing_list = ", ".join(missing)
+        pytest.skip(
+            "Missing required PostgreSQL environment variables: "
+            f"{missing_list}. Set the standard PG* connection variables before "
+            "running integration tests."
+        )
+
     return TestConfig.from_env()
 
 
@@ -39,13 +50,13 @@ def prepared_database(config: TestConfig) -> Iterator[None]:
 def db_conn(
     config: TestConfig,
     prepared_database: None,
-) -> Iterator[psycopg.Connection[tuple[object, ...]]]:
+) -> Iterator[PgConnection]:
     with connect(config, autocommit=True) as conn:
         yield conn
 
 
 @pytest.fixture
-def test_schema(db_conn: psycopg.Connection[tuple[object, ...]]) -> Iterator[str]:
+def test_schema(db_conn: PgConnection) -> Iterator[str]:
     schema_name = "pgfirstaid_pytest"
     with db_conn.cursor() as cur:
         cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")

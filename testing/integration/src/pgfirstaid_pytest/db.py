@@ -1,24 +1,26 @@
+from contextlib import contextmanager
 from pathlib import Path
 import time
-from typing import Any
+from typing import Any, Iterator
 
-import psycopg
+import psycopg2
+from psycopg2.extensions import connection as PgConnection
 
 from .config import TestConfig
 
 
+@contextmanager
 def connect(
     config: TestConfig,
     *,
     autocommit: bool = True,
     application_name: str | None = None,
-) -> psycopg.Connection[Any]:
+) -> Iterator[PgConnection]:
     kwargs: dict[str, Any] = {
         "host": config.host,
         "port": config.port,
         "user": config.user,
         "dbname": config.database,
-        "autocommit": autocommit,
     }
     if config.password is not None:
         kwargs["password"] = config.password
@@ -26,17 +28,23 @@ def connect(
         kwargs["sslmode"] = config.sslmode
     if application_name is not None:
         kwargs["application_name"] = application_name
-    return psycopg.connect(**kwargs)
+
+    conn = psycopg2.connect(**kwargs)
+    conn.autocommit = autocommit
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
-def execute_sql_file(conn: psycopg.Connection[Any], file_path: Path) -> None:
+def execute_sql_file(conn: PgConnection, file_path: Path) -> None:
     sql_text = file_path.read_text(encoding="utf-8")
     with conn.cursor() as cur:
         cur.execute(sql_text)
 
 
 def wait_for_sql_true(
-    conn: psycopg.Connection[Any],
+    conn: PgConnection,
     sql: str,
     params: tuple[Any, ...] | None = None,
     *,

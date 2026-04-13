@@ -75,7 +75,7 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 
 - **Table Bloat** - Tables with >20% bloat affecting performance (tables >100MB)
 - **Missing Statistics** - Tables never analyzed, leaving the query planner without statistics
-- **Duplicate Indexes** - Multiple indexes with identical or overlapping column sets
+- **Duplicate Indexes** - Indexes with the same structure, including predicates and expressions
 - **Inactive Replication Slots** - Identifies replication slots that are inactive and can be removed if no longer needed
 - **Tables Larger Than 100GB** - Identifies tables that are larger than 100GB
 - **Tables With More Than 200 Columns** - List tables with more than 200 columns. You should probably look into those...
@@ -121,8 +121,8 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 - **PostgreSQL Version** - Version information and configuration details
 - **Installed Extensions** - Lists installed extensions on the Server
 - **Server Uptime** - Server uptime since last restart
-- **Log Directory** - Location of Log File(s). Results will vary for managed services like AWS RDS. (note: need access to AWS/Azure/GCP environments where I can test against!)
-- **Log File Sizes** - The size of the log files. Again, this will vary for managed services. 
+- **Log Directory** - Current log directory when the platform exposes it
+- **Log File Sizes** - Current log file sizes when the platform exposes them
 
 ## Usage Tips
 
@@ -210,11 +210,14 @@ pgFirstAid is designed to be lightweight and safe to run on production systems:
 - A coverage guard ensures every `check_name` in `pgFirstAid.sql` is referenced by at least one pgTAP assertion.
 - Managed database validation is exercised through the reusable workflow in `.github/workflows/managed-db-validate.yml`.
 
+> **Important:** We currently validate managed-database testing against AWS, but we do not have the funding or credits needed to keep Azure and GCP test environments running. If you have access to Azure Database for PostgreSQL or GCP Cloud SQL and want to help validate pgFirstAid there, we would be happy to have the help.
+
 ## Compatibility
 
 - **PostgreSQL 10+** - Supported, with active automated validation focused on PostgreSQL 15-18
 - **PostgreSQL 9.x** - Most features work (minor syntax adjustments may be needed)
 - Works with PostgreSQL-compatible databases, including Amazon RDS, Aurora, Azure Database for PostgreSQL, GCP Cloud SQL, and self-hosted PostgreSQL
+- Automated managed-database validation is active for AWS today. Azure and GCP support is best-effort until we can fund those test environments.
 
 ## Contributing
 

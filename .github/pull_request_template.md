@@ -43,8 +43,10 @@
 **Has this code been deployed and tested on the following platforms?**
 
 - [ ] Amazon RDS for PostgreSQL
-- [ ] Google Cloud SQL for PostgreSQL
-- [ ] Azure Database for PostgreSQL
+- [ ] Google Cloud SQL for PostgreSQL (currently unable to test)
+- [ ] Azure Database for PostgreSQL (currently unable to test)
+- [ ] Neon 
+- [ ] Supabase
 - [ ] Self-managed PostgreSQL
 
 **Platform-specific notes:**

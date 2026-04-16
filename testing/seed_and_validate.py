@@ -518,7 +518,82 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main() -> int:
+    """Orchestrate the full seed-and-validate run. Returns exit code (0 = pass)."""
     args = parse_args()
     params = get_conn_params(args)
+
     print(f"Connecting to {params['user']}@{params['host']}:{params['port']}")
+
+    admin_conn = connect_admin(params)
+    test_conn: psycopg.Connection | None = None
+    replication_slot_created = False
+    stop_event: threading.Event | None = None
+    success = False
+
+    try:
+        # --- Database setup -----------------------------------------------
+        print(f"Creating test database '{TEST_DB}'...")
+        create_test_db(admin_conn)
+
+        test_conn = connect_test(params)
+
+        print("Installing pgFirstAid with patched thresholds...")
+        install_function(test_conn)
+
+        # --- Static seed ------------------------------------------------------
+        print("Seeding structural checks (01_seed_static_checks.sql)...")
+        run_sql_file(test_conn, SEED_DIR / "01_seed_static_checks.sql")
+        verify_seed_sizes(test_conn)
+
+        # --- pg_stat_statements seed (via psql for \gexec support) -----------
+        print("Seeding pg_stat_statements workload (02_seed_pg_stat_statements.sql)...")
+        pss_seeded = run_psql_file(params, SEED_DIR / "02_seed_pg_stat_statements.sql")
+
+        # --- Replication slot -------------------------------------------------
+        print("Attempting replication slot seeding...")
+        replication_slot_created = try_create_replication_slot(test_conn)
+
+        # --- Live session threads ---------------------------------------------
+        print("Starting live session threads...")
+        _threads, stop_event = start_session_threads(params, admin_conn)
+
+        # Wait for the long query to appear as an active query (>30s threshold).
+        print("Waiting 35s for active query threshold (Top 10 Expensive Active Queries)...")
+        if not _wait_for_active_query(admin_conn, min_seconds=35, timeout=60):
+            print("  WARNING: long query did not reach 35s threshold — check may not fire")
+
+        # Wait for idle-in-transaction and long-running query (>5 min threshold).
+        print(
+            "Waiting 6 minutes for 5-minute session thresholds "
+            "(Long Running Queries, Idle In Transaction)..."
+        )
+        for minute in range(1, 7):
+            time.sleep(60)
+            print(f"  {minute}/6 minutes elapsed")
+
+        # --- Validate ---------------------------------------------------------
+        print("Running pg_firstAid() validation...")
+        success = run_validation(test_conn, replication_slot_created, pss_seeded)
+
+    finally:
+        # Signal threads to stop and allow them to rollback cleanly.
+        if stop_event is not None:
+            stop_event.set()
+            time.sleep(2)
+
+        if replication_slot_created and test_conn is not None:
+            drop_replication_slot(test_conn)
+
+        if test_conn is not None:
+            test_conn.close()
+
+        print(f"Dropping test database '{TEST_DB}'...")
+        drop_test_db(admin_conn)
+        admin_conn.close()
+
+    return 0 if success else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

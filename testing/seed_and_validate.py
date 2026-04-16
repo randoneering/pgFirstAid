@@ -107,6 +107,84 @@ def install_function(test_conn: psycopg.Connection) -> None:
     test_conn.execute(patched)
 
 
+def run_sql_file(test_conn: psycopg.Connection, path: Path) -> None:
+    """Execute a plain SQL file against the test connection."""
+    test_conn.execute(path.read_text())
+
+
+def run_psql_file(params: dict, path: Path) -> bool:
+    """Run a SQL file via psql subprocess (required for \\gexec support).
+
+    Returns True on success, False if psql is unavailable or the file errors.
+    """
+    env = {**os.environ, "PGPASSWORD": params.get("password", "")}
+    cmd = [
+        "psql",
+        f"--host={params['host']}",
+        f"--port={params['port']}",
+        f"--username={params['user']}",
+        f"--dbname={TEST_DB}",
+        f"--file={path}",
+        "--no-psqlrc",
+    ]
+    try:
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    except FileNotFoundError:
+        print("  SKIP: psql not found — pg_stat_statements seed skipped")
+        return False
+    if result.returncode != 0:
+        print(f"  WARNING: psql exited {result.returncode}:\n{result.stderr[:500]}")
+        return False
+    return True
+
+
+def try_create_replication_slot(test_conn: psycopg.Connection) -> bool:
+    """Create a logical replication slot to trigger the inactive-slot check.
+
+    Returns True if the slot was created, False if skipped due to
+    wal_level != logical or insufficient privilege.
+    """
+    try:
+        test_conn.execute(
+            "SELECT pg_create_logical_replication_slot("
+            "    'pgfirstaid_test_slot', 'test_decoding')"
+        )
+        return True
+    except psycopg.errors.ObjectNotInPrerequisiteState:
+        print("  SKIP: wal_level != logical — Inactive Replication Slots check not seeded")
+        return False
+    except psycopg.errors.InsufficientPrivilege:
+        print("  SKIP: insufficient privilege — Inactive Replication Slots check not seeded")
+        return False
+
+
+def drop_replication_slot(test_conn: psycopg.Connection) -> None:
+    """Drop the test replication slot if it exists."""
+    try:
+        test_conn.execute(
+            "SELECT pg_drop_replication_slot('pgfirstaid_test_slot')"
+        )
+    except Exception:
+        pass
+
+
+def verify_seed_sizes(test_conn: psycopg.Connection) -> None:
+    """Warn if size-seeded tables are outside expected ranges after patching."""
+    row = test_conn.execute("""
+        SELECT
+            pg_relation_size('pgfirstaid_seed.large_table')  AS large_bytes,
+            pg_relation_size('pgfirstaid_seed.medium_table') AS medium_bytes
+    """).fetchone()
+    large_bytes, medium_bytes = row
+    if large_bytes <= 1_048_576:
+        print(f"  WARNING: large_table is {large_bytes} bytes — may not trigger >1MB check")
+    if not (524_288 <= medium_bytes <= 1_048_576):
+        print(
+            f"  WARNING: medium_table is {medium_bytes} bytes — "
+            f"expected 524288–1048576 for 50GB patched check"
+        )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Seed and validate all pgFirstAid health checks"

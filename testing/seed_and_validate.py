@@ -185,6 +185,175 @@ def verify_seed_sizes(test_conn: psycopg.Connection) -> None:
         )
 
 
+# ---------------------------------------------------------------------------
+# Live session threads
+# Each thread opens its own psycopg connection and holds it open to trigger
+# session-based health checks. All threads are daemon threads so they are
+# automatically killed when the main process exits.
+# ---------------------------------------------------------------------------
+
+def _blocker_thread(params: dict, ready: threading.Event, stop: threading.Event) -> None:
+    """Hold an UPDATE lock on lock_target row 1 for the duration of the test."""
+    conn = psycopg.connect(**{**params, "dbname": TEST_DB})
+    conn.autocommit = False
+    conn.execute(
+        "UPDATE pgfirstaid_seed.lock_target SET payload = 'locked_by_blocker' WHERE id = 1"
+    )
+    ready.set()
+    stop.wait(timeout=700)
+    try:
+        conn.rollback()
+    except Exception:
+        pass
+    conn.close()
+
+
+def _blocked_thread(params: dict, blocker_ready: threading.Event) -> None:
+    """Attempt to UPDATE the same row as the blocker — will wait on the lock."""
+    blocker_ready.wait()
+    time.sleep(0.5)  # Ensure blocker's lock is fully held before we attempt.
+    conn = psycopg.connect(**{**params, "dbname": TEST_DB})
+    conn.autocommit = False
+    try:
+        conn.execute(
+            "UPDATE pgfirstaid_seed.lock_target SET payload = 'blocked' WHERE id = 1"
+        )
+    except Exception:
+        pass
+    finally:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        conn.close()
+
+
+def _idle_in_txn_thread(params: dict, ready: threading.Event, stop: threading.Event) -> None:
+    """Open a transaction and remain idle — triggers Idle In Transaction checks."""
+    conn = psycopg.connect(**{**params, "dbname": TEST_DB})
+    conn.autocommit = False
+    conn.execute("SELECT 1")  # Starts the transaction; connection is now idle in txn.
+    ready.set()
+    stop.wait(timeout=700)
+    try:
+        conn.rollback()
+    except Exception:
+        pass
+    conn.close()
+
+
+def _long_query_thread(params: dict, stop: threading.Event) -> None:
+    """Run a long-sleeping query — triggers Long Running Queries checks."""
+    conn = psycopg.connect(**{**params, "dbname": TEST_DB})
+    try:
+        conn.execute("SELECT pg_sleep(700)")
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Wait helpers — poll pg_stat_activity / pg_locks from the admin connection
+# ---------------------------------------------------------------------------
+
+def _wait_for_blocked(admin_conn: psycopg.Connection, timeout: int = 30) -> bool:
+    """Wait until at least one session is waiting on a lock in TEST_DB."""
+    for _ in range(timeout):
+        row = admin_conn.execute(
+            "SELECT 1 FROM pg_locks l "
+            "JOIN pg_stat_activity a ON l.pid = a.pid "
+            "WHERE NOT l.granted AND a.datname = %s",
+            (TEST_DB,),
+        ).fetchone()
+        if row:
+            return True
+        time.sleep(1)
+    return False
+
+
+def _wait_for_state(
+    admin_conn: psycopg.Connection, state: str, timeout: int = 30
+) -> bool:
+    """Wait until at least one session in TEST_DB has the given state."""
+    for _ in range(timeout):
+        row = admin_conn.execute(
+            "SELECT 1 FROM pg_stat_activity "
+            "WHERE state = %s AND datname = %s AND pid <> pg_backend_pid()",
+            (state, TEST_DB),
+        ).fetchone()
+        if row:
+            return True
+        time.sleep(1)
+    return False
+
+
+def _wait_for_active_query(
+    admin_conn: psycopg.Connection, min_seconds: int = 35, timeout: int = 60
+) -> bool:
+    """Wait until a session in TEST_DB has been active for at least min_seconds."""
+    for _ in range(timeout):
+        row = admin_conn.execute(
+            "SELECT 1 FROM pg_stat_activity "
+            "WHERE state = 'active' AND datname = %s "
+            "AND now() - query_start > make_interval(secs => %s) "
+            "AND pid <> pg_backend_pid()",
+            (TEST_DB, min_seconds),
+        ).fetchone()
+        if row:
+            return True
+        time.sleep(1)
+    return False
+
+
+def start_session_threads(
+    params: dict, admin_conn: psycopg.Connection
+) -> tuple[list[threading.Thread], threading.Event]:
+    """Start all live-session daemon threads and wait for each to establish.
+
+    Returns the list of threads and a stop event. Set the stop event to
+    signal threads to clean up before the database is dropped.
+    """
+    stop = threading.Event()
+    blocker_ready = threading.Event()
+    idle_ready = threading.Event()
+
+    threads = [
+        threading.Thread(
+            target=_blocker_thread, args=(params, blocker_ready, stop), daemon=True
+        ),
+        threading.Thread(
+            target=_blocked_thread, args=(params, blocker_ready), daemon=True
+        ),
+        threading.Thread(
+            target=_idle_in_txn_thread, args=(params, idle_ready, stop), daemon=True
+        ),
+        threading.Thread(
+            target=_long_query_thread, args=(params, stop), daemon=True
+        ),
+    ]
+
+    print("  Starting blocker thread...")
+    threads[0].start()
+    blocker_ready.wait(timeout=10)
+
+    print("  Starting blocked thread...")
+    threads[1].start()
+    if not _wait_for_blocked(admin_conn, timeout=15):
+        print("  WARNING: blocked session did not appear in pg_locks within 15s")
+
+    print("  Starting idle-in-transaction thread...")
+    threads[2].start()
+    idle_ready.wait(timeout=10)
+    if not _wait_for_state(admin_conn, "idle in transaction", timeout=15):
+        print("  WARNING: idle-in-transaction session did not appear within 15s")
+
+    print("  Starting long query thread...")
+    threads[3].start()
+
+    return threads, stop
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Seed and validate all pgFirstAid health checks"

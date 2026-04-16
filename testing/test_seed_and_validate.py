@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from seed_and_validate import get_conn_params
+from seed_and_validate import get_conn_params, patch_thresholds, PG_FIRSTAID_SQL
 
 
 def _args(**kwargs):
@@ -49,3 +49,31 @@ def test_get_conn_params_cli_overrides_env(monkeypatch):
     params = get_conn_params(_args(host="cli-host", port="5432"))
     assert params["host"] == "cli-host"
     assert params["port"] == 5432
+
+
+def test_patch_unused_large_index():
+    sql = "pg_relation_size(psi.indexrelid) > 104857600;"
+    result = patch_thresholds(sql)
+    assert "> 8192" in result
+    assert "104857600" not in result
+
+
+def test_patch_tables_over_100gb():
+    sql = "pg_relation_size(...) > 107374182400"
+    result = patch_thresholds(sql)
+    assert "> 1048576" in result
+    assert "107374182400" not in result
+
+
+def test_patch_tables_50gb_to_100gb():
+    sql = "pg_relation_size(...) between 53687091200 and 107374182400"
+    result = patch_thresholds(sql)
+    assert "between 524288 and 1048576" in result
+    assert "53687091200" not in result
+
+
+def test_patch_does_not_modify_file(tmp_path):
+    """patch_thresholds must not write to disk."""
+    original = PG_FIRSTAID_SQL.read_text()
+    patch_thresholds(original)
+    assert PG_FIRSTAID_SQL.read_text() == original

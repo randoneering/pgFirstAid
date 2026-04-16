@@ -17,6 +17,7 @@ Dependency:
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -28,6 +29,27 @@ import psycopg
 SEED_DIR = Path(__file__).parent / "healthcheck_seed"
 PG_FIRSTAID_SQL = Path(__file__).parent.parent / "pgFirstAid.sql"
 TEST_DB = "pgfirstaid_test"
+
+# Each tuple is (pattern, replacement). Applied in order.
+_THRESHOLD_PATCHES: list[tuple[str, str]] = [
+    # Unused Large Index: 100MB -> 8KB
+    (r"> 104857600", "> 8192"),
+    # Tables larger than 100GB -> 1MB
+    (r"> 107374182400", "> 1048576"),
+    # Tables larger than 50-100GB -> 512KB-1MB
+    (r"between 53687091200 and 107374182400", "between 524288 and 1048576"),
+]
+
+
+def patch_thresholds(sql: str) -> str:
+    """Return sql with size thresholds replaced by test-friendly values.
+
+    The original pgFirstAid.sql file is never modified; callers receive
+    the patched text and install it directly into the test database.
+    """
+    for pattern, replacement in _THRESHOLD_PATCHES:
+        sql = re.sub(pattern, replacement, sql)
+    return sql
 
 
 def get_conn_params(args: argparse.Namespace) -> dict:

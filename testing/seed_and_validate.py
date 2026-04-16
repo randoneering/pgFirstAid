@@ -354,6 +354,159 @@ def start_session_threads(
     return threads, stop
 
 
+# ---------------------------------------------------------------------------
+# Expected checks: every check_name that should appear in pg_firstAid()
+# output after a complete seed run.
+# ---------------------------------------------------------------------------
+
+# Checks that always fire regardless of seed data.
+_ALWAYS_FIRE: frozenset[str] = frozenset({
+    "Database Size",
+    "PostgreSQL Version",
+    "shared_buffers Setting",
+    "work_mem Setting",
+    "effective_cache_size Setting",
+    "maintenance_work_mem Setting",
+    "Transaction ID Wraparound Risk",
+    "Checkpoint Stats",
+    "Server Role",
+    "Connection Utilization",
+    "Installed Extension",
+    "Server Uptime",
+    "Is Logging Enabled",
+    "Size of ALL Logfiles combined",
+})
+
+# Checks seeded by 01_seed_static_checks.sql.
+_STATIC_CHECKS: frozenset[str] = frozenset({
+    "Missing Primary Key",
+    "Unused Large Index",
+    "Duplicate Index",
+    "Table with more than 200 columns",
+    "Missing Statistics",
+    "Tables larger than 100GB",
+    "Tables larger than 50GB",
+    "Outdated Statistics",
+    "Table with more than 50 columns",
+    "Low Index Efficiency",
+    "Excessive Sequential Scans",
+    "Missing FK Index",
+    "Table With Single Or No Columns",
+    "Table With No Activity Since Stats Reset",
+    "Role Never Logged In",
+    "Empty Table",
+    "Index With Very Low Usage",
+})
+
+# Checks seeded by live session threads.
+_SESSION_CHECKS: frozenset[str] = frozenset({
+    "Current Blocked/Blocking Queries",
+    "Long Running Queries",
+    "Top 10 Expensive Active Queries",
+    "Lock-Wait-Heavy Active Queries",
+    "Idle In Transaction Over 5 Minutes",
+})
+
+# pg_stat_statements workload checks (seeded by 02_seed_pg_stat_statements.sql).
+_PSS_WORKLOAD_CHECKS: frozenset[str] = frozenset({
+    "Top 10 Queries by Total Execution Time",
+    "High Mean Execution Time Queries",
+    "Top 10 Queries by Temp Block Spills",
+    "High Runtime Variance Queries",
+    "High Calls Low Value Queries",
+    "High Rows Per Call Queries",
+    "High Shared Block Reads Per Call Queries",
+    "Top Queries by WAL Bytes Per Call",
+})
+
+# Checks that fire when pg_stat_statements is absent.
+_PSS_MISSING_CHECK: str = "pg_stat_statements Extension Missing"
+
+# Checks that require wal_level=logical (conditional).
+_REPLICATION_CHECKS: frozenset[str] = frozenset({
+    "Inactive Replication Slots",
+})
+
+# Checks intentionally not seeded.
+_NEVER_SEEDED: frozenset[str] = frozenset({
+    "High Connection Count",
+    "Replication Slots Near Max Wal Size",
+})
+
+
+def build_report(
+    fired: set[str],
+    expected: set[str],
+    skipped: set[str],
+) -> tuple[list[str], list[str], list[str]]:
+    """Classify each expected check as passed, failed, or skipped.
+
+    Returns (passed, failed, skipped_list) — each is a sorted list of check names.
+    A check in `skipped` is never placed in `failed`, even if it did not fire.
+    """
+    passed: list[str] = []
+    failed: list[str] = []
+    skipped_list: list[str] = []
+
+    for check in sorted(expected):
+        if check in skipped:
+            skipped_list.append(check)
+        elif check in fired:
+            passed.append(check)
+        else:
+            failed.append(check)
+
+    return passed, failed, skipped_list
+
+
+def run_validation(
+    test_conn: psycopg.Connection,
+    replication_slot_created: bool,
+    pss_seeded: bool,
+) -> bool:
+    """Run pg_firstAid() and compare results to the expected check set.
+
+    Returns True if all non-skipped expected checks fired, False otherwise.
+    """
+    rows = test_conn.execute(
+        "SELECT check_name, count(*) FROM pg_firstAid() GROUP BY check_name"
+    ).fetchall()
+    fired: set[str] = {row[0] for row in rows}
+
+    expected = set(_ALWAYS_FIRE) | set(_STATIC_CHECKS) | set(_SESSION_CHECKS)
+
+    skipped = set(_NEVER_SEEDED)
+
+    if pss_seeded:
+        expected |= set(_PSS_WORKLOAD_CHECKS)
+    else:
+        expected.add(_PSS_MISSING_CHECK)
+
+    if replication_slot_created:
+        expected |= set(_REPLICATION_CHECKS)
+    else:
+        skipped |= set(_REPLICATION_CHECKS)
+
+    passed, failed, skipped_list = build_report(fired, expected, skipped)
+
+    print("\n=== pgFirstAid Validation Results ===\n")
+    for check in passed:
+        print(f"  PASS  {check}")
+    for check in failed:
+        print(f"  FAIL  {check}")
+    for check in skipped_list:
+        print(f"  SKIP  {check}")
+
+    total = len(passed) + len(failed)
+    print(
+        f"\n  {len(passed)}/{total} checks passed"
+        f", {len(skipped_list)} skipped"
+        f", {len(failed)} failed\n"
+    )
+
+    return len(failed) == 0
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Seed and validate all pgFirstAid health checks"

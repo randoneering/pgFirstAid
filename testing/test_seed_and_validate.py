@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from seed_and_validate import get_conn_params, patch_thresholds, PG_FIRSTAID_SQL
+from seed_and_validate import get_conn_params, patch_thresholds, PG_FIRSTAID_SQL, build_report
 
 
 def _args(**kwargs):
@@ -77,3 +77,33 @@ def test_patch_does_not_modify_file(tmp_path):
     original = PG_FIRSTAID_SQL.read_text()
     patch_thresholds(original)
     assert PG_FIRSTAID_SQL.read_text() == original
+
+
+def test_build_report_all_pass():
+    fired = {"Missing Primary Key", "Duplicate Index", "Database Size"}
+    expected = {"Missing Primary Key", "Duplicate Index", "Database Size"}
+    skipped = set()
+    passed, failed, skip_list = build_report(fired, expected, skipped)
+    assert "Missing Primary Key" in passed
+    assert "Duplicate Index" in passed
+    assert failed == []
+    assert skip_list == []
+
+
+def test_build_report_missing_check():
+    fired = {"Database Size"}
+    expected = {"Database Size", "Missing Primary Key"}
+    skipped = set()
+    passed, failed, skip_list = build_report(fired, expected, skipped)
+    assert "Missing Primary Key" in failed
+    assert "Database Size" in passed
+
+
+def test_build_report_skipped_not_in_failed():
+    fired = set()
+    expected = {"Inactive Replication Slots", "Database Size"}
+    skipped = {"Inactive Replication Slots"}
+    passed, failed, skip_list = build_report(fired, expected, skipped)
+    assert "Inactive Replication Slots" in skip_list
+    assert "Inactive Replication Slots" not in failed
+    assert "Database Size" in failed

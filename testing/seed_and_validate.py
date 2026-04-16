@@ -67,6 +67,46 @@ def get_conn_params(args: argparse.Namespace) -> dict:
     }
 
 
+def connect_admin(params: dict) -> psycopg.Connection:
+    """Connect to the maintenance database with autocommit (for CREATE/DROP DATABASE)."""
+    return psycopg.connect(**params, autocommit=True)
+
+
+def connect_test(params: dict) -> psycopg.Connection:
+    """Connect to the test database with autocommit for DDL."""
+    test_params = {**params, "dbname": TEST_DB}
+    return psycopg.connect(**test_params, autocommit=True)
+
+
+def create_test_db(admin_conn: psycopg.Connection) -> None:
+    """Drop and recreate the test database from scratch."""
+    # Terminate any existing connections to the test db before dropping.
+    admin_conn.execute(
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+        "WHERE datname = %s AND pid <> pg_backend_pid()",
+        (TEST_DB,),
+    )
+    admin_conn.execute(f"DROP DATABASE IF EXISTS {TEST_DB}")
+    admin_conn.execute(f"CREATE DATABASE {TEST_DB}")
+
+
+def drop_test_db(admin_conn: psycopg.Connection) -> None:
+    """Terminate all connections to the test database and drop it."""
+    admin_conn.execute(
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+        "WHERE datname = %s AND pid <> pg_backend_pid()",
+        (TEST_DB,),
+    )
+    admin_conn.execute(f"DROP DATABASE IF EXISTS {TEST_DB}")
+
+
+def install_function(test_conn: psycopg.Connection) -> None:
+    """Read pgFirstAid.sql, patch thresholds, and install into test DB."""
+    sql = PG_FIRSTAID_SQL.read_text()
+    patched = patch_thresholds(sql)
+    test_conn.execute(patched)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Seed and validate all pgFirstAid health checks"

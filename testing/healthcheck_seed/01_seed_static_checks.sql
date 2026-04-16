@@ -222,15 +222,11 @@ CREATE TABLE pgfirstaid_seed.inactive_table (
 -- ============================================================
 -- LOW: Role Never Logged In
 -- Role has LOGIN privilege but has never connected.
+-- Drop first so re-runs start clean (roles are cluster-level,
+-- not dropped by DROP SCHEMA CASCADE).
 -- ============================================================
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_roles WHERE rolname = 'pgfirstaid_seed_role'
-    ) THEN
-        CREATE ROLE pgfirstaid_seed_role LOGIN PASSWORD 'seed_only';
-    END IF;
-END $$;
+DROP ROLE IF EXISTS pgfirstaid_seed_role;
+CREATE ROLE pgfirstaid_seed_role LOGIN PASSWORD 'seed_only';
 
 -- ============================================================
 -- LOW: Empty Table

@@ -1,6 +1,6 @@
 -- pgFirstAid seed: structural and static checks
 -- Idempotent. Run against the pgfirstaid_test database.
--- Requires the pgfirstaid_seed schema to not exist, or be dropped first.
+-- Drops and recreates the pgfirstaid_seed schema on each run.
 
 DROP SCHEMA IF EXISTS pgfirstaid_seed CASCADE;
 CREATE SCHEMA pgfirstaid_seed;
@@ -45,7 +45,7 @@ CREATE INDEX pgfirstaid_seed_dup_idx_b ON pgfirstaid_seed.dup_idx_table (val);
 ANALYZE pgfirstaid_seed.dup_idx_table;
 
 -- ============================================================
--- HIGH: Table with more than 200 columns
+-- HIGH: Table with 201 columns (threshold is >200)
 -- ============================================================
 DO $$
 DECLARE
@@ -226,7 +226,8 @@ CREATE TABLE pgfirstaid_seed.inactive_table (
 -- not dropped by DROP SCHEMA CASCADE).
 -- ============================================================
 DROP ROLE IF EXISTS pgfirstaid_seed_role;
-CREATE ROLE pgfirstaid_seed_role LOGIN PASSWORD 'seed_only';
+-- PASSWORD NULL: the check fires on schema structure, not authentication.
+CREATE ROLE pgfirstaid_seed_role LOGIN PASSWORD NULL;
 
 -- ============================================================
 -- LOW: Empty Table
@@ -241,7 +242,7 @@ ANALYZE pgfirstaid_seed.empty_table;
 -- ============================================================
 -- LOW: Index With Very Low Usage
 -- idx_scan > 0 AND idx_scan < 100 AND pg_relation_size > 1MB.
--- 200000 rows * ~70 bytes/row ≈ 14MB index.
+-- 25000 rows * ~70 bytes/row ≈ 1.75MB index, safely above 1MB threshold.
 -- Scanned exactly 5 times (1 < 5 < 100).
 -- ============================================================
 CREATE TABLE pgfirstaid_seed.low_usage_idx_table (
@@ -250,7 +251,7 @@ CREATE TABLE pgfirstaid_seed.low_usage_idx_table (
 );
 INSERT INTO pgfirstaid_seed.low_usage_idx_table
 SELECT g, md5(g::text)
-FROM generate_series(1, 200000) g;
+FROM generate_series(1, 25000) g;
 CREATE INDEX pgfirstaid_seed_low_usage_idx
     ON pgfirstaid_seed.low_usage_idx_table (search_key);
 ANALYZE pgfirstaid_seed.low_usage_idx_table;

@@ -18,7 +18,7 @@ concurrency:
 jobs:
   integration:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
-    runs-on: [self-hosted, linux, pgfirstaid-ci]
+    runs-on: [self-hosted, nix, nixos, x86_64-linux]
     permissions:
       contents: read
     strategy:

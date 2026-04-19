@@ -28,6 +28,7 @@ import psycopg
 
 SEED_DIR = Path(__file__).parent / "healthcheck_seed"
 PG_FIRSTAID_SQL = Path(__file__).parent.parent / "pgFirstAid.sql"
+PG_FIRSTAID_MANAGED_SQL = Path(__file__).parent.parent / "view_pgFirstAid_managed.sql"
 TEST_DB = "pgfirstaid_test"
 
 # Each tuple is (pattern, replacement). Applied in order.
@@ -100,9 +101,14 @@ def drop_test_db(admin_conn: psycopg.Connection) -> None:
     admin_conn.execute(f"DROP DATABASE IF EXISTS {TEST_DB}")
 
 
-def install_function(test_conn: psycopg.Connection) -> None:
-    """Read pgFirstAid.sql, patch thresholds, and install into test DB."""
-    sql = PG_FIRSTAID_SQL.read_text()
+def install_function(test_conn: psycopg.Connection, managed: bool = False) -> None:
+    """Read and install pgFirstAid SQL into the test DB, patching thresholds.
+
+    When managed=True, installs view_pgFirstAid_managed.sql (view-based, no
+    superuser-only queries) instead of the default function-based pgFirstAid.sql.
+    """
+    sql_file = PG_FIRSTAID_MANAGED_SQL if managed else PG_FIRSTAID_SQL
+    sql = sql_file.read_text()
     patched = patch_thresholds(sql)
     test_conn.execute(patched)
 
@@ -479,14 +485,18 @@ def run_validation(
     replication_slot_created: bool,
     pss_seeded: bool,
     pss_extension_installed: bool = False,
+    managed: bool = False,
 ) -> bool:
-    """Run pg_firstAid() and compare results to the expected check set.
+    """Run pg_firstAid() or SELECT from v_pgfirstAid and compare to expected checks.
 
     Returns True if all non-skipped expected checks fired, False otherwise.
     """
-    rows = test_conn.execute(
-        "SELECT check_name, count(*) FROM pg_firstAid() GROUP BY check_name"
-    ).fetchall()
+    query = (
+        "SELECT check_name, count(*) FROM v_pgfirstAid GROUP BY check_name"
+        if managed
+        else "SELECT check_name, count(*) FROM pg_firstAid() GROUP BY check_name"
+    )
+    rows = test_conn.execute(query).fetchall()
     fired: set[str] = {row[0] for row in rows}
 
     expected = set(_ALWAYS_FIRE) | set(_STATIC_CHECKS) | set(_SESSION_CHECKS)
@@ -535,6 +545,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", default=None, help="PostgreSQL port (default: PGPORT or 5432)")
     parser.add_argument("--user", default=None, help="PostgreSQL user (default: PGUSER or postgres)")
     parser.add_argument("--password", default=None, help="PostgreSQL password (default: PGPASSWORD)")
+    parser.add_argument(
+        "--managed",
+        action="store_true",
+        default=False,
+        help="Install view_pgFirstAid_managed.sql and query v_pgfirstAid instead of pg_firstaid()",
+    )
     return parser.parse_args()
 
 
@@ -543,7 +559,9 @@ def main() -> int:
     args = parse_args()
     params = get_conn_params(args)
 
-    print(f"Connecting to {params['user']}@{params['host']}:{params['port']}")
+    managed = args.managed
+    mode_label = "managed (v_pgfirstAid)" if managed else "standard (pg_firstaid())"
+    print(f"Connecting to {params['user']}@{params['host']}:{params['port']} [{mode_label}]")
 
     admin_conn = connect_admin(params)
     test_conn: psycopg.Connection | None = None
@@ -561,7 +579,7 @@ def main() -> int:
         test_conn = connect_test(params)
 
         print("Installing pgFirstAid with patched thresholds...")
-        install_function(test_conn)
+        install_function(test_conn, managed=managed)
 
         # --- Static seed ------------------------------------------------------
         print("Seeding structural checks (01_seed_static_checks.sql)...")
@@ -614,9 +632,10 @@ def main() -> int:
                     pss_seeded = False
 
         # --- Validate ---------------------------------------------------------
-        print("Running pg_firstAid() validation...")
+        target = "v_pgfirstAid" if managed else "pg_firstAid()"
+        print(f"Running {target} validation...")
         success = run_validation(
-            test_conn, replication_slot_created, pss_seeded, pss_extension_installed
+            test_conn, replication_slot_created, pss_seeded, pss_extension_installed, managed
         )
 
     finally:

@@ -132,6 +132,8 @@ def run_psql_file(params: dict, path: Path) -> bool:
         f"--dbname={TEST_DB}",
         f"--file={path}",
         "--no-psqlrc",
+        "-v",
+        "ON_ERROR_STOP=1",
     ]
     try:
         result = subprocess.run(cmd, env=env, capture_output=True, text=True)
@@ -159,6 +161,24 @@ def is_pss_queryable(test_conn: psycopg.Connection) -> bool:
         return False
 
 
+def is_extension_installed(test_conn: psycopg.Connection, extension_name: str) -> bool:
+    """Return True if the named extension exists in pg_extension."""
+    row = test_conn.execute(
+        "SELECT 1 FROM pg_extension WHERE extname = %s",
+        (extension_name,),
+    ).fetchone()
+    return row is not None
+
+
+def classify_pss_state(
+    test_conn: psycopg.Connection, psql_seed_succeeded: bool
+) -> tuple[bool, bool]:
+    """Return whether pg_stat_statements is installed and fully seedable."""
+    installed = is_extension_installed(test_conn, "pg_stat_statements")
+    seeded = psql_seed_succeeded and installed and is_pss_queryable(test_conn)
+    return installed, seeded
+
+
 def try_create_replication_slot(test_conn: psycopg.Connection) -> bool:
     """Create a logical replication slot to trigger the inactive-slot check.
 
@@ -172,19 +192,32 @@ def try_create_replication_slot(test_conn: psycopg.Connection) -> bool:
         )
         return True
     except psycopg.errors.ObjectNotInPrerequisiteState:
-        print("  SKIP: wal_level != logical — Inactive Replication Slots check not seeded")
+        print(
+            "  SKIP: wal_level != logical — Inactive Replication Slots check not seeded"
+        )
         return False
     except psycopg.errors.InsufficientPrivilege:
-        print("  SKIP: insufficient privilege — Inactive Replication Slots check not seeded")
+        print(
+            "  SKIP: insufficient privilege — Inactive Replication Slots check not seeded"
+        )
         return False
+    except psycopg.Error as error:
+        message = str(error).lower()
+        if "test_decoding" in message and (
+            "does not exist" in message or "could not access file" in message
+        ):
+            print(
+                "  SKIP: test_decoding unavailable — "
+                "Inactive Replication Slots check not seeded"
+            )
+            return False
+        raise
 
 
 def drop_replication_slot(test_conn: psycopg.Connection) -> None:
     """Drop the test replication slot if it exists."""
     try:
-        test_conn.execute(
-            "SELECT pg_drop_replication_slot('pgfirstaid_test_slot')"
-        )
+        test_conn.execute("SELECT pg_drop_replication_slot('pgfirstaid_test_slot')")
     except Exception:
         pass
 
@@ -198,12 +231,42 @@ def verify_seed_sizes(test_conn: psycopg.Connection) -> None:
     """).fetchone()
     large_bytes, medium_bytes = row
     if large_bytes <= 1_048_576:
-        print(f"  WARNING: large_table is {large_bytes} bytes — may not trigger >1MB check")
+        print(
+            f"  WARNING: large_table is {large_bytes} bytes — may not trigger >1MB check"
+        )
     if not (524_288 <= medium_bytes <= 1_048_576):
         print(
             f"  WARNING: medium_table is {medium_bytes} bytes — "
             f"expected 524288–1048576 for 50GB patched check"
         )
+
+
+def seed_low_usage_index_scans(test_conn: psycopg.Connection) -> None:
+    """Run low-cardinality index lookups as separate statements so stats record them."""
+    for value in range(1, 6):
+        test_conn.execute(
+            "SELECT id FROM pgfirstaid_seed.low_usage_idx_table "
+            "WHERE search_key = md5(%s::text) LIMIT 1",
+            (str(value),),
+        )
+
+
+def wait_for_index_scan_count(
+    test_conn: psycopg.Connection,
+    index_name: str,
+    min_scans: int = 1,
+    timeout: int = 5,
+) -> bool:
+    """Wait for pg_stat_user_indexes to reflect recent scans for an index."""
+    for _ in range(timeout):
+        row = test_conn.execute(
+            "SELECT idx_scan FROM pg_stat_user_indexes WHERE indexrelname = %s",
+            (index_name,),
+        ).fetchone()
+        if row and row[0] >= min_scans:
+            return True
+        time.sleep(1.0)
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +276,10 @@ def verify_seed_sizes(test_conn: psycopg.Connection) -> None:
 # automatically killed when the main process exits.
 # ---------------------------------------------------------------------------
 
-def _blocker_thread(params: dict, ready: threading.Event, stop: threading.Event) -> None:
+
+def _blocker_thread(
+    params: dict, ready: threading.Event, stop: threading.Event
+) -> None:
     """Hold an UPDATE lock on lock_target row 1 for the duration of the test."""
     conn = psycopg.connect(**{**params, "dbname": TEST_DB})
     conn.autocommit = False
@@ -249,7 +315,9 @@ def _blocked_thread(params: dict, blocker_ready: threading.Event) -> None:
         conn.close()
 
 
-def _idle_in_txn_thread(params: dict, ready: threading.Event, stop: threading.Event) -> None:
+def _idle_in_txn_thread(
+    params: dict, ready: threading.Event, stop: threading.Event
+) -> None:
     """Open a transaction and remain idle — triggers Idle In Transaction checks."""
     conn = psycopg.connect(**{**params, "dbname": TEST_DB})
     conn.autocommit = False
@@ -277,6 +345,7 @@ def _long_query_thread(params: dict, stop: threading.Event) -> None:
 # ---------------------------------------------------------------------------
 # Wait helpers — poll pg_stat_activity / pg_locks from the admin connection
 # ---------------------------------------------------------------------------
+
 
 def _wait_for_blocked(admin_conn: psycopg.Connection, timeout: int = 30) -> bool:
     """Wait until at least one session is waiting on a lock in TEST_DB."""
@@ -349,9 +418,7 @@ def start_session_threads(
         threading.Thread(
             target=_idle_in_txn_thread, args=(params, idle_ready, stop), daemon=True
         ),
-        threading.Thread(
-            target=_long_query_thread, args=(params, stop), daemon=True
-        ),
+        threading.Thread(target=_long_query_thread, args=(params, stop), daemon=True),
     ]
 
     print("  Starting blocker thread...")
@@ -381,78 +448,127 @@ def start_session_threads(
 # ---------------------------------------------------------------------------
 
 # Checks that always fire regardless of seed data.
-_ALWAYS_FIRE: frozenset[str] = frozenset({
-    "Database Size",
-    "PostgreSQL Version",
-    "shared_buffers Setting",
-    "work_mem Setting",
-    "effective_cache_size Setting",
-    "maintenance_work_mem Setting",
-    "Transaction ID Wraparound Risk",
-    "Checkpoint Stats",
-    "Server Role",
-    "Connection Utilization",
-    "Installed Extension",
-    "Server Uptime",
-    "Is Logging Enabled",
-    "Size of ALL Logfiles combined",
-})
+_ALWAYS_FIRE: frozenset[str] = frozenset(
+    {
+        "Database Size",
+        "PostgreSQL Version",
+        "shared_buffers Setting",
+        "work_mem Setting",
+        "effective_cache_size Setting",
+        "maintenance_work_mem Setting",
+        "Transaction ID Wraparound Risk",
+        "Checkpoint Stats",
+        "Server Role",
+        "Connection Utilization",
+        "Installed Extension",
+        "Server Uptime",
+        "Is Logging Enabled",
+        "Size of ALL Logfiles combined",
+    }
+)
 
 # Checks seeded by 01_seed_static_checks.sql.
-_STATIC_CHECKS: frozenset[str] = frozenset({
-    "Missing Primary Key",
-    "Unused Large Index",
-    "Duplicate Index",
-    "Table with more than 200 columns",
-    "Missing Statistics",
-    "Tables larger than 100GB",
-    "Tables larger than 50GB",
-    "Outdated Statistics",
-    "Table with more than 50 columns",
-    "Low Index Efficiency",
-    "Excessive Sequential Scans",
-    "Missing FK Index",
-    "Table With Single Or No Columns",
-    "Table With No Activity Since Stats Reset",
-    "Role Never Logged In",
-    "Empty Table",
-    "Index With Very Low Usage",
-})
+_STATIC_CHECKS: frozenset[str] = frozenset(
+    {
+        "Missing Primary Key",
+        "Unused Large Index",
+        "Duplicate Index",
+        "Table with more than 200 columns",
+        "Missing Statistics",
+        "Tables larger than 100GB",
+        "Tables larger than 50GB",
+        "Outdated Statistics",
+        "Table with more than 50 columns",
+        "Low Index Efficiency",
+        "Excessive Sequential Scans",
+        "Missing FK Index",
+        "Table With Single Or No Columns",
+        "Table With No Activity Since Stats Reset",
+        "Role Never Logged In",
+        "Empty Table",
+        "Index With Very Low Usage",
+    }
+)
 
 # Checks seeded by live session threads.
-_SESSION_CHECKS: frozenset[str] = frozenset({
-    "Current Blocked/Blocking Queries",
-    "Long Running Queries",
-    "Top 10 Expensive Active Queries",
-    "Lock-Wait-Heavy Active Queries",
-    "Idle In Transaction Over 5 Minutes",
-})
+_SESSION_CHECKS: frozenset[str] = frozenset(
+    {
+        "Current Blocked/Blocking Queries",
+        "Long Running Queries",
+        "Top 10 Expensive Active Queries",
+        "Lock-Wait-Heavy Active Queries",
+        "Idle In Transaction Over 5 Minutes",
+    }
+)
 
 # pg_stat_statements workload checks (seeded by 02_seed_pg_stat_statements.sql).
-_PSS_WORKLOAD_CHECKS: frozenset[str] = frozenset({
-    "Top 10 Queries by Total Execution Time",
-    "High Mean Execution Time Queries",
-    "Top 10 Queries by Temp Block Spills",
-    "High Runtime Variance Queries",
-    "High Calls Low Value Queries",
-    "High Rows Per Call Queries",
-    "High Shared Block Reads Per Call Queries",
-    "Top Queries by WAL Bytes Per Call",
-})
+_PSS_WORKLOAD_CHECKS: frozenset[str] = frozenset(
+    {
+        "Top 10 Queries by Total Execution Time",
+        "High Mean Execution Time Queries",
+        "Top 10 Queries by Temp Block Spills",
+        "Low Cache Hit Ratio Queries",
+        "High Runtime Variance Queries",
+        "High Calls Low Value Queries",
+        "High Rows Per Call Queries",
+        "High Shared Block Reads Per Call Queries",
+        "Top Queries by WAL Bytes Per Call",
+    }
+)
 
 # Checks that fire when pg_stat_statements is absent.
 _PSS_MISSING_CHECK: str = "pg_stat_statements Extension Missing"
 
 # Checks that require wal_level=logical (conditional).
-_REPLICATION_CHECKS: frozenset[str] = frozenset({
-    "Inactive Replication Slots",
-})
+_REPLICATION_CHECKS: frozenset[str] = frozenset(
+    {
+        "Inactive Replication Slots",
+    }
+)
 
 # Checks intentionally not seeded.
-_NEVER_SEEDED: frozenset[str] = frozenset({
-    "High Connection Count",
-    "Replication Slots Near Max Wal Size",
-})
+_NEVER_SEEDED: frozenset[str] = frozenset(
+    {
+        "High Connection Count",
+        "Replication Slots Near Max Wal Size",
+        "Table Bloat (Detailed)",
+        "Idle Connections Over 1 Hour",
+    }
+)
+
+_MANAGED_UNSUPPORTED_CHECKS: frozenset[str] = frozenset(
+    {
+        "Empty Table",
+        "Index With Very Low Usage",
+        "Role Never Logged In",
+        "Table With No Activity Since Stats Reset",
+    }
+)
+
+_DEFAULT_ONLY_CHECKS: dict[str, tuple[str, str]] = {
+    "shared_buffers At Default": ("shared_buffers", "128MB"),
+    "work_mem At Default": ("work_mem", "4MB"),
+}
+
+
+def classify_default_setting_checks(
+    test_conn: psycopg.Connection,
+) -> tuple[set[str], set[str]]:
+    """Return expected and skipped checks for settings that only fire at defaults."""
+    expected: set[str] = set()
+    skipped: set[str] = set()
+
+    for check_name, (setting_name, default_value) in _DEFAULT_ONLY_CHECKS.items():
+        row = test_conn.execute(
+            "SELECT pg_size_bytes(current_setting(%s)) = pg_size_bytes(%s)",
+            (setting_name, default_value),
+        ).fetchone()
+        if row and row[0]:
+            expected.add(check_name)
+        else:
+            skipped.add(check_name)
+
+    return expected, skipped
 
 
 def build_report(
@@ -503,6 +619,13 @@ def run_validation(
 
     skipped = set(_NEVER_SEEDED)
 
+    default_expected, default_skipped = classify_default_setting_checks(test_conn)
+    expected |= default_expected
+    skipped |= default_skipped
+
+    if managed:
+        skipped |= set(_MANAGED_UNSUPPORTED_CHECKS)
+
     if pss_seeded:
         expected |= set(_PSS_WORKLOAD_CHECKS)
     elif pss_extension_installed:
@@ -541,10 +664,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Seed and validate all pgFirstAid health checks"
     )
-    parser.add_argument("--host", default=None, help="PostgreSQL host (default: PGHOST or localhost)")
-    parser.add_argument("--port", default=None, help="PostgreSQL port (default: PGPORT or 5432)")
-    parser.add_argument("--user", default=None, help="PostgreSQL user (default: PGUSER or postgres)")
-    parser.add_argument("--password", default=None, help="PostgreSQL password (default: PGPASSWORD)")
+    parser.add_argument(
+        "--host", default=None, help="PostgreSQL host (default: PGHOST or localhost)"
+    )
+    parser.add_argument(
+        "--port", default=None, help="PostgreSQL port (default: PGPORT or 5432)"
+    )
+    parser.add_argument(
+        "--user", default=None, help="PostgreSQL user (default: PGUSER or postgres)"
+    )
+    parser.add_argument(
+        "--password", default=None, help="PostgreSQL password (default: PGPASSWORD)"
+    )
     parser.add_argument(
         "--managed",
         action="store_true",
@@ -561,7 +692,9 @@ def main() -> int:
 
     managed = args.managed
     mode_label = "managed (v_pgfirstAid)" if managed else "standard (pg_firstaid())"
-    print(f"Connecting to {params['user']}@{params['host']}:{params['port']} [{mode_label}]")
+    print(
+        f"Connecting to {params['user']}@{params['host']}:{params['port']} [{mode_label}]"
+    )
 
     admin_conn = connect_admin(params)
     test_conn: psycopg.Connection | None = None
@@ -584,15 +717,25 @@ def main() -> int:
         # --- Static seed ------------------------------------------------------
         print("Seeding structural checks (01_seed_static_checks.sql)...")
         run_sql_file(test_conn, SEED_DIR / "01_seed_static_checks.sql")
+        seed_low_usage_index_scans(test_conn)
         verify_seed_sizes(test_conn)
+        if not wait_for_index_scan_count(test_conn, "pgfirstaid_seed_low_usage_idx"):
+            print(
+                "  WARNING: low-usage index scan stats did not become visible within 5s"
+            )
 
         # --- pg_stat_statements seed (via psql for \gexec support) -----------
         print("Seeding pg_stat_statements workload (02_seed_pg_stat_statements.sql)...")
-        pss_extension_installed = run_psql_file(params, SEED_DIR / "02_seed_pg_stat_statements.sql")
-        pss_seeded = pss_extension_installed
-        if pss_seeded and not is_pss_queryable(test_conn):
-            print("  SKIP: pg_stat_statements not in shared_preload_libraries — PSS checks not seeded")
-            pss_seeded = False
+        psql_seed_succeeded = run_psql_file(
+            params, SEED_DIR / "02_seed_pg_stat_statements.sql"
+        )
+        pss_extension_installed, pss_seeded = classify_pss_state(
+            test_conn, psql_seed_succeeded
+        )
+        if pss_extension_installed and not pss_seeded:
+            print(
+                "  SKIP: pg_stat_statements not in shared_preload_libraries — PSS checks not seeded"
+            )
 
         # --- Replication slot -------------------------------------------------
         print("Attempting replication slot seeding...")
@@ -603,9 +746,13 @@ def main() -> int:
         _threads, stop_event = start_session_threads(params, admin_conn)
 
         # Wait for the long query to appear as an active query (>30s threshold).
-        print("Waiting 35s for active query threshold (Top 10 Expensive Active Queries)...")
+        print(
+            "Waiting 35s for active query threshold (Top 10 Expensive Active Queries)..."
+        )
         if not _wait_for_active_query(admin_conn, min_seconds=35, timeout=60):
-            print("  WARNING: long query did not reach 35s threshold — check may not fire")
+            print(
+                "  WARNING: long query did not reach 35s threshold — check may not fire"
+            )
 
         # Wait for idle-in-transaction and long-running query (>5 min threshold).
         print(
@@ -619,23 +766,33 @@ def main() -> int:
         # --- PSS diagnostic (before validation) --------------------------------
         if pss_seeded:
             if not is_pss_queryable(test_conn):
-                print("  PSS diagnostic: pg_stat_statements not accessible — downgrading pss_seeded")
+                print(
+                    "  PSS diagnostic: pg_stat_statements not accessible — downgrading pss_seeded"
+                )
                 pss_seeded = False
             else:
                 try:
                     row = test_conn.execute(
                         "SELECT count(*) FROM pg_stat_statements"
                     ).fetchone()
-                    print(f"  PSS diagnostic: {row[0]} total entries in pg_stat_statements")
+                    print(
+                        f"  PSS diagnostic: {row[0]} total entries in pg_stat_statements"
+                    )
                 except psycopg.Error as e:
-                    print(f"  PSS diagnostic: query failed ({e}) — downgrading pss_seeded")
+                    print(
+                        f"  PSS diagnostic: query failed ({e}) — downgrading pss_seeded"
+                    )
                     pss_seeded = False
 
         # --- Validate ---------------------------------------------------------
         target = "v_pgfirstAid" if managed else "pg_firstAid()"
         print(f"Running {target} validation...")
         success = run_validation(
-            test_conn, replication_slot_created, pss_seeded, pss_extension_installed, managed
+            test_conn,
+            replication_slot_created,
+            pss_seeded,
+            pss_extension_installed,
+            managed,
         )
 
     finally:

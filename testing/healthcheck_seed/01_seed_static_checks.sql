@@ -243,7 +243,7 @@ ANALYZE pgfirstaid_seed.empty_table;
 -- LOW: Index With Very Low Usage
 -- idx_scan > 0 AND idx_scan < 100 AND pg_relation_size > 1MB.
 -- 25000 rows * ~70 bytes/row ≈ 1.75MB index, safely above 1MB threshold.
--- Scanned exactly 5 times (1 < 5 < 100).
+-- Run five top-level lookups so pg_stat_user_indexes records visible scans.
 -- ============================================================
 CREATE TABLE pgfirstaid_seed.low_usage_idx_table (
     id bigint PRIMARY KEY,
@@ -256,17 +256,25 @@ CREATE INDEX pgfirstaid_seed_low_usage_idx
     ON pgfirstaid_seed.low_usage_idx_table (search_key);
 ANALYZE pgfirstaid_seed.low_usage_idx_table;
 
-DO $$
-DECLARE
-    dummy bigint;
-BEGIN
-    FOR i IN 1..5 LOOP
-        SELECT id INTO dummy
-        FROM pgfirstaid_seed.low_usage_idx_table
-        WHERE search_key = md5(i::text)
-        LIMIT 1;
-    END LOOP;
-END $$;
+SELECT id FROM pgfirstaid_seed.low_usage_idx_table
+WHERE search_key = md5('1')
+LIMIT 1;
+
+SELECT id FROM pgfirstaid_seed.low_usage_idx_table
+WHERE search_key = md5('2')
+LIMIT 1;
+
+SELECT id FROM pgfirstaid_seed.low_usage_idx_table
+WHERE search_key = md5('3')
+LIMIT 1;
+
+SELECT id FROM pgfirstaid_seed.low_usage_idx_table
+WHERE search_key = md5('4')
+LIMIT 1;
+
+SELECT id FROM pgfirstaid_seed.low_usage_idx_table
+WHERE search_key = md5('5')
+LIMIT 1;
 
 -- ============================================================
 -- Lock target for live session threads (blocker/blocked checks).

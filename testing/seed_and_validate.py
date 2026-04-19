@@ -135,7 +135,22 @@ def run_psql_file(params: dict, path: Path) -> bool:
     if result.returncode != 0:
         print(f"  WARNING: psql exited {result.returncode}:\n{result.stderr[:500]}")
         return False
+    if result.stdout.strip():
+        print(f"  psql output:\n{result.stdout[:1000]}")
     return True
+
+
+def is_pss_queryable(test_conn: psycopg.Connection) -> bool:
+    """Return True only if the pg_stat_statements view is actually accessible.
+
+    The extension may be installed (in pg_extension) but still crash at query
+    time when pg_stat_statements is absent from shared_preload_libraries.
+    """
+    try:
+        test_conn.execute("SELECT 1 FROM pg_stat_statements LIMIT 0")
+        return True
+    except psycopg.Error:
+        return False
 
 
 def try_create_replication_slot(test_conn: psycopg.Connection) -> bool:
@@ -463,6 +478,7 @@ def run_validation(
     test_conn: psycopg.Connection,
     replication_slot_created: bool,
     pss_seeded: bool,
+    pss_extension_installed: bool = False,
 ) -> bool:
     """Run pg_firstAid() and compare results to the expected check set.
 
@@ -479,6 +495,10 @@ def run_validation(
 
     if pss_seeded:
         expected |= set(_PSS_WORKLOAD_CHECKS)
+    elif pss_extension_installed:
+        # Extension installed but not queryable (not in shared_preload_libraries).
+        # Neither workload checks nor "Extension Missing" check will fire.
+        skipped.add(_PSS_MISSING_CHECK)
     else:
         expected.add(_PSS_MISSING_CHECK)
 
@@ -528,6 +548,8 @@ def main() -> int:
     admin_conn = connect_admin(params)
     test_conn: psycopg.Connection | None = None
     replication_slot_created = False
+    pss_extension_installed = False
+    pss_seeded = False
     stop_event: threading.Event | None = None
     success = False
 
@@ -548,7 +570,11 @@ def main() -> int:
 
         # --- pg_stat_statements seed (via psql for \gexec support) -----------
         print("Seeding pg_stat_statements workload (02_seed_pg_stat_statements.sql)...")
-        pss_seeded = run_psql_file(params, SEED_DIR / "02_seed_pg_stat_statements.sql")
+        pss_extension_installed = run_psql_file(params, SEED_DIR / "02_seed_pg_stat_statements.sql")
+        pss_seeded = pss_extension_installed
+        if pss_seeded and not is_pss_queryable(test_conn):
+            print("  SKIP: pg_stat_statements not in shared_preload_libraries — PSS checks not seeded")
+            pss_seeded = False
 
         # --- Replication slot -------------------------------------------------
         print("Attempting replication slot seeding...")
@@ -572,9 +598,26 @@ def main() -> int:
             time.sleep(60)
             print(f"  {minute}/6 minutes elapsed")
 
+        # --- PSS diagnostic (before validation) --------------------------------
+        if pss_seeded:
+            if not is_pss_queryable(test_conn):
+                print("  PSS diagnostic: pg_stat_statements not accessible — downgrading pss_seeded")
+                pss_seeded = False
+            else:
+                try:
+                    row = test_conn.execute(
+                        "SELECT count(*) FROM pg_stat_statements"
+                    ).fetchone()
+                    print(f"  PSS diagnostic: {row[0]} total entries in pg_stat_statements")
+                except psycopg.Error as e:
+                    print(f"  PSS diagnostic: query failed ({e}) — downgrading pss_seeded")
+                    pss_seeded = False
+
         # --- Validate ---------------------------------------------------------
         print("Running pg_firstAid() validation...")
-        success = run_validation(test_conn, replication_slot_created, pss_seeded)
+        success = run_validation(
+            test_conn, replication_slot_created, pss_seeded, pss_extension_installed
+        )
 
     finally:
         # Signal threads to stop and allow them to rollback cleanly.

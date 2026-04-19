@@ -7,11 +7,13 @@ It uses:
 
 - Integration tests using (`psycopg`) for live runtime behavior(for checks looking for active connections)
 - Execution of the pgTAP SQL suite sing Python
+- The `testing/seed_and_validate.py` harness in CI for end-to-end seeded validation against live database targets
 
 ## What is covered
 
 - pgTAP assertions grouped by severity (`testing/pgTAP/01_*.sql` to `06_*.sql`)
 - Python integration scenarios that need concurrent sessions and timing control
+- End-to-end seeded validation via `testing/seed_and_validate.py --managed` in the managed CI workflows
 - Function/view parity assertions
 - A coverage guard test that ensures every `check_name` in `pgFirstAid.sql` is
   referenced by at least one pgTAP assertion

@@ -169,3 +169,6 @@ jobs:
 
       - name: Run integration tests (includes pgTAP suite)
         run: uv run python -m pytest tests/integration -m integration
+
+      - name: Run seed and validate harness
+        run: uv run python ../seed_and_validate.py --managed

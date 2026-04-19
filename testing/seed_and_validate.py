@@ -64,6 +64,7 @@ def get_conn_params(args: argparse.Namespace) -> dict:
         "port": int(args.port or os.environ.get("PGPORT", 5432)),
         "user": args.user or os.environ.get("PGUSER", "postgres"),
         "password": args.password or os.environ.get("PGPASSWORD", ""),
+        "sslmode": os.environ.get("PGSSLMODE", "prefer"),
         "dbname": "postgres",
     }
 

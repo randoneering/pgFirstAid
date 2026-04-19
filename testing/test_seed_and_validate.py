@@ -60,11 +60,13 @@ def test_get_conn_params_env(monkeypatch):
     monkeypatch.setenv("PGPORT", "5433")
     monkeypatch.setenv("PGUSER", "admin")
     monkeypatch.setenv("PGPASSWORD", "secret")
+    monkeypatch.setenv("PGSSLMODE", "require")
     params = get_conn_params(_args())
     assert params["host"] == "db.example.com"
     assert params["port"] == 5433
     assert params["user"] == "admin"
     assert params["password"] == "secret"
+    assert params["sslmode"] == "require"
 
 
 def test_get_conn_params_cli_overrides_env(monkeypatch):
@@ -73,6 +75,12 @@ def test_get_conn_params_cli_overrides_env(monkeypatch):
     params = get_conn_params(_args(host="cli-host", port="5432"))
     assert params["host"] == "cli-host"
     assert params["port"] == 5432
+
+
+def test_get_conn_params_defaults_sslmode(monkeypatch):
+    monkeypatch.delenv("PGSSLMODE", raising=False)
+    params = get_conn_params(_args())
+    assert params["sslmode"] == "prefer"
 
 
 def test_patch_unused_large_index():

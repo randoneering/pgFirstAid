@@ -127,9 +127,6 @@ jobs:
 
           echo "PGHOST=$host" >> "$GITHUB_ENV"
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
       - name: Validate required PG env vars
         run: |
           missing=0
@@ -158,6 +155,14 @@ jobs:
             exit 1
           fi
           python3 --version
+
+      - name: Verify uv is installed on runner
+        run: |
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "::error::uv not found on runner. Install uv on the self-hosted NixOS runner."
+            exit 1
+          fi
+          uv --version
 
       - name: Sync dependencies
         run: uv sync --python python3

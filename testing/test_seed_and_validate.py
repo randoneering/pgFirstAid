@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import psycopg
+import psycopg2
 
 from seed_and_validate import (
     _ALWAYS_FIRE,
@@ -111,6 +111,21 @@ def test_patch_does_not_modify_file(tmp_path):
     assert PG_FIRSTAID_SQL.read_text() == original
 
 
+def test_testing_suite_uses_psycopg2_not_psycopg() -> None:
+    root = Path(__file__).parent
+
+    for python_file in root.rglob("*.py"):
+        if ".venv" in python_file.parts or "site-packages" in python_file.parts:
+            continue
+
+        source = python_file.read_text()
+        assert re.search(r"(?m)^\s*import psycopg\s*$", source) is None
+        assert re.search(r"(?m)^\s*from psycopg\s+", source) is None
+
+    pyproject = (Path(__file__).parent.parent / "pyproject.toml").read_text()
+    assert '"psycopg[binary]' not in pyproject
+
+
 def test_build_report_all_pass():
     fired = {"Missing Primary Key", "Duplicate Index", "Database Size"}
     expected = {"Missing Primary Key", "Duplicate Index", "Database Size"}
@@ -176,7 +191,7 @@ def test_run_psql_file_enables_on_error_stop(monkeypatch, tmp_path):
 def test_try_create_replication_slot_skips_missing_output_plugin(capsys):
     class FakeConn:
         def execute(self, _query):
-            raise psycopg.errors.UndefinedObject(
+            raise psycopg2.errors.UndefinedObject(
                 'logical decoding output plugin "test_decoding" does not exist'
             )
 
@@ -248,7 +263,7 @@ def test_classify_pss_state_marks_installed_but_unqueryable_as_not_seeded():
             if "FROM pg_extension" in query:
                 return FakeResult(1)
             if "FROM pg_stat_statements" in query:
-                raise psycopg.errors.ObjectNotInPrerequisiteState(
+                raise psycopg2.errors.ObjectNotInPrerequisiteState(
                     'pg_stat_statements must be loaded via "shared_preload_libraries"'
                 )
             raise AssertionError(query)
@@ -257,6 +272,12 @@ def test_classify_pss_state_marks_installed_but_unqueryable_as_not_seeded():
 
     assert installed is True
     assert seeded is False
+
+
+def test_managed_sql_guards_pg_stat_statements_prerequisite_errors():
+    managed_sql = PG_FIRSTAID_MANAGED_SQL.read_text()
+
+    assert "exception when object_not_in_prerequisite_state then" in managed_sql
 
 
 def test_wait_for_index_scan_count_polls_until_scans_visible(monkeypatch):

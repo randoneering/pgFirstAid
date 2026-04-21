@@ -3,7 +3,7 @@ name = "pgfirstaid-testing"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "psycopg[binary]>=3.1",
+    "psycopg2-binary>=2.9.12",
     "pytest>=8.0",
 ]
 

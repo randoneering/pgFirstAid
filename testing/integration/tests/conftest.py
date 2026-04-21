@@ -23,6 +23,14 @@ def _teardown_sql_path() -> Path:
     return _repo_root() / "testing" / "pgTAP" / "99_teardown.sql"
 
 
+def _pgfirstaid_sql_path() -> Path:
+    return _repo_root() / "pgFirstAid.sql"
+
+
+def _managed_view_sql_path() -> Path:
+    return _repo_root() / "view_pgFirstAid_managed.sql"
+
+
 @pytest.fixture(scope="session")
 def config() -> TestConfig:
     missing = TestConfig.missing_env_vars()
@@ -41,6 +49,8 @@ def config() -> TestConfig:
 def prepared_database(config: TestConfig) -> Iterator[None]:
     with connect(config, autocommit=True) as conn:
         execute_sql_file(conn, _setup_sql_path())
+        execute_sql_file(conn, _pgfirstaid_sql_path())
+        execute_sql_file(conn, _managed_view_sql_path())
     yield
     with connect(config, autocommit=True) as conn:
         execute_sql_file(conn, _teardown_sql_path())

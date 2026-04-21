@@ -126,6 +126,19 @@ def test_testing_suite_uses_psycopg2_not_psycopg() -> None:
     assert '"psycopg[binary]' not in pyproject
 
 
+def test_integration_workflows_use_runner_python_on_self_hosted() -> None:
+    repo_root = Path(__file__).parent.parent
+
+    for workflow_name in [
+        "integration-pg-matrix.yml",
+        "managed-db-validate.yml",
+    ]:
+        workflow = (repo_root / ".github" / "workflows" / workflow_name).read_text()
+        assert "actions/setup-python" not in workflow
+        assert "command -v python3" in workflow
+        assert "uv sync --python python3" in workflow
+
+
 def test_build_report_all_pass():
     fired = {"Missing Primary Key", "Duplicate Index", "Database Size"}
     expected = {"Missing Primary Key", "Duplicate Index", "Database Size"}

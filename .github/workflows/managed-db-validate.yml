@@ -127,11 +127,6 @@ jobs:
 
           echo "PGHOST=$host" >> "$GITHUB_ENV"
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
@@ -156,8 +151,16 @@ jobs:
           fi
           psql --version
 
+      - name: Verify Python is installed on runner
+        run: |
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "::error::python3 not found on runner. Install Python on the self-hosted NixOS runner."
+            exit 1
+          fi
+          python3 --version
+
       - name: Sync dependencies
-        run: uv sync
+        run: uv sync --python python3
 
       - name: Install pgFirstAid function
         run: psql -v ON_ERROR_STOP=1 -f ../../pgFirstAid.sql

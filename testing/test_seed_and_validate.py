@@ -136,6 +136,7 @@ def test_integration_workflows_use_runner_python_on_self_hosted() -> None:
         workflow = (repo_root / ".github" / "workflows" / workflow_name).read_text()
         assert "actions/setup-python" not in workflow
         assert "astral-sh/setup-uv" not in workflow
+        assert "shell: bash -l {0}" in workflow
         assert "command -v uv" in workflow
         assert "uv sync" in workflow
         assert "uv sync --python python3" not in workflow

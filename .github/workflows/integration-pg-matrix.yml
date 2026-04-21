@@ -30,6 +30,7 @@ jobs:
 
     defaults:
       run:
+        shell: bash -l {0}
         working-directory: testing/integration
 
     env:

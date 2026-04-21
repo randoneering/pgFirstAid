@@ -2,7 +2,7 @@
 
 This repo keeps `managed-db-validate.yml` as a reusable validation workflow.
 
-`managed-db-validate.yml` installs `pgFirstAid.sql`, recreates `view_pgFirstAid_managed.sql`, and runs integration tests, including the pgTAP-backed checks in the integration harness.
+`managed-db-validate.yml` installs `pgFirstAid.sql`, recreates `view_pgFirstAid_managed.sql`, runs integration tests including the pgTAP-backed checks, and then runs `testing/seed_and_validate.py --managed` against the same target.
 
 ## Supported connection modes
 

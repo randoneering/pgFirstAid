@@ -208,6 +208,7 @@ pgFirstAid is designed to be lightweight and safe to run on production systems:
 - Query and health-check coverage is validated with pgTAP assertions grouped by severity.
 - Integration tests cover live runtime behavior, function/view parity, and checks that need concurrent sessions or timing control.
 - A coverage guard ensures every `check_name` in `pgFirstAid.sql` is referenced by at least one pgTAP assertion.
+- The GitHub Actions validation workflows also run `testing/seed_and_validate.py --managed` against live database targets to confirm the seeded checks actually fire end-to-end.
 - Managed database validation is exercised through the reusable workflow in `.github/workflows/managed-db-validate.yml`.
 
 > **Important:** We currently validate managed-database testing against AWS, but we do not have the funding or credits needed to keep Azure and GCP test environments running. If you have access to Azure Database for PostgreSQL or GCP Cloud SQL and want to help validate pgFirstAid there, we would be happy to have the help.

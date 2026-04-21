@@ -22,6 +22,7 @@ begin
         return;
     end if;
 
+    begin
     return query
 with pss as (
     select
@@ -264,6 +265,9 @@ with pss as (
     order by
         ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) desc
     limit 10;
+    exception when object_not_in_prerequisite_state then
+        return;
+    end;
 end;
 $$ language plpgsql;
 

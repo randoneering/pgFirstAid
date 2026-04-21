@@ -62,6 +62,7 @@ jobs:
       contents: read
     defaults:
       run:
+        shell: bash -l {0}
         working-directory: testing/integration
     env:
       PGHOST: ${{ inputs.pg_host }}
@@ -78,6 +79,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Add Nix profile paths
+        run: |
+          echo "/run/current-system/sw/bin" >> "$GITHUB_PATH"
+          echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+          echo "/etc/profiles/per-user/$USER/bin" >> "$GITHUB_PATH"
 
       - name: Configure AWS credentials
         if: ${{ inputs.cloud_provider == 'aws' }}
@@ -127,14 +135,6 @@ jobs:
 
           echo "PGHOST=$host" >> "$GITHUB_ENV"
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
       - name: Validate required PG env vars
         run: |
           missing=0
@@ -156,6 +156,14 @@ jobs:
           fi
           psql --version
 
+      - name: Verify uv is installed on runner
+        run: |
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "::error::uv not found on runner. Install uv on the self-hosted NixOS runner."
+            exit 1
+          fi
+          uv --version
+
       - name: Sync dependencies
         run: uv sync
 
@@ -169,3 +177,6 @@ jobs:
 
       - name: Run integration tests (includes pgTAP suite)
         run: uv run python -m pytest tests/integration -m integration
+
+      - name: Run seed and validate harness
+        run: uv run python ../seed_and_validate.py --managed

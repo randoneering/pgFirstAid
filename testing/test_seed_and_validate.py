@@ -137,7 +137,10 @@ def test_integration_workflows_use_runner_python_on_self_hosted() -> None:
         assert "actions/setup-python" not in workflow
         assert "astral-sh/setup-uv" not in workflow
         assert "shell: bash -l {0}" in workflow
+        assert 'echo "/run/current-system/sw/bin" >> "$GITHUB_PATH"' in workflow
+        assert 'echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"' in workflow
         assert "command -v uv" in workflow
+        assert "command -v psql" in workflow
         assert "uv sync" in workflow
         assert "uv sync --python python3" not in workflow
 

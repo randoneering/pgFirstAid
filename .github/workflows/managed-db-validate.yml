@@ -80,6 +80,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Add Nix profile paths
+        run: |
+          echo "/run/current-system/sw/bin" >> "$GITHUB_PATH"
+          echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+          echo "/etc/profiles/per-user/$USER/bin" >> "$GITHUB_PATH"
+
       - name: Configure AWS credentials
         if: ${{ inputs.cloud_provider == 'aws' }}
         uses: aws-actions/configure-aws-credentials@v4

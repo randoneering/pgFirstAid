@@ -29,9 +29,9 @@ import psycopg2
 from psycopg2 import Error, errors
 from psycopg2.extensions import connection as PgConnection
 
-SEED_DIR = Path(__file__).parent / "healthcheck_seed"
-PG_FIRSTAID_SQL = Path(__file__).parent.parent / "pgFirstAid.sql"
-PG_FIRSTAID_MANAGED_SQL = Path(__file__).parent.parent / "view_pgFirstAid_managed.sql"
+SEED_DIR = Path(__file__).resolve().parent / "healthcheck_seed"
+PG_FIRSTAID_SQL = Path(__file__).resolve().parent.parent / "pgFirstAid.sql"
+PG_FIRSTAID_MANAGED_SQL = Path(__file__).resolve().parent.parent / "view_pgFirstAid_managed.sql"
 TEST_DB = "pgfirstaid_test"
 
 # Each tuple is (pattern, replacement). Applied in order.

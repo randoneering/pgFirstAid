@@ -1,6 +1,7 @@
 name: Python + pgTAP Integration (PG15-PG18)
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize]
     paths:

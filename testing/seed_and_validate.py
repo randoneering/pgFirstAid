@@ -380,6 +380,9 @@ def _blocked_thread(params: dict, blocker_ready: threading.Event) -> None:
     conn = psycopg2.connect(**{**params, "dbname": TEST_DB})
     conn.autocommit = False
     try:
+        # Disable lock_timeout so the server cannot terminate this session before
+        # validation runs — some servers set a short lock_timeout cluster-wide.
+        _execute(conn, "SET lock_timeout = 0")
         _execute(
             conn,
             "UPDATE pgfirstaid_seed.lock_target SET payload = 'blocked' WHERE id = 1",
@@ -400,6 +403,9 @@ def _idle_in_txn_thread(
     """Open a transaction and remain idle — triggers Idle In Transaction checks."""
     conn = psycopg2.connect(**{**params, "dbname": TEST_DB})
     conn.autocommit = False
+    # Disable server-side idle-in-transaction timeout so the session survives the
+    # full 5+ minute wait needed to trigger the check.
+    _execute(conn, "SET idle_in_transaction_session_timeout = 0")
     _execute(conn, "SELECT 1")  # Starts the transaction; connection is now idle in txn.
     ready.set()
     stop.wait(timeout=700)

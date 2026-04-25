@@ -160,7 +160,24 @@ def drop_test_db(admin_conn: PgConnection) -> None:
         "WHERE datname = %s AND pid <> pg_backend_pid()",
         (TEST_DB,),
     )
-    _execute(admin_conn, f"DROP DATABASE IF EXISTS {TEST_DB}")
+    # pg_terminate_backend sends SIGTERM; backends need time to actually exit.
+    # Poll until pg_stat_activity is clear, then drop with FORCE as a backstop.
+    for _ in range(20):
+        row = _fetchone(
+            admin_conn,
+            "SELECT count(*) FROM pg_stat_activity "
+            "WHERE datname = %s AND pid <> pg_backend_pid()",
+            (TEST_DB,),
+        )
+        if row and row[0] == 0:
+            break
+        time.sleep(0.5)
+    else:
+        print(
+            "  WARNING: connections still active after 10s — proceeding with WITH (FORCE)"
+        )
+    # WITH (FORCE) terminates any lingering connections before dropping (PG13+).
+    _execute(admin_conn, f"DROP DATABASE IF EXISTS {TEST_DB} WITH (FORCE)")
 
 
 def drop_seed_role(admin_conn: PgConnection) -> None:

@@ -89,24 +89,6 @@ SELECT format(
 FROM generate_series(1, 25) AS g
 \gexec
 
-SELECT
-    check_name,
-    count(*) AS findings
-FROM pg_firstAid()
-WHERE check_name IN (
-    'Top 10 Queries by Total Execution Time',
-    'High Mean Execution Time Queries',
-    'Top 10 Queries by Temp Block Spills',
-    'Low Cache Hit Ratio Queries',
-    'High Runtime Variance Queries',
-    'High Calls Low Value Queries',
-    'High Rows Per Call Queries',
-    'High Shared Block Reads Per Call Queries',
-    'Top Queries by WAL Bytes Per Call'
-)
-GROUP BY check_name
-ORDER BY check_name;
-
 RESET work_mem;
 RESET enable_indexscan;
 RESET enable_bitmapscan;

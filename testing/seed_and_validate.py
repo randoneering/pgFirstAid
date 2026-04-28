@@ -839,6 +839,13 @@ def main() -> int:
         psql_seed_succeeded = run_psql_file(
             params, SEED_DIR / "02_seed_pg_stat_statements.sql"
         )
+        # The psql subprocess can run for several minutes; managed DBs may drop
+        # idle connections in that window. Reconnect proactively before proceeding.
+        try:
+            _fetchone(test_conn, "SELECT 1")
+        except Error:
+            test_conn.close()
+            test_conn = connect_test(params)
         pss_extension_installed, pss_seeded = classify_pss_state(
             test_conn, psql_seed_succeeded
         )
@@ -918,6 +925,11 @@ def main() -> int:
             test_conn.close()
 
         print(f"Dropping test database '{TEST_DB}'...")
+        try:
+            _fetchone(admin_conn, "SELECT 1")
+        except Error:
+            admin_conn.close()
+            admin_conn = connect_admin(params)
         drop_test_db(admin_conn)
         drop_seed_role(admin_conn)
         admin_conn.close()

@@ -267,6 +267,51 @@ def classify_pss_state(
     return installed, seeded
 
 
+def pss_buffer_dependent_skips(test_conn: PgConnection) -> set[str]:
+    """Return PSS checks that cannot fire because the seed table is fully cached.
+
+    When shared_buffers is large enough to hold the sequential-scan seed table
+    (roughly table_size > shared_buffers / 4 triggers the ring buffer), all 30
+    sequential scans run as pure buffer hits. shared_blks_read stays at zero and
+    neither the block-read-per-call nor the cache-hit-ratio threshold is crossed.
+    Skip these rather than failing — they are environment-dependent, not broken.
+    """
+    skipped: set[str] = set()
+    row = _fetchone(
+        test_conn,
+        """
+        SELECT
+            EXISTS(
+                SELECT 1 FROM pg_stat_statements
+                WHERE calls >= 20
+                  AND (shared_blks_read::numeric / NULLIF(calls, 0)) > 1000
+            ),
+            EXISTS(
+                SELECT 1 FROM pg_stat_statements
+                WHERE calls >= 20
+                  AND (shared_blks_hit + shared_blks_read) > 0
+                  AND (100.0 * shared_blks_hit
+                       / NULLIF(shared_blks_hit + shared_blks_read, 0)) < 90
+            )
+        """,
+    )
+    if row:
+        block_read_fires, cache_hit_fires = row
+        if not block_read_fires:
+            print(
+                "  SKIP: High Shared Block Reads Per Call Queries "
+                "— seed table fits in shared_buffers; no physical reads generated"
+            )
+            skipped.add("High Shared Block Reads Per Call Queries")
+        if not cache_hit_fires:
+            print(
+                "  SKIP: Low Cache Hit Ratio Queries "
+                "— seed table fits in shared_buffers; no physical reads generated"
+            )
+            skipped.add("Low Cache Hit Ratio Queries")
+    return skipped
+
+
 def try_create_replication_slot(test_conn: PgConnection) -> bool:
     """Create a logical replication slot to trigger the inactive-slot check.
 
@@ -377,6 +422,10 @@ def _blocker_thread(
     """Hold an UPDATE lock on lock_target row 1 for the duration of the test."""
     conn = psycopg2.connect(**{**params, "dbname": TEST_DB})
     conn.autocommit = False
+    # Prevent managed-DB server timeouts from killing this idle-in-transaction session
+    # before validation runs — both settings are commonly set on RDS and Cloud SQL.
+    _execute(conn, "SET idle_in_transaction_session_timeout = 0")
+    _execute(conn, "SET statement_timeout = 0")
     _execute(
         conn,
         "UPDATE pgfirstaid_seed.lock_target SET payload = 'locked_by_blocker' WHERE id = 1",
@@ -397,9 +446,10 @@ def _blocked_thread(params: dict, blocker_ready: threading.Event) -> None:
     conn = psycopg2.connect(**{**params, "dbname": TEST_DB})
     conn.autocommit = False
     try:
-        # Disable lock_timeout so the server cannot terminate this session before
-        # validation runs — some servers set a short lock_timeout cluster-wide.
+        # Disable timeouts so the server cannot terminate this session before
+        # validation runs — both are commonly set on managed databases.
         _execute(conn, "SET lock_timeout = 0")
+        _execute(conn, "SET statement_timeout = 0")
         _execute(
             conn,
             "UPDATE pgfirstaid_seed.lock_target SET payload = 'blocked' WHERE id = 1",
@@ -738,6 +788,7 @@ def run_validation(
 
     if pss_seeded:
         expected |= set(_PSS_WORKLOAD_CHECKS)
+        skipped |= pss_buffer_dependent_skips(test_conn)
     elif pss_extension_installed:
         # Extension installed but not queryable (not in shared_preload_libraries).
         # Neither workload checks nor "Extension Missing" check will fire.

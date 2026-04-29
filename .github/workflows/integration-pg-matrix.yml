@@ -89,14 +89,29 @@ jobs:
       - name: Sync dependencies
         run: uv sync
 
+      - name: Terminate idle connections from previous runs
+        continue-on-error: true
+        run: |
+          psql -c "
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE pid <> pg_backend_pid()
+              AND usename = current_user
+              AND state IN ('idle', 'idle in transaction', 'idle in transaction (aborted)')
+          "
+
       - name: Install pgFirstAid function
         run: |
           psql -v ON_ERROR_STOP=1 -f ../../pgFirstAid.sql
 
       - name: Recreate managed view only
         run: |
-          psql -v ON_ERROR_STOP=1 -c "DROP VIEW IF EXISTS v_pgfirstaid"
-          psql -v ON_ERROR_STOP=1 -f ../../view_pgFirstAid_managed.sql
+          psql -v ON_ERROR_STOP=1 \
+            -c "SET lock_timeout = '30s'" \
+            -c "DROP VIEW IF EXISTS v_pgfirstaid"
+          psql -v ON_ERROR_STOP=1 \
+            -c "SET lock_timeout = '30s'" \
+            -f ../../view_pgFirstAid_managed.sql
 
       - name: Run integration tests
         run: uv run python -m pytest tests/integration -m integration

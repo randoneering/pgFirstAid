@@ -83,6 +83,11 @@ Branches should follow the pattern `type/description`, where `type` is one of th
 | `doc/` | Documentation changes |
 | `docs/` | Documentation changes (alternative to `doc/`) |
 | `test/` | Adding or fixing tests |
+| `perf/` | Performance improvements |
+| `style/` | Formatting or lint-only changes |
+| `ci/` | CI/CD configuration changes |
+| `build/` | Build or packaging changes |
+| `revert/` | Reverting a previous change |
 | `refactor/` | Code restructuring without behavior changes |
 
 Examples:
@@ -92,6 +97,11 @@ feat/inactive-replication-slot-check
 fix/duplicate-index-predicate-matching
 docs/update-contributing-guide
 test/pgtap-blocked-session-coverage
+perf/reduce-duplicate-index-scan-work
+style/normalize-sql-indentation
+ci/add-postgres-18-matrix-job
+build/update-integration-harness-setup
+revert/remove-blocked-session-text-change
 refactor/align-view-check-ordering
 ```
 

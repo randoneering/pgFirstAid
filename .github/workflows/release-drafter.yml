@@ -4,16 +4,33 @@ on:
   push:
     branches:
       - main
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
 
 permissions:
   contents: read
 
 jobs:
+  autolabel-pr:
+    if: github.event_name == 'pull_request_target'
+    permissions:
+      pull-requests: write
+    runs-on: [self-hosted, nix, nixos, x86_64-linux]
+    steps:
+      - name: Apply release-drafter labels
+        uses: release-drafter/release-drafter/autolabeler@v6 # v6.1.0
+
   update-release-draft:
+    if: github.event_name == 'push'
     permissions:
       contents: write
       pull-requests: read
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nix, nixos, x86_64-linux]
     steps:
       - name: Draft release notes
         uses: release-drafter/release-drafter@v6 # v6.1.0

@@ -1,6 +1,43 @@
 name-template: "v$RESOLVED_VERSION"
 tag-template: "v$RESOLVED_VERSION"
 
+autolabeler:
+  - label: "feat"
+    branch:
+      - '/feat\/.+/'
+      - '/feature\/.+/'
+  - label: "fix"
+    branch:
+      - '/fix\/.+/'
+  - label: "docs"
+    branch:
+      - '/doc\/.+/'
+      - '/docs\/.+/'
+  - label: "test"
+    branch:
+      - '/test\/.+/'
+  - label: "refactor"
+    branch:
+      - '/refactor\/.+/'
+  - label: "chore"
+    branch:
+      - '/chore\/.+/'
+  - label: "perf"
+    branch:
+      - '/perf\/.+/'
+  - label: "style"
+    branch:
+      - '/style\/.+/'
+  - label: "ci"
+    branch:
+      - '/ci\/.+/'
+  - label: "build"
+    branch:
+      - '/build\/.+/'
+  - label: "revert"
+    branch:
+      - '/revert\/.+/'
+
 categories:
   - title: "Features"
     labels:

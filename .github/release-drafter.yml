@@ -60,6 +60,9 @@ categories:
   - title: "Performance"
     labels:
       - "perf"
+  - title: "Style"
+    labels:
+      - "style"
   - title: "CI/CD"
     labels:
       - "ci"
@@ -91,6 +94,7 @@ version-resolver:
       - "test"
       - "chore"
       - "perf"
+      - "style"
       - "ci"
       - "build"
       - "revert"

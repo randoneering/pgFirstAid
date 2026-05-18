@@ -1,0 +1,67 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+categories:
+  - title: "Features"
+    labels:
+      - "feat"
+  - title: "Bug Fixes"
+    labels:
+      - "fix"
+  - title: "Documentation"
+    labels:
+      - "docs"
+  - title: "Refactoring"
+    labels:
+      - "refactor"
+  - title: "Testing"
+    labels:
+      - "test"
+  - title: "Chores"
+    labels:
+      - "chore"
+  - title: "Performance"
+    labels:
+      - "perf"
+  - title: "CI/CD"
+    labels:
+      - "ci"
+  - title: "Build"
+    labels:
+      - "build"
+  - title: "Reverts"
+    labels:
+      - "revert"
+
+change-template: "- $TITLE (#$NUMBER) by @$AUTHOR"
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - "major"
+      - "breaking"
+  minor:
+    labels:
+      - "minor"
+      - "feat"
+  patch:
+    labels:
+      - "patch"
+      - "fix"
+      - "docs"
+      - "refactor"
+      - "test"
+      - "chore"
+      - "perf"
+      - "ci"
+      - "build"
+      - "revert"
+  default: patch
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION

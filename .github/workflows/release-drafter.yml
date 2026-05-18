@@ -17,10 +17,10 @@ permissions:
 
 jobs:
   autolabel-pr:
-    if: github.event_name == 'pull_request_target'
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.fork == false
     permissions:
       pull-requests: write
-    runs-on: [self-hosted, nix, nixos, x86_64-linux]
+    runs-on: ubuntu-latest
     steps:
       - name: Apply release-drafter labels
         uses: release-drafter/release-drafter/autolabeler@v6 # v6.1.0

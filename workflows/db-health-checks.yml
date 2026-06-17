@@ -1,0 +1,237 @@
+# Database Health Check Suite
+#
+# Scheduled health monitoring — tracking database health trends over time.
+# Runs daily via cron and supports manual triggers for ad-hoc checks.
+
+name: Database Health Check Suite
+
+on:
+  schedule:
+    # Daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      check_baseline:
+        description: 'Run baseline health check'
+        required: false
+        default: 'false'
+      check_current:
+        description: 'Run current health check'
+        required: false
+        default: 'true'
+
+concurrency:
+  group: db-health-checks-${{ github.sha }}
+
+jobs:
+  full-health-check:
+    name: Full Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PostgreSQL client
+        uses: shogo82148/actions-setup-postgres@v1
+        with:
+          postgres-version: 16
+          postgres-password: ${{ secrets.PGPASSWORD }}
+
+      - name: Install pgFirstAid
+        run: |
+          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" <<'EOF'
+          CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+          -- Install pgFirstAid function
+          \i pgFirstAid.sql
+          \i view_pgFirstAid.sql
+          \i view_pgFirstAid_managed.sql
+          EOF
+        env:
+          PGHOST: ${{ secrets.PGHOST }}
+          PGUSER: ${{ secrets.PGUSER }}
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Run Full Health Check
+        run: |
+          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" <<'EOF'
+          -- Snapshot health data once to avoid repeated expensive bloat estimation
+          CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();
+
+          \echo '========================================'
+          \echo '    DATABASE HEALTH CHECK REPORT'
+          \echo '========================================'
+          \echo ''
+
+          \echo '=== CRITICAL Issues (Must Fix) ==='
+          SELECT severity, check_name, object_name, issue_description, recommended_action, documentation_link
+          FROM _health_snapshot
+          WHERE severity = 'CRITICAL'
+          ORDER BY check_name;
+          \echo ''
+
+          \echo '=== HIGH Priority Issues (Should Fix) ==='
+          SELECT severity, check_name, object_name, issue_description, recommended_action
+          FROM _health_snapshot
+          WHERE severity = 'HIGH'
+          ORDER BY check_name;
+          \echo ''
+
+          \echo '=== MEDIUM Priority Issues (Monitor) ==='
+          SELECT severity, check_name, object_name, issue_description, recommended_action
+          FROM _health_snapshot
+          WHERE severity = 'MEDIUM'
+          ORDER BY check_name;
+          \echo ''
+
+          \echo '=== LOW Priority Issues (Nice to Have) ==='
+          SELECT severity, check_name, object_name, issue_description
+          FROM _health_snapshot
+          WHERE severity = 'LOW'
+          ORDER BY check_name;
+          \echo ''
+
+          \echo '=== INFO (General Information) ==='
+          SELECT severity, check_name, object_name
+          FROM _health_snapshot
+          WHERE severity = 'INFO'
+          ORDER BY check_name;
+          \echo ''
+
+          \echo '========================================'
+          \echo '    SUMMARY STATISTICS'
+          \echo '========================================'
+          \echo ''
+          SELECT
+            severity,
+            COUNT(*) as issue_count,
+            COUNT(DISTINCT object_name) as affected_objects
+          FROM _health_snapshot
+          GROUP BY severity
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              WHEN 'LOW' THEN 4
+              ELSE 5
+            END;
+          EOF
+        env:
+          PGHOST: ${{ secrets.PGHOST }}
+          PGUSER: ${{ secrets.PGUSER }}
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Generate CSV Report
+        run: |
+          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" \
+            -c "CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();" \
+            -c "SELECT * FROM _health_snapshot ORDER BY severity, check_name;" \
+            > "${{ github.workspace }}/full_health_check.csv"
+        env:
+          PGHOST: ${{ secrets.PGHOST }}
+          PGUSER: ${{ secrets.PGUSER }}
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Generate JSON Report
+        run: |
+          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" \
+            -c "CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();" \
+            -c "SELECT json_agg(to_json(d)) FROM _health_snapshot d;" \
+            > "${{ github.workspace }}/full_health_check.json"
+        env:
+          PGHOST: ${{ secrets.PGHOST }}
+          PGUSER: ${{ secrets.PGUSER }}
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Upload Reports
+        uses: actions/upload-artifact@v4
+        if: github.event_name == 'schedule'
+        with:
+          name: latest-full-health-check
+          path: |
+            ${{ github.workspace }}/full_health_check.csv
+            ${{ github.workspace }}/full_health_check.json
+          retention-days: 30
+
+  baseline-comparison:
+    name: Baseline Comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    needs: full-health-check
+    if: github.event_name == 'schedule'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PostgreSQL client
+        uses: shogo82148/actions-setup-postgres@v1
+        with:
+          postgres-version: 16
+          postgres-password: ${{ secrets.PGPASSWORD }}
+
+      - name: Install pgFirstAid
+        run: |
+          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" <<'EOF'
+          CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+          \i pgFirstAid.sql
+          \i view_pgFirstAid.sql
+          EOF
+        env:
+          PGHOST: ${{ secrets.PGHOST }}
+          PGUSER: ${{ secrets.PGUSER }}
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Download Previous Baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: latest-full-health-check
+          path: previous/
+
+      - name: Download Current Results
+        run: |
+          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" --csv \
+            -c "CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();" \
+            -c "SELECT * FROM _health_snapshot ORDER BY severity, check_name;" \
+            > "${{ github.workspace }}/current_health_check.csv"
+        env:
+          PGHOST: ${{ secrets.PGHOST }}
+          PGUSER: ${{ secrets.PGUSER }}
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Compare Baselines
+        run: |
+          echo "=== Baseline Comparison ===" > comparison-report.md
+          echo "" >> comparison-report.md
+          echo "Previous artifact from: $(ls -t previous/ | head -1)" >> comparison-report.md
+          echo "Current snapshot: $(date)" >> comparison-report.md
+          echo "" >> comparison-report.md
+
+          echo "## Critical Issues Change" >> comparison-report.md
+          PREV_CRITICAL=$(grep -c '^CRITICAL,' previous/full_health_check.csv 2>/dev/null || echo 0)
+          CURR_CRITICAL=$(grep -c '^CRITICAL,' "${{ github.workspace }}/current_health_check.csv" 2>/dev/null || echo 0)
+          echo "Previous: $PREV_CRITICAL | Current: $CURR_CRITICAL" >> comparison-report.md
+
+          if [ "$CURR_CRITICAL" -gt "$PREV_CRITICAL" ]; then
+            echo "::warning::Critical issues increased by $((CURR_CRITICAL - PREV_CRITICAL))"
+          fi
+
+          cat comparison-report.md
+
+      - name: Upload Comparison Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-comparison-${{ github.run_id }}
+          path: comparison-report.md
+          retention-days: 7

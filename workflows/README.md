@@ -1,28 +1,28 @@
 # pgFirstAid CI/CD Integration Workflows
 
-This directory contains four non-overlapping GitHub Actions workflows for integrating pgFirstAid into your CI/CD pipeline. Each workflow has a distinct purpose and trigger, covering the full database health lifecycle: **PR feedback → migration safety → scheduled monitoring → cloud validation**.
+This directory contains five non-overlapping GitHub Actions workflows for integrating pgFirstAid into your CI/CD pipeline. Each workflow has a distinct purpose and trigger, covering the full database health lifecycle: **PR feedback → migration safety → Neon branching validation → scheduled monitoring → cloud validation**.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    pgFirstAid Workflow Suite                     │
-├──────────────┬──────────────┬──────────────┬────────────────────┤
-│  PR Audit    │  Migration   │  Health      │  Managed DB        │
-│  (per PR)    │  Safety      │  Monitoring  │  Validation        │
-│              │  (per PR on  │  (daily      │  (manual,          │
-│              │   migrations)│   cron)      │   per-provider)    │
-├──────────────┼──────────────┼──────────────┼────────────────────┤
-│ Quick dev    │ Gate         │ Trend        │ Cloud-specific     │
-│ feedback     │ deployments  │ tracking     │ compatibility      │
-└──────────────┴──────────────┴──────────────┴────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         pgFirstAid Workflow Suite                             │
+├──────────────┬──────────────┬──────────────┬──────────────┬──────────────────┤
+│  PR Audit    │  Migration   │  Neon Before/│  Health      │  Managed DB      │
+│  (per PR)    │  Safety      │  After Valid.│  Monitoring  │  Validation      │
+│              │  (per PR on  │  (per PR /   │  (daily      │  (manual,        │
+│              │   migrations)│   dispatch)  │   cron)      │   per-provider)  │
+├──────────────┼──────────────┼──────────────┼──────────────┼──────────────────┤
+│ Quick dev    │ Gate         │ Isolated     │ Trend        │ Cloud-specific   │
+│ feedback     │ deployments  │ branch check │ tracking     │ compatibility    │
+└──────────────┴──────────────┴──────────────┴──────────────┴──────────────────┘
 ```
 
 ## Available Workflows
 
-### 1. `pgfirstaid-pr-audit.yml` — **PR Developer Feedback**
+### 1. `pgfirstaid-pr-audit.yml` - **PR Developer Feedback**
 
 Posts a pgFirstAid audit summary as a PR comment on every push. Gives developers immediate visibility into database health impact of their changes without leaving the PR.
 
-**Use Case:** Add to your standard CI — every PR automatically learns about DB health.
+**Use Case:** Add to your standard CI - every PR automatically learns about DB health.
 
 **Triggers:** Pull request (opened, synchronize, reopened) + workflow_dispatch
 
@@ -30,7 +30,7 @@ Posts a pgFirstAid audit summary as a PR comment on every push. Gives developers
 - Runs pgFirstAid against your staging database
 - Posts/updates a single PR comment with severity summary and full findings table
 - Fails the job if findings meet the configured threshold (CRITICAL/HIGH/MEDIUM/LOW/NONE)
-- Uses a standalone Python script — no postgres client setup required in CI
+- Uses a standalone Python script - no postgres client setup required in CI
 
 **Files to copy into your repo:**
 
@@ -63,17 +63,17 @@ env:
   PGFIRSTAID_FAIL_SEVERITY: HIGH  # CRITICAL | HIGH | MEDIUM | LOW | NONE
 ```
 
-`NONE` posts results without ever failing the job — useful for teams that want visibility before enforcing a gate.
+`NONE` posts results without ever failing the job - useful for teams that want visibility before enforcing a gate.
 
-4. Database permissions — the database user needs `SELECT` on system catalogs. Most read-only users already have this. If you hit permission errors:
+4. Database permissions - the database user needs `SELECT` on system catalogs. Most read-only users already have this. If you hit permission errors:
 ```sql
 GRANT pg_monitor TO your_ci_user;
 ```
 `pg_monitor` is a built-in PostgreSQL role (10+) that covers the catalog views pgFirstAid queries.
 
 **Network access:** The GitHub-hosted runner needs a route to your staging database.
-- **Public staging DB** — works out of the box. Restrict by IP using [GitHub's runner IP ranges](https://api.github.com/meta).
-- **VPC / private network** — use [Tailscale GitHub Action](https://github.com/tailscale/github-action) to join the runner to your mesh, or a [self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners) inside your network.
+- **Public staging DB** - works out of the box. Restrict by IP using [GitHub's runner IP ranges](https://api.github.com/meta).
+- **VPC / private network** - use [Tailscale GitHub Action](https://github.com/tailscale/github-action) to join the runner to your mesh, or a [self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners) inside your network.
 
 **Manual runs:** The workflow includes `workflow_dispatch`, so you can trigger an audit from **Actions → pgFirstAid Staging Audit → Run workflow**. Without a PR, results print to the job log instead of posting a comment.
 
@@ -95,14 +95,14 @@ GRANT pg_monitor TO your_ci_user;
 
 </details>
 
-> Job failed — findings at or above `HIGH` threshold were found.
+> Job failed - findings at or above `HIGH` threshold were found.
 ```
 
 ---
 
-### 2. `pre-post-migration-validate.yml` — **Migration Safety Gate**
+### 2. `pre-post-migration-validate.yml` - **Migration Safety Gate**
 
-Validates database health before and after migrations. This is the **only workflow that gates deployments** — it blocks if migrations introduce new critical issues.
+Validates database health before and after migrations against your **existing staging database**. This is the **only workflow that gates deployments** - it blocks if migrations introduce new critical issues.
 
 **Use Case:** Essential for any project with database migrations. Add to your CI to prevent migration regressions.
 
@@ -133,9 +133,46 @@ jobs:
       environment: staging
 ```
 
+**Alternative:** For an isolated copy of your data without affecting staging, see [Neon Before/After Validation](#3-neon-before-after-validateyml--neon-isolated-branch-validation) below - it creates an instant Neon branch so the comparison runs on a production clone with zero side effects.
+
 ---
 
-### 3. `db-health-checks.yml` — **Scheduled Health Monitoring**
+### 3. `neon-before-after-validate.yml` - **Neon Isolated Branch Validation**
+
+Uses [Neon's instant database branching](https://neon.tech/docs/manage/branches) to run before/after health checks on an isolated copy of your data - no production risk. Detects regressions from **any** change that affects query behavior: SQL migrations, application code deploys, infrastructure changes, or configuration tweaks.
+
+**Use Case:** Deploy with confidence when you need a production-faithful copy for health comparison. Requires a Neon project.
+
+**Triggers:** Pull requests on `migrations/**` + workflow_dispatch
+
+**Key Features:**
+- Creates a Neon branch (instant copy-on-write clone of your data)
+- Captures pre-change health baseline
+- Applies SQL changes or point your app test suite at the branch
+- Compares post-change health against baseline
+- Posts results as a PR comment (on PR events)
+- Blocks deployment if new critical issues appear
+- Deletes the Neon branch automatically (even on failure)
+
+**Secrets required:**
+
+| Secret | Value |
+|---|---|
+| `NEON_API_KEY` | API key from https://console.neon.tech/app/settings/api-keys |
+| `NEON_PROJECT_ID` | Neon project ID from project settings page |
+
+**Alternative - local testing with `neonctl`:**
+```bash
+export NEON_API_KEY=... NEON_PROJECT_ID=...
+./testing/local-workflows/test_neon_before_after.sh \
+  --role-name neondb_owner \
+  --database-name pgFirstAid
+```
+See `testing/local-workflows/.env.example` for all configuration options.
+
+<br>
+
+### 4. `db-health-checks.yml` - **Scheduled Health Monitoring**
 
 Tracks database health trends over time via daily cron. Generates full reports and compares against previous baselines to detect degradation.
 
@@ -168,7 +205,7 @@ jobs:
 
 ---
 
-### 4. `managed-db-validate.yml` — **Cloud Compatibility Validation**
+### 5. `managed-db-validate.yml` - **Cloud Compatibility Validation**
 
 Validates pgFirstAid against a specific cloud-managed PostgreSQL instance (AWS RDS, GCP Cloud SQL, or Azure).
 
@@ -229,9 +266,61 @@ The `pg_firstAid()` function returns health issues organized by severity:
  HIGH    | Structural Health | Missing Statistics   | orders      | Statistics not updated recently | Run ANALYZE on orders table
 ```
 
+## Local Testing
+
+Before pushing to CI, validate against a real Neon branch locally:
+
+```bash
+# Install neonctl
+npm install -g neonctl
+
+# Set credentials
+export NEON_API_KEY=... NEON_PROJECT_ID=...
+
+# Run before/after validation (creates branch, runs checks, deletes branch)
+./testing/local-workflows/test_neon_before_after.sh \
+  --role-name neondb_owner \
+  --database-name pgFirstAid
+
+# Or run standalone health checks against any Postgres
+./testing/local-workflows/test_db_health_checks.sh
+```
+
+See `testing/local-workflows/.env.example` and `testing/local-workflows/TESTING_INSTRUCTIONS.md` for setup details.
+
 ## Integrating with Migration Tools
 
-### Flyway
+### Neon Branching (recommended for production-like validation)
+
+Uses a Neon branch as an isolated clone - run Flyway or Liquibase against it without touching your real database.
+
+```yaml
+- name: Create Neon branch
+  uses: neondatabase/create-branch-action@v6
+  id: create-branch
+  with:
+    project_id: ${{ vars.NEON_PROJECT_ID }}
+    api_key: ${{ secrets.NEON_API_KEY }}
+
+- name: Pre-Migration Health Check
+  run: psql "${{ steps.create-branch.outputs.db_url }}" -c "SELECT count(*) FROM pg_firstAid() WHERE severity='CRITICAL';"
+
+- name: Apply Migrations
+  run: flyway migrate -url="${{ steps.create-branch.outputs.db_url }}"
+
+- name: Post-Migration Health Check
+  run: psql "${{ steps.create-branch.outputs.db_url }}" -c "SELECT count(*) FROM pg_firstAid() WHERE severity='CRITICAL';"
+
+- name: Delete Neon branch
+  if: always()
+  uses: neondatabase/delete-branch-action@v3
+  with:
+    project_id: ${{ vars.NEON_PROJECT_ID }}
+    branch: ${{ steps.create-branch.outputs.branch_id }}
+    api_key: ${{ secrets.NEON_API_KEY }}
+```
+
+### Flyway (direct against staging)
 
 ```yaml
 - name: Pre-Migration Health Check
@@ -245,7 +334,7 @@ The `pg_firstAid()` function returns health issues organized by severity:
     psql -c "SELECT count(*) FROM pg_firstAid() WHERE severity='CRITICAL';"
 ```
 
-### Liquibase
+### Liquibase (direct against staging)
 
 ```yaml
 - name: Pre-Migration Health Check
@@ -283,6 +372,8 @@ CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 \i pgFirstAid.sql
 \i view_pgFirstAid.sql
 ```
+
+(For the Neon branching workflow, the install step handles this automatically.)
 
 ### Permission errors
 

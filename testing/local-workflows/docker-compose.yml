@@ -1,0 +1,35 @@
+# pgFirstAid Local Test Database (Path B — optional)
+#
+# Standalone PostgreSQL 16 instance for fully offline testing.
+# Only needed if you do NOT have access to remote PG instances.
+#
+# Usage:
+#   docker compose up -d          # start PG
+#   make test-all                  # run tests against it
+#   docker compose down -v        # stop and delete data
+#
+# Connection defaults match .env.example:
+#   PGHOST=localhost  PGPORT=5432  PGUSER=pgfirstaid
+#   PGPASSWORD=pgfirstaid  PGDATABASE=pgfirstaid
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pgfirstaid-local
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: pgfirstaid
+      POSTGRES_PASSWORD: pgfirstaid
+      POSTGRES_DB: pgfirstaid
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pgfirstaid"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

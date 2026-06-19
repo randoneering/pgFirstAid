@@ -2,39 +2,18 @@ name: Release Drafter
 
 on:
   push:
-    branches:
-      - main
-  pull_request_target:
-    branches:
-      - main
-    types:
-      - opened
-      - reopened
-      - synchronize
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
-  autolabel-pr:
-    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.fork == false
-    permissions:
-      pull-requests: write
-    runs-on: [self-hosted, linux, pgfirstaid-ci]
-    steps:
-      - name: Apply release-drafter labels
-        uses: release-drafter/release-drafter/autolabeler@v6 # v6.1.0
-
-  update-release-draft:
-    if: github.event_name == 'push'
-    permissions:
-      contents: write
-      pull-requests: read
+  update:
     runs-on: [self-hosted, nix, nixos, x86_64-linux]
     steps:
-      - name: Draft release notes
-        uses: release-drafter/release-drafter@v6 # v6.1.0
-        with:
-          config-name: release-drafter.yml
+      - uses: release-drafter/release-drafter@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

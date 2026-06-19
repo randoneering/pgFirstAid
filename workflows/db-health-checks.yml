@@ -129,7 +129,7 @@ jobs:
 
       - name: Generate CSV Report
         run: |
-          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" \
+          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" --csv \
             -c "CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();" \
             -c "SELECT * FROM _health_snapshot ORDER BY severity, check_name;" \
             > "${{ github.workspace }}/full_health_check.csv"

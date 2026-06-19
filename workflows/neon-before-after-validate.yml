@@ -104,7 +104,6 @@ jobs:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ steps.branch-name.outputs.name }}
           api_key: ${{ secrets.NEON_API_KEY }}
-          expires_at: ${{ fromJSON('{"push":"","pull_request":""}')[github.event_name] || '' }}
 
       - name: Install pgFirstAid on branch
         env:

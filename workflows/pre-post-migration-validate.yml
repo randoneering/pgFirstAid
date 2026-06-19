@@ -347,14 +347,10 @@ jobs:
           echo "" >> summary.md
           BASELINE_CRIT=$(cat baseline/baseline_critical_count.txt 2>/dev/null || echo "N/A")
           echo "Baseline: $BASELINE_CRIT critical issues" >> summary.md
-          echo "Current: $(psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} -t -c 'SELECT count(*) FROM pg_firstAid() WHERE severity = '\''CRITICAL'\'';' | tr -d '[:space:]') critical issues" >> summary.md
+          CURRENT_CRIT=$(awk -F',' '$1 == "CRITICAL" {print $2}' post-migration/post_migration_severity.csv 2>/dev/null || echo "N/A")
+          echo "Current: $CURRENT_CRIT critical issues" >> summary.md
 
           cat summary.md
-        env:
-          PGHOST: ${{ secrets.PGHOST }}
-          PGUSER: ${{ secrets.PGUSER }}
-          PGDATABASE: ${{ secrets.PGDATABASE }}
-          PGPASSWORD: ${{ secrets.PGPASSWORD }}
 
       - name: Upload Summary
         uses: actions/upload-artifact@v4

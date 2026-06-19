@@ -1,8 +1,8 @@
-# pgFirstAid staging database health audit.
+# pgFirstAid PR Audit
 #
-# Runs on every pull request update and posts a summary of database health
-# findings as a PR comment. Re-runs update the same comment rather than
-# spamming new ones.
+# Runs pgFirstAid against a staging DB on every PR update and posts a severity
+# summary as a PR comment. Re-runs update the same comment rather than spamming
+# new ones.
 #
 # Setup:
 #   1. Copy this file to .github/workflows/pgfirstaid-audit.yml in your repo.
@@ -10,25 +10,10 @@
 #   3. Add STAGING_DATABASE_URL as a repository secret (Settings → Secrets).
 #   4. Adjust PGFIRSTAID_FAIL_SEVERITY below to match your team's tolerance.
 #
-# STAGING_DATABASE_URL format:
-#   postgresql://user:password@host:5432/dbname
-#   or any libpq-compatible connection string.
-#
+# STAGING_DATABASE_URL format: postgresql://user:password@host:5432/dbname
 # The runner must have network access to your staging database.
 # If it lives behind a VPC, see the Tailscale GitHub Action or a self-hosted
-# runner as options for establishing connectivity.
-
-# pgFirstAid PR Audit
-#
-# Focused on PR-level developer feedback: runs pgFirstAid against a staging DB
-# on every PR update and posts a severity summary as a PR comment.
-# This is the only workflow in the suite that targets pull requests directly.
-#
-# Setup:
-#   1. Copy this file to .github/workflows/pgfirstaid-audit.yml in your repo.
-#   2. Copy pgfirstaid_audit.py to .github/scripts/pgfirstaid_audit.py.
-#   3. Add STAGING_DATABASE_URL as a repository secret (Settings → Secrets).
-#   4. Adjust PGFIRSTAID_FAIL_SEVERITY to match your team's tolerance.
+# runner for connectivity.
 
 name: pgFirstAid Staging Audit
 
@@ -77,4 +62,4 @@ jobs:
           PGFIRSTAID_VERSION: ${{ env.PGFIRSTAID_VERSION }}
           PGFIRSTAID_FAIL_SEVERITY: ${{ env.PGFIRSTAID_FAIL_SEVERITY }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: python .github/scripts/pgfirstaid_audit.py
+        run: uv run python .github/scripts/pgfirstaid_audit.py

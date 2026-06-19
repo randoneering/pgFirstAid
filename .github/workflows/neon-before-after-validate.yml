@@ -1,0 +1,296 @@
+# Neon Before/After Validation
+#
+# Uses Neon's instant database branching to run before/after health checks
+# on an isolated copy of your data — no production risk. Detects regressions
+# from any change that affects query behavior on the target database:
+#
+#   - SQL migrations (schema changes, index additions)
+#   - Application code deploys (new ORM queries, join patterns)
+#   - Infrastructure changes (connection pools, work_mem, PGBouncer)
+#   - Configuration changes (timeouts, statement timeouts)
+#
+# Flow:
+#   1. Create a Neon branch (instant, copy-on-write clone)
+#   2. Install pgFirstAid on the branch
+#   3. Capture pre-change health baseline
+#   4. Apply the change (SQL files, or point your app test suite at the
+#      branch via the db_url output)
+#   5. Capture post-change health
+#   6. Compare and report new issues
+#   7. Delete the Neon branch
+#
+# Setup:
+#   - Add NEON_API_KEY as a repository secret (Settings -> Actions)
+#   - Add NEON_PROJECT_ID as a repository variable
+#   - The parent branch must have representative data so the clone
+#     produces meaningful health check results.
+#
+# Required secrets:
+#   NEON_API_KEY -- from https://console.neon.tech/app/settings/api-keys
+#
+# Required variables:
+#   NEON_PROJECT_ID -- from your Neon project's Settings page
+#
+# Change files:
+#   When triggered on pull_request, the workflow auto-discovers .sql files
+#   under migrations/ and applies them as the change. For app or infra
+#   changes, use workflow_dispatch and either:
+#     (a) pass your SQL files via the `change_files` input, or
+#     (b) leave it blank and apply changes outside this workflow
+#         (you only need the pre- and post- comparison jobs).
+
+name: Neon Before/After Validation
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/**'
+      - 'pgFirstAid.sql'
+      - 'view_pgFirstAid.sql'
+      - 'view_pgFirstAid_managed.sql'
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Neon branch name (default: auto-generated)'
+        required: false
+        default: ''
+      change_files:
+        description: 'Space-separated SQL files to apply as the change (optional)'
+        required: false
+        default: ''
+
+concurrency:
+  group: neon-beforeafter-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+env:
+  PGFIRSTAID_FAIL_SEVERITY: HIGH
+  BRANCH_PREFIX: pgfa-beforeafter
+
+jobs:
+  before-after-validation:
+    name: Before/After Health Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up PostgreSQL client
+        uses: shogo82148/actions-setup-postgres@v1
+        with:
+          postgres-version: 16
+          postgres-password: 'ephemeral'
+
+      - name: Set branch name
+        id: branch-name
+        run: |
+          if [ -n "${{ inputs.branch_name }}" ]; then
+            echo "name=${{ inputs.branch_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${BRANCH_PREFIX}-pr-${{ github.event.number || github.run_id }}-$(date +%s)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Neon branch
+        id: create-branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ steps.branch-name.outputs.name }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Install pgFirstAid on branch
+        env:
+          DB_URL: ${{ steps.create-branch.outputs.db_url }}
+        run: |
+          psql "$DB_URL" -v ON_ERROR_STOP=1 <<'EOF'
+          CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+          \i pgFirstAid.sql
+          \i view_pgFirstAid.sql
+          \i view_pgFirstAid_managed.sql
+          EOF
+
+      - name: Pre-change baseline
+        id: baseline
+        env:
+          DB_URL: ${{ steps.create-branch.outputs.db_url }}
+        run: |
+          psql "$DB_URL" -v ON_ERROR_STOP=1 <<'EOF'
+          CREATE UNLOGGED TABLE _pre_change_snapshot AS SELECT * FROM pg_firstAid();
+          \echo '=== PRE-CHANGE HEALTH BASELINE ==='
+          \echo ''
+          SELECT severity, COUNT(*) as issue_count
+          FROM _pre_change_snapshot
+          GROUP BY severity
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              WHEN 'LOW' THEN 4
+              ELSE 5
+            END;
+          \echo ''
+          SELECT severity, check_name, object_name, issue_description
+          FROM _pre_change_snapshot
+          WHERE severity IN ('CRITICAL', 'HIGH')
+          ORDER BY severity, check_name;
+          EOF
+
+      - name: Apply changes
+        env:
+          DB_URL: ${{ steps.create-branch.outputs.db_url }}
+        run: |
+          echo "========================================================"
+          echo "  ⬇  BEFORE / AFTER BOUNDARY  ⬇"
+          echo "========================================================"
+          echo ""
+          echo "  Pre-change baseline captured above."
+          echo ""
+          echo "  The change being tested:"
+          echo "    ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || 'manual dispatch' }}"
+          echo ""
+          echo "  Now applying SQL changes..."
+          echo ""
+
+          if [ -n "${{ inputs.change_files }}" ]; then
+            FILES="${{ inputs.change_files }}"
+          else
+            FILES=$(find migrations/ -name '*.sql' -type f 2>/dev/null | sort || echo "")
+          fi
+
+          if [ -z "$FILES" ]; then
+            echo "::warning::No SQL files found in migrations/ or via change_files input."
+            echo "::warning::If your change requires SQL run it outside this workflow."
+            echo "::warning::Post-change comparison will run against unmodified branch."
+          else
+            for f in $FILES; do
+              echo "Applying: $f"
+              psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$f"
+            done
+          fi
+
+      - name: Post-change comparison
+        id: comparison
+        env:
+          DB_URL: ${{ steps.create-branch.outputs.db_url }}
+        run: |
+          psql "$DB_URL" -v ON_ERROR_STOP=1 <<'EOF'
+          CREATE TEMP TABLE _post_change_snapshot AS SELECT * FROM pg_firstAid();
+
+          \echo '=== POST-CHANGE HEALTH ==='
+          \echo ''
+          SELECT severity, COUNT(*) as issue_count
+          FROM _post_change_snapshot
+          GROUP BY severity
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              WHEN 'LOW' THEN 4
+              ELSE 5
+            END;
+
+          \echo ''
+          \echo '=== NEW ISSUES SINCE BASELINE ==='
+          SELECT severity, check_name, object_name, issue_description, recommended_action
+          FROM _post_change_snapshot
+          WHERE (check_name, object_name) NOT IN (
+            SELECT check_name, object_name FROM _pre_change_snapshot
+          )
+          ORDER BY severity, check_name;
+          EOF
+
+      - name: Compare critical counts
+        id: gate
+        env:
+          DB_URL: ${{ steps.create-branch.outputs.db_url }}
+        run: |
+          BASELINE_CRITICAL=$(psql "$DB_URL" -t -c "SELECT count(*) FROM _pre_change_snapshot WHERE severity = 'CRITICAL';" | tr -d '[:space:]')
+          CURRENT_CRITICAL=$(psql "$DB_URL" -t -c "SELECT count(*) FROM pg_firstAid() WHERE severity = 'CRITICAL';" | tr -d '[:space:]')
+
+          echo "baseline=$BASELINE_CRITICAL" >> "$GITHUB_OUTPUT"
+          echo "current=$CURRENT_CRITICAL" >> "$GITHUB_OUTPUT"
+          echo "diff=$((CURRENT_CRITICAL - BASELINE_CRITICAL))" >> "$GITHUB_OUTPUT"
+
+          echo "Baseline CRITICAL: $BASELINE_CRITICAL"
+          echo "Current CRITICAL:  $CURRENT_CRITICAL"
+
+          if [ "$CURRENT_CRITICAL" -gt "$BASELINE_CRITICAL" ]; then
+            echo "status=blocked" >> "$GITHUB_OUTPUT"
+            echo "::error::Change introduces $((CURRENT_CRITICAL - BASELINE_CRITICAL)) new critical issue(s)!"
+          else
+            echo "status=passed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post PR comment
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const baseline = ${{ steps.gate.outputs.baseline }};
+            const current = ${{ steps.gate.outputs.current }};
+            const diff = ${{ steps.gate.outputs.diff }};
+            const status = '${{ steps.gate.outputs.status }}';
+
+            const body = [
+              '<!-- pgfirstaid-neon-beforeafter -->',
+              '### Neon Before/After Validation',
+              '',
+              '| Metric | Value |',
+              '|--------|-------|',
+              '| Branch ID | `${{ steps.create-branch.outputs.branch_id }}` |',
+              '| Baseline CRITICAL | ' + baseline + ' |',
+              '| Post-change CRITICAL | ' + current + ' |',
+              '| New CRITICAL issues | ' + diff + ' |',
+              '',
+              status === 'passed'
+                ? '**No new critical issues -- safe to deploy.**'
+                : '**Change introduces ' + diff + ' new critical issue(s) -- review before merging.**',
+              '',
+              '> Neon branch deleted automatically after workflow completion.',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes('pgfirstaid-neon-beforeafter'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+
+      - name: Delete Neon branch
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: ${{ steps.create-branch.outputs.branch_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Final gate
+        if: steps.gate.outputs.status == 'blocked'
+        run: |
+          echo "::error::Change blocked: ${{ steps.gate.outputs.diff }} new critical issue(s) introduced."
+          exit 1

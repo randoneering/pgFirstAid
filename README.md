@@ -203,6 +203,20 @@ pgFirstAid is designed to be lightweight and safe to run on production systems:
 - Typical execution time: <1 second on most databases
 - No locking or blocking of user queries
 
+## CI/CD Integration
+
+Drop-in GitHub Actions workflows in [`workflows/`](workflows/) for integrating pgFirstAid into your pipeline:
+
+| Workflow | Purpose |
+|----------|---------|
+| [`pgfirstaid-pr-audit.yml`](workflows/pgfirstaid-pr-audit.yml) | Posts a health audit on every PR |
+| [`pre-post-migration-validate.yml`](workflows/pre-post-migration-validate.yml) | Gates deployments on migration safety |
+| [`neon-before-after-validate.yml`](workflows/neon-before-after-validate.yml) | Isolated before/after checks via Neon branching |
+| [`db-health-checks.yml`](workflows/db-health-checks.yml) | Scheduled daily health monitoring |
+| [`managed-db-validate.yml`](workflows/managed-db-validate.yml) | Cloud-specific compatibility validation |
+
+Copy any workflow file to `.github/workflows/` in your repo. See [`workflows/README.md`](workflows/README.md) for setup and configuration.
+
 ## Testing
 
 - Query and health-check coverage is validated with pgTAP assertions grouped by severity.

@@ -1,0 +1,65 @@
+# pgFirstAid PR Audit
+#
+# Runs pgFirstAid against a staging DB on every PR update and posts a severity
+# summary as a PR comment. Re-runs update the same comment rather than spamming
+# new ones.
+#
+# Setup:
+#   1. Copy this file to .github/workflows/pgfirstaid-audit.yml in your repo.
+#   2. Copy pgfirstaid_audit.py to .github/scripts/pgfirstaid_audit.py.
+#   3. Add STAGING_DATABASE_URL as a repository secret (Settings → Secrets).
+#   4. Adjust PGFIRSTAID_FAIL_SEVERITY below to match your team's tolerance.
+#
+# STAGING_DATABASE_URL format: postgresql://user:password@host:5432/dbname
+# The runner must have network access to your staging database.
+# If it lives behind a VPC, see the Tailscale GitHub Action or a self-hosted
+# runner for connectivity.
+
+name: pgFirstAid Staging Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: pgfirstaid-audit-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  # Pin to a tag for stability (e.g. v2.1.1). Override via workflow_dispatch.
+  PGFIRSTAID_VERSION: main
+  PGFIRSTAID_FAIL_SEVERITY: HIGH
+
+jobs:
+  pgfirstaid-audit:
+    name: Database Health Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install audit dependencies
+        run: uv pip install psycopg2-binary
+
+      - name: Run pgFirstAid audit
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PGFIRSTAID_VERSION: ${{ env.PGFIRSTAID_VERSION }}
+          PGFIRSTAID_FAIL_SEVERITY: ${{ env.PGFIRSTAID_FAIL_SEVERITY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: uv run python .github/scripts/pgfirstaid_audit.py

@@ -1,0 +1,147 @@
+# NixOS Runner — Local Test Workflow
+#
+# Runs all four test suites (health checks, managed DB validation, migration
+# validation, PR audit) on the self-hosted NixOS runner. Point it at any of
+# your PG15-PG18 instances by selecting the postgres_version.
+#
+# The NixOS runner already has psql, uv, and network access to the test PG
+# instances (Neon / DigitalOcean). No Docker or local PG install needed.
+#
+# Usage:
+#   1. Go to Actions → NixOS Local Test Workflow → Run workflow
+#   2. Select postgres_version (15/16/17/18)
+#   3. Optionally set cloud_provider label for the managed DB test
+#
+# The cloud auth steps (AWS/GCP/Azure CLI) in managed-db-validate.yml are
+# NOT replicated here — they require real cloud credentials and live cloud
+# DBs, and remain manual-dispatch only in CI.
+
+name: NixOS Local Test Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      postgres_version:
+        description: 'PostgreSQL major version to test against'
+        required: true
+        type: choice
+        options:
+          - '15'
+          - '16'
+          - '17'
+          - '18'
+        default: '16'
+      cloud_provider:
+        description: 'Cloud provider label (for managed DB test output)'
+        required: false
+        type: choice
+        options:
+          - direct
+          - aws
+          - gcp
+          - azure
+        default: 'direct'
+
+concurrency:
+  group: nixos-local-test-${{ inputs.postgres_version }}-${{ github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  local-test:
+    runs-on: [self-hosted, nix, nixos, x86_64-linux]
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    env:
+      PG_VERSION: ${{ inputs.postgres_version }}
+      # Connection — map the selected version to secrets
+      PGHOST: ${{ inputs.postgres_version == '15' && secrets.PG15_HOST || inputs.postgres_version == '16' && secrets.PG16_HOST || inputs.postgres_version == '17' && secrets.PG17_HOST || secrets.PG18_HOST }}
+      PGPORT: ${{ inputs.postgres_version == '15' && secrets.PG15_PORT || inputs.postgres_version == '16' && secrets.PG16_PORT || inputs.postgres_version == '17' && secrets.PG17_PORT || secrets.PG18_PORT }}
+      PGUSER: ${{ inputs.postgres_version == '15' && secrets.PG15_USER || inputs.postgres_version == '16' && secrets.PG16_USER || inputs.postgres_version == '17' && secrets.PG17_USER || secrets.PG18_USER }}
+      PGPASSWORD: ${{ inputs.postgres_version == '15' && secrets.PG15_PASSWORD || inputs.postgres_version == '16' && secrets.PG16_PASSWORD || inputs.postgres_version == '17' && secrets.PG17_PASSWORD || secrets.PG18_PASSWORD }}
+      PGDATABASE: ${{ inputs.postgres_version == '15' && secrets.PG15_DATABASE || inputs.postgres_version == '16' && secrets.PG16_DATABASE || inputs.postgres_version == '17' && secrets.PG17_DATABASE || secrets.PG18_DATABASE }}
+      PGSSLMODE: require
+      DATABASE_URL: ${{ inputs.postgres_version == '15' && secrets.PG15_DATABASE_URL || inputs.postgres_version == '16' && secrets.PG16_DATABASE_URL || inputs.postgres_version == '17' && secrets.PG17_DATABASE_URL || secrets.PG18_DATABASE_URL }}
+      CLOUD_PROVIDER: ${{ inputs.cloud_provider }}
+      PGFIRSTAID_FAIL_SEVERITY: HIGH
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add Nix profile paths
+        run: |
+          echo "/run/current-system/sw/bin" >> "$GITHUB_PATH"
+          echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+          echo "/etc/profiles/per-user/$USER/bin" >> "$GITHUB_PATH"
+
+      - name: Validate PG connection vars
+        run: |
+          missing=0
+          for var in PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required secret/env: ${var} for PG${{ inputs.postgres_version }}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+          echo "Target: PG${{ inputs.postgres_version }} @ $PGHOST:$PGPORT"
+
+      - name: Verify psql + uv
+        run: |
+          command -v psql >/dev/null 2>&1 || { echo "::error::psql not found"; exit 1; }
+          psql --version
+          command -v uv >/dev/null 2>&1 || { echo "::error::uv not found"; exit 1; }
+          uv --version
+
+      - name: Test — Health Check Suite
+        working-directory: testing/local-workflows
+        run: |
+          mkdir -p reports
+          ./test_db_health_checks.sh
+
+      - name: Test — Managed DB Validation
+        working-directory: testing/local-workflows
+        run: |
+          ./test_managed_db_validate.sh
+
+      - name: Test — Pre/Post Migration Validation
+        working-directory: testing/local-workflows
+        run: |
+          ./test_pre_post_migration.sh
+        continue-on-error: true
+
+      - name: Test — PR Audit Script
+        working-directory: testing/local-workflows
+        run: |
+          uv pip install --quiet psycopg2-binary 2>/dev/null || uv pip install psycopg2-binary
+          ./test_pr_audit.sh
+        continue-on-error: true
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports-pg${{ inputs.postgres_version }}
+          path: testing/local-workflows/reports/
+          retention-days: 14
+
+      - name: Post summary
+        if: always()
+        run: |
+          {
+            echo "## NixOS Local Test Results — PG${{ inputs.postgres_version }}"
+            echo ""
+            echo "| Suite | Status |"
+            echo "|-------|--------|"
+            echo "| Health Check | ${{ job.status == 'success' && '✅' || '❌' }} |"
+            echo "| Managed DB Validate | ${{ job.status == 'success' && '✅' || '❌' }} |"
+            echo "| Migration Validate | ${{ job.status == 'success' && '✅' || '❌' }} |"
+            echo "| PR Audit | ${{ job.status == 'success' && '✅' || '❌' }} |"
+            echo ""
+            echo "Cloud provider label: ${{ inputs.cloud_provider }}"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,18 @@
+# Secrets
+.env
+
+# Reports
+reports/
+*.csv
+*.json
+*.md
+
+# Temp artifacts
+baseline_severity.csv
+baseline_critical_count.txt
+current_health_check.csv
+full_health_check.csv
+full_health_check.json
+post_migration_severity.csv
+post_migration_health.csv
+comparison-report.md

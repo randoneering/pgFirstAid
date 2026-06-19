@@ -1,0 +1,376 @@
+# Pre/Post Migration Validation Workflow
+# This workflow focuses only on migration safety:
+# pre-snapshot baseline → apply migration → post-comparison → deployment gate.
+# It is the ONLY workflow that gates deployments.
+# Does NOT overlap with db-health-checks.yml (scheduled monitoring) or
+# pgfirstaid-pr-audit.yml (PR comments).
+
+name: Pre/Post Migration Validation
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/**'
+      - 'db/**'
+      - 'pgFirstAid.sql'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+
+concurrency:
+  group: migration-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Job 1: Capture baseline health before migrations
+  pre-migration-baseline:
+    name: Pre-Migration Health Baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Set up PostgreSQL client
+        uses: shogo82148/actions-setup-postgres@v1
+        with:
+          postgres-version: 16
+          postgres-password: ${{ secrets.PGPASSWORD }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pgFirstAid
+        run: |
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} <<'EOF'
+          CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+          DROP FUNCTION IF EXISTS pg_firstAid();
+          \i pgFirstAid.sql
+          EOF
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Generate Baseline Report
+        run: |
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} <<'EOF'
+          CREATE TEMP TABLE _pre_health_snapshot AS SELECT * FROM pg_firstAid();
+          \echo '=== Pre-Migration Health Baseline ==='
+          \echo ''
+          \echo 'Severity Summary:'
+          SELECT severity, COUNT(*) as issue_count
+          FROM _pre_health_snapshot
+          GROUP BY severity
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              WHEN 'LOW' THEN 4
+              ELSE 5
+            END;
+          \echo ''
+          \echo 'Critical Issues (blocking):'
+          SELECT severity, check_name, object_name, issue_description
+          FROM _pre_health_snapshot
+          WHERE severity = 'CRITICAL'
+          ORDER BY check_name;
+          \echo ''
+          \echo 'High Priority Issues:'
+          SELECT severity, check_name, object_name, issue_description
+          FROM _pre_health_snapshot
+          WHERE severity = 'HIGH'
+          ORDER BY check_name;
+          EOF
+        continue-on-error: true
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Save Baseline Data
+        run: |
+          # Create persistent snapshot table for cross-job comparison
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} <<'EOF'
+          DROP TABLE IF EXISTS _pre_health_snapshot;
+          CREATE UNLOGGED TABLE _pre_health_snapshot AS SELECT * FROM pg_firstAid();
+          EOF
+          # Save severity counts as CSV
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} --csv \
+            -c "SELECT severity, COUNT(*)::int AS count FROM _pre_health_snapshot GROUP BY severity ORDER BY 1;" \
+            > ${{ github.workspace }}/baseline_severity.csv
+          # Save critical count
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} -t \
+            -c "SELECT count(*) FROM _pre_health_snapshot WHERE severity = 'CRITICAL';" \
+            | tr -d '[:space:]' > ${{ github.workspace }}/baseline_critical_count.txt
+        continue-on-error: true
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Upload Baseline Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pre-migration-baseline
+          path: |
+            ${{ github.workspace }}/baseline_severity.csv
+            ${{ github.workspace }}/baseline_critical_count.txt
+          retention-days: 7
+
+  # Job 2: Apply migrations
+  apply-migrations:
+    name: Apply Database Migrations
+    runs-on: ubuntu-latest
+    needs: pre-migration-baseline
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Migrations
+        run: |
+          # Flyway example
+          # flyway migrate
+
+          # Or Liquibase
+          # mvn liquibase:update
+
+          # Or direct SQL
+          # psql -h $PGHOST -U $PGUSER -d $PGDATABASE -f migrations/apply.sql
+
+          echo "Migrations applied successfully"
+        env:
+          PGHOST: ${{ secrets.PGHOST }}
+          PGUSER: ${{ secrets.PGUSER }}
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+          PGPORT: '5432'
+          FLYWAY_URL: jdbc:postgresql://${{ secrets.PGHOST }}:5432/${{ secrets.PGDATABASE }}
+          FLYWAY_USER: ${{ secrets.PGUSER }}
+          FLYWAY_PASSWORD: ${{ secrets.PGPASSWORD }}
+
+  # Job 3: Validate post-migration health
+  post-migration-validation:
+    name: Post-Migration Health Validation
+    runs-on: ubuntu-latest
+    needs: apply-migrations
+    timeout-minutes: 15
+
+    steps:
+      - name: Set up PostgreSQL client
+        uses: shogo82148/actions-setup-postgres@v1
+        with:
+          postgres-version: 16
+          postgres-password: ${{ secrets.PGPASSWORD }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Re-install pgFirstAid
+        run: |
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} <<'EOF'
+          CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+          DROP FUNCTION IF EXISTS pg_firstAid();
+          \i pgFirstAid.sql
+          EOF
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Download baseline data
+        uses: actions/download-artifact@v4
+        with:
+          name: pre-migration-baseline
+          path: ./
+
+      - name: Run Post-Migration Health Check
+        run: |
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} <<'EOF'
+          CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();
+          \echo '=== Post-Migration Health Report ==='
+          \echo ''
+          \echo 'Severity Summary:'
+          SELECT severity, COUNT(*) as issue_count
+          FROM _health_snapshot
+          GROUP BY severity
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              WHEN 'LOW' THEN 4
+              ELSE 5
+            END;
+          \echo ''
+          \echo 'All Issues (ordered by priority):'
+          SELECT severity, check_name, object_name, issue_description, recommended_action
+          FROM _health_snapshot
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              WHEN 'LOW' THEN 4
+              ELSE 5
+            END,
+            check_name;
+          \echo ''
+          \echo 'New Issues (compared to baseline):'
+          SELECT severity, check_name, object_name, issue_description, recommended_action
+          FROM _health_snapshot
+          WHERE (check_name, object_name) NOT IN (
+            SELECT check_name, object_name FROM _pre_health_snapshot
+          )
+          ORDER BY severity, check_name;
+          EOF
+        continue-on-error: true
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Compare Critical Issue Count
+        id: compare-critical
+        run: |
+          BASELINE_CRITICAL=$(cat baseline_critical_count.txt | tr -d '[:space:]' || echo "0")
+          CURRENT_CRITICAL=$(psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} \
+            -t -c "SELECT count(*) FROM pg_firstAid() WHERE severity = 'CRITICAL';" | tr -d '[:space:]')
+
+          echo "baseline_critical=$BASELINE_CRITICAL" >> $GITHUB_OUTPUT
+          echo "current_critical=$CURRENT_CRITICAL" >> $GITHUB_OUTPUT
+
+          if [ "$CURRENT_CRITICAL" -gt "$BASELINE_CRITICAL" ]; then
+            NEW_CRITICAL=$((CURRENT_CRITICAL - BASELINE_CRITICAL))
+            echo "::error::Migration introduced $NEW_CRITICAL new critical issues!"
+            echo "Baseline: $BASELINE_CRITICAL | Current: $CURRENT_CRITICAL"
+            exit 1
+          else
+            echo "No new critical issues introduced"
+          fi
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Check for New High Priority Issues
+        id: check-high
+        run: |
+          CURRENT_HIGH=$(psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} \
+            -t -c "SELECT count(*) FROM pg_firstAid() WHERE severity = 'HIGH';" | tr -d '[:space:]')
+
+          echo "high_issues=$CURRENT_HIGH" >> $GITHUB_OUTPUT
+
+          if [ "$CURRENT_HIGH" -gt 0 ]; then
+            echo "Found $CURRENT_HIGH high priority issues:"
+            psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} \
+              -c "SELECT check_name, object_name, issue_description FROM pg_firstAid() WHERE severity = 'HIGH';"
+            echo "high_issues_warn=true" >> $GITHUB_OUTPUT
+          else
+            echo "No high priority issues"
+            echo "high_issues_warn=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Save Post-Migration CSV
+        run: |
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} --csv \
+            -c "SELECT severity, COUNT(*)::int AS count FROM pg_firstAid() GROUP BY severity ORDER BY 1;" \
+            > ${{ github.workspace }}/post_migration_severity.csv
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} --csv \
+            -c "SELECT severity, check_name, object_name, issue_description, recommended_action FROM pg_firstAid() ORDER BY severity, check_name;" \
+            > ${{ github.workspace }}/post_migration_health.csv
+        continue-on-error: true
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+      - name: Upload Post-Migration Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: post-migration-report
+          path: |
+            ${{ github.workspace }}/post_migration_severity.csv
+            ${{ github.workspace }}/post_migration_health.csv
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Cleanup baseline snapshot
+        if: always()
+        run: |
+          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} \
+            -c "DROP TABLE IF EXISTS _pre_health_snapshot;"
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+  # Job 4: Summary and notification
+  generate-summary:
+    name: Generate Summary Report
+    runs-on: ubuntu-latest
+    needs: [pre-migration-baseline, post-migration-validation]
+
+    steps:
+      - name: Download baseline artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pre-migration-baseline
+          path: baseline/
+
+      - name: Download post-migration artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: post-migration-report
+          path: post-migration/
+
+      - name: Generate Summary
+        run: |
+          echo "=== MIGRATION VALIDATION SUMMARY ===" > summary.md
+          echo "" >> summary.md
+          echo "## Baseline (Pre-Migration)" >> summary.md
+          echo "" >> summary.md
+          echo "| Severity | Count |" >> summary.md
+          echo "|----------|-------|" >> summary.md
+          if [ -f "baseline/baseline_severity.csv" ]; then
+            awk -F',' 'NR>1 {printf "| %s | %s |\n", $1, $2}' baseline/baseline_severity.csv >> summary.md
+          else
+            echo "| Not Available | |" >> summary.md
+          fi
+          echo "" >> summary.md
+          echo "## Post-Migration" >> summary.md
+          echo "" >> summary.md
+          echo "| Severity | Count |" >> summary.md
+          echo "|----------|-------|" >> summary.md
+          if [ -f "post-migration/post_migration_severity.csv" ]; then
+            awk -F',' 'NR>1 {printf "| %s | %s |\n", $1, $2}' post-migration/post_migration_severity.csv >> summary.md
+          else
+            echo "| Not Available | |" >> summary.md
+          fi
+          echo "" >> summary.md
+          echo "## Critical Issue Change" >> summary.md
+          echo "" >> summary.md
+          BASELINE_CRIT=$(cat baseline/baseline_critical_count.txt 2>/dev/null || echo "N/A")
+          echo "Baseline: $BASELINE_CRIT critical issues" >> summary.md
+          CURRENT_CRIT=$(awk -F',' '$1 == "CRITICAL" {print $2}' post-migration/post_migration_severity.csv 2>/dev/null || echo "N/A")
+          echo "Current: $CURRENT_CRIT critical issues" >> summary.md
+
+          cat summary.md
+
+      - name: Upload Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-validation-summary
+          path: summary.md
+          retention-days: 30
+
+  # Job 5: Block deployment if critical issues introduced
+  gate-check:
+    name: Gate Check (Block Deployment)
+    runs-on: ubuntu-latest
+    needs: [pre-migration-baseline, post-migration-validation, generate-summary]
+    if: success() || failure()
+
+    steps:
+      - name: Check if migration should be blocked
+        run: |
+          if [ "${{ needs.post-migration-validation.result }}" != "success" ]; then
+            echo "::error::Migration validation failed. Please review pgFirstAid health checks."
+            exit 1
+          fi
+          echo "Migration passed validation - safe to deploy"

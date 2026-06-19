@@ -1,0 +1,492 @@
+# Managed Database Validation Workflow
+#
+# Validates pgFirstAid against cloud-managed PostgreSQL databases (AWS RDS, GCP Cloud SQL, Azure).
+# Triggered manually to test compatibility with each cloud provider.
+#
+# This workflow is NOT for:
+#   - Scheduled health monitoring (see db-health-checks.yml)
+#   - Migration safety validation (see pre-post-migration-validate.yml)
+#   - PR feedback (see pgfirstaid-pr-audit.yml)
+
+name: Managed Database Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_provider:
+        description: 'Cloud provider to validate against'
+        required: true
+        type: choice
+        options:
+          - aws
+          - gcp
+          - azure
+      db_identifier:
+        description: 'Database identifier (RDS instance ID, Cloud SQL name, Azure server name)'
+        required: true
+      region:
+        description: 'Cloud region'
+        required: true
+        default: 'us-east-1'
+      resource_group:
+        description: 'Azure resource group (required for Azure)'
+        required: false
+        default: ''
+      check_type:
+        description: 'Type of validation to run'
+        required: false
+        type: choice
+        options:
+          - full
+          - critical-only
+          - regression
+        default: 'full'
+
+concurrency:
+  group: managed-db-${{ inputs.cloud_provider }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Job 1: AWS RDS Validation
+  validate-aws-rds:
+    name: AWS RDS Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: inputs.cloud_provider == 'aws'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.region }}
+
+      - name: Set up PostgreSQL client
+        uses: shogo82148/actions-setup-postgres@v1
+        with:
+          postgres-version: 16
+          postgres-password: ${{ secrets.AWS_RDS_PASSWORD }}
+
+      - name: Resolve RDS Endpoint
+        id: rds-endpoint
+        run: |
+          # Get RDS endpoint from instance identifier
+          RESOLVED_HOST=$(aws rds describe-db-instances \
+            --db-instance-identifier "${{ inputs.db_identifier }}" \
+            --query 'DBInstances[0].Endpoint.Address' \
+            --output text)
+
+          if [ -z "$RESOLVED_HOST" ]; then
+            echo "::error::Could not resolve RDS instance ${{ inputs.db_identifier }}"
+            exit 1
+          fi
+
+          echo "host=$RESOLVED_HOST" >> $GITHUB_OUTPUT
+          echo "instance=$RESOLVED_HOST"
+
+          # Get instance details
+          echo "Instance Details:"
+          aws rds describe-db-instances \
+            --db-instance-identifier "${{ inputs.db_identifier }}" \
+            --query 'DBInstances[0].[DBInstanceStatus,EngineVersion,MultiAZ,AutomatedBackupMinutes]' \
+            --output table
+        env:
+          AWS_REGION: ${{ inputs.region }}
+
+      - name: Install pgFirstAid on RDS
+        run: |
+          psql -h ${{ steps.rds-endpoint.outputs.host }} \
+               -U ${{ secrets.AWS_RDS_USER }} \
+               -d postgres <<'SQL'
+          -- Check for pg_stat_statements extension
+          SELECT name FROM pg_extension WHERE extname = 'pg_stat_statements';
+
+          -- Install if not present
+          CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+          -- Install pgFirstAid
+          \i pgFirstAid.sql
+          \i view_pgFirstAid_managed.sql
+
+          -- Verify installation
+          SELECT pg_firstAid();
+          SQL
+        env:
+          PGPASSWORD: ${{ secrets.AWS_RDS_PASSWORD }}
+
+      - name: Run Health Check on RDS
+        run: |
+          psql -h ${{ steps.rds-endpoint.outputs.host }} \
+               -U ${{ secrets.AWS_RDS_USER }} \
+               -d postgres <<'SQL'
+          -- Capture snapshot to avoid redundant function calls
+          CREATE TEMP TABLE _snap AS SELECT * FROM pg_firstAid();
+
+          \echo '=== AWS RDS Health Check ==='
+          \echo 'Instance: ${{ inputs.db_identifier }}'
+          \echo 'Region: ${{ inputs.region }}'
+          \echo ''
+
+          -- Show summary
+          SELECT
+            severity,
+            COUNT(*) as issue_count,
+            COUNT(DISTINCT object_name) as affected_objects
+          FROM _snap
+          GROUP BY severity
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              ELSE 4
+            END;
+          \echo ''
+
+          -- Show critical issues (RDS-specific considerations)
+          \echo '=== RDS-Specific Critical Issues ==='
+          SELECT severity, check_name, object_name, issue_description, recommended_action
+          FROM _snap
+          WHERE severity = 'CRITICAL'
+          ORDER BY check_name;
+          \echo ''
+
+          -- Show high priority issues
+          \echo '=== High Priority Issues ==='
+          SELECT severity, check_name, object_name, issue_description
+          FROM _snap
+          WHERE severity = 'HIGH'
+          ORDER BY check_name;
+          \echo ''
+          SQL
+        env:
+          PGPASSWORD: ${{ secrets.AWS_RDS_PASSWORD }}
+
+      - name: Generate CSV Report
+        run: |
+          psql -h ${{ steps.rds-endpoint.outputs.host }} \
+               -U ${{ secrets.AWS_RDS_USER }} \
+               -d postgres \
+               -c "\copy (SELECT * FROM pg_firstAid() ORDER BY severity, check_name) TO '${{ github.workspace }}/rds_health_check.csv' CSV HEADER"
+        env:
+          PGPASSWORD: ${{ secrets.AWS_RDS_PASSWORD }}
+
+      - name: Post job summary
+        if: always()
+        run: |
+          {
+            echo "## ✅ AWS RDS Validation Complete"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Instance | ${{ inputs.db_identifier }} |"
+            echo "| Region | ${{ inputs.region }} |"
+            echo "| Report | \`rds_health_check.csv\` |"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload AWS RDS Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aws-rds-report-${{ inputs.db_identifier }}
+          path: ${{ github.workspace }}/rds_health_check.csv
+          retention-days: 7
+
+  # Job 2: GCP Cloud SQL Validation
+  validate-gcp-cloud-sql:
+    name: GCP Cloud SQL Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: inputs.cloud_provider == 'gcp'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Set up PostgreSQL client
+        uses: shogo82148/actions-setup-postgres@v1
+        with:
+          postgres-version: 16
+          postgres-password: ${{ secrets.GCP_CLOUD_SQL_PASSWORD }}
+
+      - name: Resolve Cloud SQL Endpoint
+        id: cloudsql-endpoint
+        run: |
+          # Get Cloud SQL endpoint
+          RESOLVED_HOST=$(gcloud sql instances describe "${{ inputs.db_identifier }}" \
+            --project="${{ secrets.GCP_PROJECT_ID }}" \
+            --format='value(ipAddresses[0].ipAddress)')
+
+          if [ -z "$RESOLVED_HOST" ]; then
+            echo "::error::Could not resolve Cloud SQL instance ${{ inputs.db_identifier }}"
+            exit 1
+          fi
+
+          echo "host=$RESOLVED_HOST" >> $GITHUB_OUTPUT
+          echo "instance=$RESOLVED_HOST"
+
+          # Get instance details
+          echo "Instance Details:"
+          gcloud sql instances describe "${{ inputs.db_identifier }}" \
+            --project="${{ secrets.GCP_PROJECT_ID }}" \
+            --format='table(name,state,backendType,diskSizeGb)'
+        env:
+          CLOUDSDK_CORE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Install pgFirstAid on Cloud SQL
+        run: |
+          psql -h ${{ steps.cloudsql-endpoint.outputs.host }} \
+               -U ${{ secrets.GCP_CLOUD_SQL_USER }} \
+               -d postgres <<'SQL'
+          -- Check for pg_stat_statements extension
+          SELECT name FROM pg_extension WHERE extname = 'pg_stat_statements';
+
+          -- Install if not present
+          CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+          -- Install pgFirstAid managed view
+          \i pgFirstAid.sql
+          \i view_pgFirstAid_managed.sql
+
+          -- Verify installation
+          SELECT pg_firstAid();
+          SQL
+        env:
+          PGPASSWORD: ${{ secrets.GCP_CLOUD_SQL_PASSWORD }}
+
+      - name: Run Health Check on Cloud SQL
+        run: |
+          psql -h ${{ steps.cloudsql-endpoint.outputs.host }} \
+               -U ${{ secrets.GCP_CLOUD_SQL_USER }} \
+               -d postgres <<'SQL'
+          -- Capture snapshot to avoid redundant function calls
+          CREATE TEMP TABLE _snap AS SELECT * FROM pg_firstAid();
+
+          \echo '=== GCP Cloud SQL Health Check ==='
+          \echo 'Instance: ${{ inputs.db_identifier }}'
+          \echo 'Project: ${{ secrets.GCP_PROJECT_ID }}'
+          \echo ''
+
+          -- Show summary
+          SELECT
+            severity,
+            COUNT(*) as issue_count,
+            COUNT(DISTINCT object_name) as affected_objects
+          FROM _snap
+          GROUP BY severity
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              ELSE 4
+            END;
+          \echo ''
+
+          -- Show all issues
+          \echo '=== All Issues ==='
+          SELECT severity, check_name, object_name, issue_description, recommended_action
+          FROM _snap
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              ELSE 4
+            END,
+            check_name;
+          \echo ''
+          SQL
+        env:
+          PGPASSWORD: ${{ secrets.GCP_CLOUD_SQL_PASSWORD }}
+
+      - name: Generate CSV Report
+        run: |
+          psql -h ${{ steps.cloudsql-endpoint.outputs.host }} \
+               -U ${{ secrets.GCP_CLOUD_SQL_USER }} \
+               -d postgres \
+               -c "\copy (SELECT * FROM pg_firstAid() ORDER BY severity, check_name) TO '${{ github.workspace }}/cloudsql_health_check.csv' CSV HEADER"
+        env:
+          PGPASSWORD: ${{ secrets.GCP_CLOUD_SQL_PASSWORD }}
+
+      - name: Post job summary
+        if: always()
+        run: |
+          {
+            echo "## ✅ GCP Cloud SQL Validation Complete"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Instance | ${{ inputs.db_identifier }} |"
+            echo "| Project | ${{ secrets.GCP_PROJECT_ID }} |"
+            echo "| Report | \`cloudsql_health_check.csv\` |"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload GCP Cloud SQL Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gcp-cloudsql-report-${{ inputs.db_identifier }}
+          path: ${{ github.workspace }}/cloudsql_health_check.csv
+          retention-days: 7
+
+  # Job 3: Azure Database for PostgreSQL Validation
+  validate-azure-postgresql:
+    name: Azure Database for PostgreSQL Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: inputs.cloud_provider == 'azure'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Azure credentials
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up PostgreSQL client
+        uses: shogo82148/actions-setup-postgres@v1
+        with:
+          postgres-version: 16
+          postgres-password: ${{ secrets.AZURE_POSTGRESQL_PASSWORD }}
+
+      - name: Resolve Azure PostgreSQL Endpoint
+        id: azure-endpoint
+        run: |
+          # Build resource group flag conditionally
+          RG_FLAG=""
+          if [ -n "${{ inputs.resource_group }}" ]; then
+            RG_FLAG="--resource-group ${{ inputs.resource_group }}"
+          fi
+
+          # Get Azure PostgreSQL Flexible Server endpoint
+          RESOLVED_HOST=$(az postgres flexible-server show \
+            --name "${{ inputs.db_identifier }}" \
+            $RG_FLAG \
+            --query 'properties.defaultHostName' \
+            --output tsv)
+
+          if [ -z "$RESOLVED_HOST" ]; then
+            echo "::error::Could not resolve Azure PostgreSQL server ${{ inputs.db_identifier }}"
+            exit 1
+          fi
+
+          echo "host=$RESOLVED_HOST" >> $GITHUB_OUTPUT
+          echo "server=$RESOLVED_HOST"
+
+          # Get server details
+          echo "Server Details:"
+          az postgres flexible-server show \
+            --name "${{ inputs.db_identifier }}" \
+            $RG_FLAG \
+            --query 'properties.{sku:sku.name,version:version,state:state}' \
+            --output table
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install pgFirstAid on Azure PostgreSQL
+        run: |
+          psql -h ${{ steps.azure-endpoint.outputs.host }} \
+               -U ${{ secrets.AZURE_POSTGRESQL_USER }} \
+               -d postgres <<'SQL'
+          -- Check for pg_stat_statements extension
+          SELECT name FROM pg_extension WHERE extname = 'pg_stat_statements';
+
+          -- Install if not present
+          CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+          -- Install pgFirstAid
+          \i pgFirstAid.sql
+          \i view_pgFirstAid_managed.sql
+
+          -- Verify installation
+          SELECT pg_firstAid();
+          SQL
+        env:
+          PGPASSWORD: ${{ secrets.AZURE_POSTGRESQL_PASSWORD }}
+
+      - name: Run Health Check on Azure PostgreSQL
+        run: |
+          psql -h ${{ steps.azure-endpoint.outputs.host }} \
+               -U ${{ secrets.AZURE_POSTGRESQL_USER }} \
+               -d postgres <<'SQL'
+          -- Capture snapshot to avoid redundant function calls
+          CREATE TEMP TABLE _snap AS SELECT * FROM pg_firstAid();
+
+          \echo '=== Azure Database for PostgreSQL Health Check ==='
+          \echo 'Server: ${{ inputs.db_identifier }}'
+          \echo 'Resource Group: ${{ inputs.resource_group }}'
+          \echo ''
+
+          -- Show summary
+          SELECT
+            severity,
+            COUNT(*) as issue_count,
+            COUNT(DISTINCT object_name) as affected_objects
+          FROM _snap
+          GROUP BY severity
+          ORDER BY
+            CASE severity
+              WHEN 'CRITICAL' THEN 1
+              WHEN 'HIGH' THEN 2
+              WHEN 'MEDIUM' THEN 3
+              ELSE 4
+            END;
+          \echo ''
+
+          -- Show critical issues
+          \echo '=== Critical Issues ==='
+          SELECT severity, check_name, object_name, issue_description, recommended_action
+          FROM _snap
+          WHERE severity = 'CRITICAL'
+          ORDER BY check_name;
+          \echo ''
+          SQL
+        env:
+          PGPASSWORD: ${{ secrets.AZURE_POSTGRESQL_PASSWORD }}
+
+      - name: Generate CSV Report
+        run: |
+          psql -h ${{ steps.azure-endpoint.outputs.host }} \
+               -U ${{ secrets.AZURE_POSTGRESQL_USER }} \
+               -d postgres \
+               -c "\copy (SELECT * FROM pg_firstAid() ORDER BY severity, check_name) TO '${{ github.workspace }}/azure_health_check.csv' CSV HEADER"
+        env:
+          PGPASSWORD: ${{ secrets.AZURE_POSTGRESQL_PASSWORD }}
+
+      - name: Post job summary
+        if: always()
+        run: |
+          {
+            echo "## ✅ Azure Database for PostgreSQL Validation Complete"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Server | ${{ inputs.db_identifier }} |"
+            echo "| Resource Group | ${{ inputs.resource_group }} |"
+            echo "| Report | \`azure_health_check.csv\` |"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Azure Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: azure-postgresql-report-${{ inputs.db_identifier }}
+          path: ${{ github.workspace }}/azure_health_check.csv
+          retention-days: 7

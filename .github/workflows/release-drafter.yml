@@ -20,7 +20,7 @@ jobs:
     if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.fork == false
     permissions:
       pull-requests: write
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, pgfirstaid-ci]
     steps:
       - name: Apply release-drafter labels
         uses: release-drafter/release-drafter/autolabeler@v6 # v6.1.0

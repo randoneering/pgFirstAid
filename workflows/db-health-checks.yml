@@ -34,11 +34,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up PostgreSQL client
-        uses: shogo82148/actions-setup-postgres@v1
-        with:
-          postgres-version: 16
-          postgres-password: ${{ secrets.PGPASSWORD }}
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
 
       - name: Install pgFirstAid
         run: |
@@ -173,11 +173,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up PostgreSQL client
-        uses: shogo82148/actions-setup-postgres@v1
-        with:
-          postgres-version: 16
-          postgres-password: ${{ secrets.PGPASSWORD }}
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
 
       - name: Install pgFirstAid
         run: |

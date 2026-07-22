@@ -571,6 +571,7 @@ from
 	q
 where
 	bloat_pct > 50.0
+	and bloat_size > pg_size_bytes('10 MB')
 	and schemaname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
 order by
 	quote_ident(schemaname),

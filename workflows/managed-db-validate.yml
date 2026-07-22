@@ -68,11 +68,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ inputs.region }}
 
-      - name: Set up PostgreSQL client
-        uses: shogo82148/actions-setup-postgres@v1
-        with:
-          postgres-version: 16
-          postgres-password: ${{ secrets.AWS_RDS_PASSWORD }}
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
 
       - name: Resolve RDS Endpoint
         id: rds-endpoint
@@ -215,11 +215,11 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Set up PostgreSQL client
-        uses: shogo82148/actions-setup-postgres@v1
-        with:
-          postgres-version: 16
-          postgres-password: ${{ secrets.GCP_CLOUD_SQL_PASSWORD }}
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
 
       - name: Resolve Cloud SQL Endpoint
         id: cloudsql-endpoint
@@ -360,11 +360,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Set up PostgreSQL client
-        uses: shogo82148/actions-setup-postgres@v1
-        with:
-          postgres-version: 16
-          postgres-password: ${{ secrets.AZURE_POSTGRESQL_PASSWORD }}
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
 
       - name: Resolve Azure PostgreSQL Endpoint
         id: azure-endpoint

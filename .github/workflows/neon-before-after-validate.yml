@@ -76,6 +76,10 @@ jobs:
       pull-requests: write
       contents: read
 
+    defaults:
+      run:
+        shell: bash -l {0}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,10 +87,19 @@ jobs:
           fetch-depth: 1
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Install PostgreSQL client
+      - name: Add Nix profile paths
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client >/dev/null
+          echo "/run/current-system/sw/bin" >> "$GITHUB_PATH"
+          echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+          echo "/etc/profiles/per-user/$USER/bin" >> "$GITHUB_PATH"
+
+      - name: Verify PostgreSQL client is installed
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            echo "::error::psql not found on runner. Install postgresql-client on the self-hosted VM."
+            exit 1
+          fi
           psql --version
 
       - name: Set branch name

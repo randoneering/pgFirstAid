@@ -57,7 +57,7 @@ on:
 
 jobs:
   validate:
-    runs-on: [self-hosted, linux, pgfirstaid-ci]
+    runs-on: [self-hosted, nix, nixos, x86_64-linux]
     permissions:
       contents: read
     defaults:

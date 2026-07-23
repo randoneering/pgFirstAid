@@ -70,7 +70,7 @@ env:
 jobs:
   before-after-validation:
     name: Before/After Health Validation
-    runs-on: [self-hosted, linux, pgfirstaid-ci]
+    runs-on: [self-hosted, nix, nixos, x86_64-linux]
     timeout-minutes: 20
     permissions:
       pull-requests: write

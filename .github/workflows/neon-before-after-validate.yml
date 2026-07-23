@@ -297,11 +297,27 @@ jobs:
 
       - name: Delete Neon branch
         if: always()
-        uses: neondatabase/delete-branch-action@v3
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch: ${{ steps.create-branch.outputs.branch_id }}
-          api_key: ${{ secrets.NEON_API_KEY }}
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BRANCH_ID: ${{ steps.create-branch.outputs.branch_id }}
+        run: |
+          if [ -z "$BRANCH_ID" ]; then
+            echo "No branch_id recorded (likely create-branch failed). Nothing to delete."
+            exit 0
+          fi
+          response=$(curl -sS -X DELETE \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            -H "Accept: application/json" \
+            -w "\n%{http_code}" \
+            "https://console.neon.tech/api/v2/projects/$PROJECT_ID/branches/$BRANCH_ID")
+          status=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          if [ "$status" = "200" ] || [ "$status" = "204" ]; then
+            echo "Branch $BRANCH_ID deleted (HTTP $status)."
+          else
+            echo "::warning::Delete failed (HTTP $status): $body"
+          fi
 
       - name: Final gate
         if: steps.gate.outputs.status == 'blocked'

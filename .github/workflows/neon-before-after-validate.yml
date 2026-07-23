@@ -32,7 +32,7 @@
 #   NEON_PROJECT_ID -- from your Neon project's Settings page
 #
 # Change files:
-#   When triggered on pull_request, the workflow auto-discovers .sql files
+#   When triggered on pull_request_target, the workflow auto-discovers .sql files
 #   under migrations/ and applies them as the change. For app or infra
 #   changes, use workflow_dispatch and either:
 #     (a) pass your SQL files via the `change_files` input, or
@@ -42,7 +42,7 @@
 name: Neon Before/After Validation
 
 on:
-  pull_request:
+  pull_request_target:
     paths:
       - 'migrations/**'
       - 'pgFirstAid.sql'
@@ -81,6 +81,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install PostgreSQL client
         run: |
@@ -154,7 +155,7 @@ jobs:
           echo "  Pre-change baseline captured above."
           echo ""
           echo "  The change being tested:"
-          echo "    ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || 'manual dispatch' }}"
+          echo "    ${{ github.event_name == 'pull_request_target' && format('PR #{0}', github.event.number) || 'manual dispatch' }}"
           echo ""
           echo "  Now applying SQL changes..."
           echo ""
@@ -231,7 +232,7 @@ jobs:
           fi
 
       - name: Post PR comment
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request_target' }}
         uses: actions/github-script@v7
         with:
           script: |

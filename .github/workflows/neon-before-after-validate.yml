@@ -136,6 +136,7 @@ jobs:
           DB_URL: ${{ steps.create-branch.outputs.db_url }}
         run: |
           psql "$DB_URL" -v ON_ERROR_STOP=1 <<'EOF'
+          DROP TABLE IF EXISTS _pre_change_snapshot;
           CREATE UNLOGGED TABLE _pre_change_snapshot AS SELECT * FROM pg_firstAid();
           \echo '=== PRE-CHANGE HEALTH BASELINE ==='
           \echo ''

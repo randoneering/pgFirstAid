@@ -7,10 +7,6 @@ Easy-to-deploy, open source PostgreSQL function (and view!) that provides a prio
 
 This project is supported by:
 
-[![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?refcode=1255f30016e1&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
-
-DigitalOcean is the cloud provider that doesn't make you wade through a thousand services to spin up a VM or database. You get straightforward VMs (they call them Droplets), managed Postgres/MySQL/Redis, Kubernetes if you need it, and pricing you can actually understand. All with an interface that doesn't require a PhD to navigate. Click the badge above to start your journey with DigitalOcean.
-
 <a href="https://get.neon.com/5HwTAdh">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/neon-logo-dark-color.png">

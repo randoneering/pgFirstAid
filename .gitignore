@@ -25,6 +25,9 @@ pgpass
 .agent
 .copilot
 .claude
+.pi
+.pi-subagents
+.opencode
 # AI files
 AGENTS.md
 CLAUDE.md

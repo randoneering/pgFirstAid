@@ -11,11 +11,19 @@ description: Use when diagnosing PostgreSQL health, performance, or stability is
 
 ## Quick Start
 
+Self-hosted (install `pgFirstAid.sql`):
+
 ```sql
 SELECT * FROM pg_firstAid();
 ```
 
-Pick the file that matches the target: `pgFirstAid.sql` for self-hosted, `view_pgFirstAid_managed.sql` for any managed service. The view `v_pgfirstAid` is optional.
+Managed services (install `view_pgFirstAid_managed.sql`):
+
+```sql
+SELECT * FROM v_pgfirstAid;
+```
+
+The managed SQL creates the view, not the function, so managed callers must use the view. The view does not run `pg_stat_statements` checks.
 
 ## Output Schema
 
@@ -43,9 +51,9 @@ Stop at the first rung with nothing to do. Always propose SQL as a draft the use
 
 For any proposed SQL, before signing off:
 
-1. **Dry-run in a transaction** with `BEGIN; ... ROLLBACK;` to see effects without committing.
+1. **Dry-run transactional commands in a transaction** with `BEGIN; ... ROLLBACK;`. Non-transactional operations (`pg_terminate_backend`, `VACUUM FULL`, `REINDEX`, `CREATE INDEX CONCURRENTLY`) cannot be wrapped this way and need isolation on a staging copy instead.
 2. **Test on a staging copy first.** Never apply CRITICAL or HIGH fixes to production untested.
-3. **EXPLAIN for query changes** with `EXPLAIN (ANALYZE, BUFFERS)`. On read replicas, drop `ANALYZE` and use `EXPLAIN` only (no write permission needed).
+3. **EXPLAIN to see the plan.** Plain `EXPLAIN` does not execute. Add `ANALYZE` only inside a transaction with rollback so DML runs but does not commit. On read replicas, `EXPLAIN` only (no write permission needed).
 4. **Confirm affected rows** with `SELECT COUNT(*)` using the same `WHERE` before any DELETE or UPDATE.
 5. **Backup before destructive ops.** `pg_dump` the affected table before DROP, TRUNCATE, or major ALTER.
 

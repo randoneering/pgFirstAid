@@ -45,13 +45,13 @@ The managed SQL creates the view, not the function, so managed callers must use 
 | MEDIUM / LOW | Batch and review. Trust the `recommended_action` summary |
 | INFO | Skip. Not action items |
 
-Stop at the first rung with nothing to do. Always propose SQL as a draft the user signs off on, never auto-apply.
+Walk through every level from CRITICAL to INFO, even when earlier levels are empty. Always propose SQL as a draft the user signs off on, never auto-apply.
 
 ## Verify Before Applying
 
 For any proposed SQL, before signing off:
 
-1. **Dry-run transactional commands in a transaction** with `BEGIN; ... ROLLBACK;`. Non-transactional operations (`pg_terminate_backend`, `VACUUM FULL`, `REINDEX`, `CREATE INDEX CONCURRENTLY`) cannot be wrapped this way and need isolation on a staging copy instead.
+1. **Dry-run transactional commands in a transaction** with `BEGIN; ... ROLLBACK;`. Non-transactional operations (`pg_terminate_backend`, `VACUUM FULL`, `REINDEX CONCURRENTLY`, `CREATE INDEX CONCURRENTLY`, and `REINDEX` on partitioned tables) cannot be wrapped this way and need isolation on a staging copy instead. `REINDEX INDEX` and `REINDEX TABLE` (without `CONCURRENTLY`) are transactional and safe to wrap in `BEGIN; ... ROLLBACK;`.
 2. **Test on a staging copy first.** Never apply CRITICAL or HIGH fixes to production untested.
 3. **EXPLAIN to see the plan.** Plain `EXPLAIN` does not execute. Add `ANALYZE` only inside a transaction with rollback so DML runs but does not commit. On read replicas, `EXPLAIN` only (no write permission needed).
 4. **Confirm affected rows** with `SELECT COUNT(*)` using the same `WHERE` before any DELETE or UPDATE.
@@ -60,15 +60,18 @@ For any proposed SQL, before signing off:
 ## Common Patterns
 
 ```sql
--- Critical only
+-- Self-hosted (install pgFirstAid.sql)
 SELECT * FROM pg_firstAid() WHERE severity = 'CRITICAL';
+
+-- Managed (install view_pgFirstAid_managed.sql)
+SELECT * FROM v_pgfirstAid WHERE severity = 'CRITICAL';
 ```
 
 ## Common Mistakes
 
 - Missing PK → drop table, or unused index → `DROP INDEX`. No, add a PK or unique constraint. Validate index usage over a representative window first.
 - Skipping the `documentation_link`. For CRITICAL/HIGH, follow it before proposing a fix. The `recommended_action` is a summary; the doc has version-specific edge cases the summary omits.
-- Skipping before/after snapshots. Capture `pg_firstAid()` output to CSV before and after the change; compare to confirm the fix removed the finding.
+- Skipping before/after snapshots. Capture the function or view output (`SELECT * FROM pg_firstAid()` for self-hosted, `SELECT * FROM v_pgfirstAid` for managed) to CSV before and after the change; compare to confirm the fix removed the finding.
 
 ## When NOT to Use
 

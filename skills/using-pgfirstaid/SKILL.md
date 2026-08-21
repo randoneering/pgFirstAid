@@ -30,7 +30,7 @@ The managed SQL creates the view, not the function, so managed callers must use 
 | Column | Meaning |
 |---|---|
 | `severity` | CRITICAL → INFO |
-| `category` | Table Health, Query Health, Replication Health, System Health, Database Health, System Info |
+| `category` | Table Health, Query Health, Index Health, Replication Health, Database Health, Connection Health, Security Health, System Health, System Info |
 | `check_name` | Label |
 | `object_name` | Schema-qualified object, or `System` |
 

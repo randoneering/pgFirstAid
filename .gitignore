@@ -28,6 +28,7 @@ pgpass
 .pi
 .pi-subagents
 .opencode
+openspec/
 # AI files
 AGENTS.md
 CLAUDE.md

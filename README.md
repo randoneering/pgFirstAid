@@ -75,6 +75,9 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 - **Inactive Replication Slots** - Identifies replication slots that are inactive and can be removed if no longer needed
 - **Tables Larger Than 100GB** - Identifies tables that are larger than 100GB
 - **Tables With More Than 200 Columns** - List tables with more than 200 columns. You should probably look into those...
+- **Autovacuum Disabled On Table** - User tables with `autovacuum_enabled = false`. Bloat, XID wraparound risk, and stale stats accumulate silently
+- **listen_addresses Wildcard** - `listen_addresses = '*'` exposes PostgreSQL on every network interface; bind to specific IPs only
+- **Timestamp Without Time Zone** - User columns typed `timestamp without time zone`. PostgreSQL silently strips TZ info; cross-region and DST reads can produce wrong results
 
 ### MEDIUM Priority Issues
 
@@ -100,6 +103,11 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 - **Top Queries by WAL Bytes Per Call** *(pg_stat_statements)*
 - **Tables With More Than 50 Columns** - List tables with more than 50 columns (but less than 200)
 - **Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
+- **Query Duration Logging Disabled** - `log_min_duration_statement = -1` so slow queries never get logged
+- **Varchar With Length Limit** - Columns declared `varchar(n)`. The book recommends `text` when in doubt; length limits can cause silent truncation
+- **Serial Column Legacy** - Columns with `nextval()` defaults instead of `GENERATED AS IDENTITY`. Migrate when convenient
+- **Rules On Tables** - Non-view rules on tables. Prefer triggers — rules on tables are an old mechanism
+- **Not In With Subquery** *(pg_stat_statements)* - Queries using `NOT IN (SELECT ...)`. SQL NULL semantics trap returns zero rows if the subquery contains any NULL
 
 ### LOW Priority Issues
 

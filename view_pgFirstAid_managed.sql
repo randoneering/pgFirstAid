@@ -265,6 +265,29 @@ with pss as (
     order by
         ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) desc
     limit 10;
+
+    return query
+    select
+        'LOW' as severity,
+        'Query Health' as category,
+        'Not In With Subquery' as check_name,
+        'queryid: ' || pss.queryid::text as object_name,
+        'Query uses NOT IN (SELECT ...). The SQL NULL semantics trap returns zero rows if the subquery returns any NULL — even if the row exists. Common bug class per the Postgres Mistakes book §2.1.' as issue_description,
+        'calls: ' || pss.calls || ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+        'Rewrite as NOT EXISTS (SELECT 1 FROM ... WHERE ...), which handles NULLs correctly. Alternatively filter NULLs in the subquery with WHERE col IS NOT NULL.' as recommended_action,
+        'https://www.postgresql.org/docs/current/functions-comparison.html \
+         https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-EXPRESSIONS' as documentation_link,
+        4 as severity_order
+    from
+        pg_stat_statements pss
+    where
+        pss.calls >= 1
+        and pss.query ~* '^\s*(select|insert|update|delete|with|merge)'
+        and pss.query ~* '\mNOT\s+IN\s*\(\s*(WITH|SELECT)'
+    order by
+        pss.total_exec_time desc
+    limit 10;
     exception when object_not_in_prerequisite_state then
         return;
     end;
@@ -630,6 +653,31 @@ join pg_index idx2 on
 join pg_class i2 on idx2.indexrelid = i2.oid
 where
 	n1.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
+union all
+-- HIGH: Autovacuum disabled on table
+(select
+    'HIGH' as severity,
+    'Table Health' as category,
+    'Autovacuum Disabled On Table' as check_name,
+    quote_ident(n.nspname) || '.' || quote_ident(c.relname) as object_name,
+    'Autovacuum is disabled at the table level. Bloat, transaction ID wraparound, and outdated planner statistics will accumulate without manual intervention.' as issue_description,
+    pg_size_pretty(pg_relation_size(c.oid)) as current_value,
+    'Re-enable autovacuum: ALTER TABLE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' SET (autovacuum_enabled = true). If this table genuinely needs autovacuum off, document the reason and schedule manual VACUUM ANALYZE.' as recommended_action,
+    'https://www.postgresql.org/docs/current/sql-createtable.html#SQL-CREATETABLE-STORAGE-PARAMETERS' as documentation_link,
+    2 as severity_order
+from pg_class c
+join pg_namespace n on c.relnamespace = n.oid
+where c.relkind = 'r'
+  and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+  and n.nspname not like 'pg_temp_%'
+  and c.reloptions is not null
+  and exists (
+      select 1 from unnest(c.reloptions) opt
+      where split_part(opt, '=', 1) = 'autovacuum_enabled'
+        and split_part(opt, '=', 2) = 'false'
+  )
+order by pg_relation_size(c.oid) desc
+limit 100)
 union all
 -- HIGH: Table with more than 200 columns
 (with cc as (
@@ -1122,6 +1170,19 @@ ORDER BY
     ur.rolsuper DESC,
     ur.role_name)
 union all
+-- HIGH: listen_addresses wildcard
+select
+    'HIGH' as severity,
+    'Security Health' as category,
+    'listen_addresses Wildcard' as check_name,
+    'System' as object_name,
+    'listen_addresses is set to *, so PostgreSQL accepts connections on every network interface. This exposes the server to every network reachable to the host.' as issue_description,
+    current_setting('listen_addresses') as current_value,
+    'Set listen_addresses to the specific IP(s) the server should bind to (e.g., localhost,127.0.0.1,10.0.0.5). Requires a PostgreSQL restart.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-LISTEN-ADDRESSES' as documentation_link,
+    2 as severity_order
+where current_setting('listen_addresses') = '*'
+union all
 -- LOW: Missing indexes on foreign keys
     select
 	'LOW' as severity,
@@ -1310,6 +1371,92 @@ https://github.com/mfvanek/pg-index-health-sql/blob/master/sql/tables_with_zero_
 from
 	sct)
 union all
+-- HIGH: Timestamp without time zone
+(select
+    'HIGH' as severity,
+    'Table Health' as category,
+    'Timestamp Without Time Zone' as check_name,
+    quote_ident(n.nspname) || '.' || quote_ident(c.relname) || '.' || quote_ident(a.attname) as object_name,
+    'Column uses timestamp without time zone. PostgreSQL silently strips timezone info on storage; cross-timezone reads and DST transitions can produce wrong results.' as issue_description,
+    format_type(a.atttypid, a.atttypmod) as current_value,
+    'Migrate to timestamptz: ALTER TABLE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' ALTER COLUMN ' || quote_ident(a.attname) || ' TYPE timestamptz USING ' || quote_ident(a.attname) || ' AT TIME ZONE ''UTC''. Verify application code handles timezone-aware values.' as recommended_action,
+    'https://www.postgresql.org/docs/current/datatype-datetime.html' as documentation_link,
+    2 as severity_order
+from pg_attribute a
+join pg_class c on a.attrelid = c.oid
+join pg_namespace n on c.relnamespace = n.oid
+where a.atttypid = 'pg_catalog.timestamp'::regtype
+  and a.attnum > 0
+  and not a.attisdropped
+  and c.relkind in ('r', 'p')
+  and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+  and n.nspname not like 'pg_temp_%'
+order by n.nspname, c.relname, a.attnum
+limit 100)
+union all
+-- LOW: Varchar with length limit
+(select
+    'LOW' as severity,
+    'Table Health' as category,
+    'Varchar With Length Limit' as check_name,
+    quote_ident(table_schema) || '.' || quote_ident(table_name) || '.' || quote_ident(column_name) as object_name,
+    'Column declared as varchar(n). The book recommends text when in doubt; length limits can cause silent truncation and require length migrations later.' as issue_description,
+    data_type || '(' || character_maximum_length || ')' as current_value,
+    'If the length limit is intentional (validation), keep it. Otherwise migrate to text: ALTER TABLE ' || quote_ident(table_schema) || '.' || quote_ident(table_name) || ' ALTER COLUMN ' || quote_ident(column_name) || ' TYPE text USING ' || quote_ident(column_name) || '::text.' as recommended_action,
+    'https://www.postgresql.org/docs/current/datatype-character.html' as documentation_link,
+    4 as severity_order
+from information_schema.columns
+where table_schema not in ('pg_catalog', 'information_schema', 'pg_toast')
+  and table_schema not like 'pg_temp_%'
+  and data_type = 'character varying'
+  and character_maximum_length is not null
+order by table_schema, table_name, ordinal_position
+limit 100)
+union all
+-- LOW: Serial column legacy
+(select
+    'LOW' as severity,
+    'Table Health' as category,
+    'Serial Column Legacy' as check_name,
+    quote_ident(n.nspname) || '.' || quote_ident(c.relname) || '.' || quote_ident(a.attname) as object_name,
+    'Column uses a serial-style nextval() default. The modern equivalent is GENERATED AS IDENTITY, which integrates better with replication, ownership, and pg_dump.' as issue_description,
+    pg_get_expr(d.adbin, d.adrelid) as current_value,
+    'Migrate to identity: ALTER TABLE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' ALTER COLUMN ' || quote_ident(a.attname) || ' ADD GENERATED BY DEFAULT AS IDENTITY. Sequence ownership transfers automatically.' as recommended_action,
+    'https://www.postgresql.org/docs/current/sql-createtable.html#SQL-CREATETABLE-GENERATED-IDENTITY' as documentation_link,
+    4 as severity_order
+from pg_attrdef d
+join pg_attribute a on d.adrelid = a.attrelid and d.adnum = a.attnum
+join pg_class c on a.attrelid = c.oid
+join pg_namespace n on c.relnamespace = n.oid
+where pg_get_expr(d.adbin, d.adrelid) ~ '^nextval'
+  and a.attnum > 0 and not a.attisdropped
+  and c.relkind in ('r', 'p')
+  and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+  and n.nspname not like 'pg_temp_%'
+  and a.attidentity = ''
+order by n.nspname, c.relname, a.attnum
+limit 100)
+union all
+-- LOW: Rules on tables
+(select
+    'LOW' as severity,
+    'Database Health' as category,
+    'Rules On Tables' as check_name,
+    quote_ident(n.nspname) || '.' || quote_ident(c.relname) as object_name,
+    'Table has a non-view rule attached. Rules on tables are an old mechanism; triggers are clearer and more flexible. Rules on views (which implement views themselves) are useful and expected.' as issue_description,
+    r.rulename as current_value,
+    'Review whether this rule can be replaced with a trigger. Run \d ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' to see the rule definition, then DROP RULE ' || r.rulename || ' ON ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' if safe.' as recommended_action,
+    'https://www.postgresql.org/docs/current/rules.html' as documentation_link,
+    4 as severity_order
+from pg_rewrite r
+join pg_class c on r.ev_class = c.oid
+join pg_namespace n on c.relnamespace = n.oid
+where c.relkind = 'r'
+  and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+  and n.nspname not like 'pg_temp_%'
+order by n.nspname, c.relname, r.rulename
+limit 100)
+union all
 -- LOW: Connections IDLE for 1 > hour
 (with ic as (
 select
@@ -1481,6 +1628,19 @@ select
     'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
     3 as severity_order
 where pg_size_bytes(current_setting('work_mem')) = pg_size_bytes('4MB')
+union all
+-- MEDIUM: Query duration logging disabled
+select
+    'MEDIUM' as severity,
+    'System Health' as category,
+    'Query Duration Logging Disabled' as check_name,
+    'System' as object_name,
+    'log_min_duration_statement is set to -1, so no slow-query log is produced. Without duration tracking, regressions and runaway queries go undetected.' as issue_description,
+    '-1 (disabled)' as current_value,
+    'Set log_min_duration_statement to a positive threshold (e.g., 1000ms) to log every query taking longer. Pair with log_line_prefix=%m [%p] %u@%d and consider auto_explain for plan capture.' as recommended_action,
+    'https://www.postgresql.org/docs/current/runtime-config-logging.html#GUC-LOG-MIN-DURATION-STATEMENT' as documentation_link,
+    3 as severity_order
+where current_setting('log_min_duration_statement') = '-1'
 union all
 -- INFO: effective_cache_size current value
 select

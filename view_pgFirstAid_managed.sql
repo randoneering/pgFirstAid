@@ -667,7 +667,7 @@ union all
     2 as severity_order
 from pg_class c
 join pg_namespace n on c.relnamespace = n.oid
-where c.relkind = 'r'
+where c.relkind in ('r', 'p')
   and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
   and n.nspname not like 'pg_temp_%'
   and c.reloptions is not null

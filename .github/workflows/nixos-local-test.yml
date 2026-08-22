@@ -62,7 +62,6 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
-      # ponytail: explicit per-version secret mapping. Add a new PG major
       # here too. Without a matching leg, the job fails closed instead of
       # silently defaulting to PG18.
       matrix:

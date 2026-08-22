@@ -104,10 +104,6 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 - **Tables With More Than 50 Columns** - List tables with more than 50 columns (but less than 200)
 - **Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
 - **Query Duration Logging Disabled** - `log_min_duration_statement = -1` so slow queries never get logged
-- **Varchar With Length Limit** - Columns declared `varchar(n)`. The book recommends `text` when in doubt; length limits can cause silent truncation
-- **Serial Column Legacy** - Columns with `nextval()` defaults instead of `GENERATED AS IDENTITY`. Migrate when convenient
-- **Rules On Tables** - Non-view rules on tables. Prefer triggers — rules on tables are an old mechanism
-- **Not In With Subquery** *(pg_stat_statements)* - Queries using `NOT IN (SELECT ...)`. SQL NULL semantics trap returns zero rows if the subquery contains any NULL
 
 ### LOW Priority Issues
 
@@ -118,6 +114,10 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 - **Tables With No Recent Activity** - Checks for zero activity since the last stats reset. This check works for all versions of Postgres. In 16+, we could use `last_*_timestamp` columns which could tell you WHEN the last activity was as well. However, this would break compatibility for anything older than 16.
 - **Indexes With Low Usage** - Flags indexes with 1MB with 1-99 scans. Zero scans are already caught by the CRITICAL unused indexes check.
 - **Roles That Have Never Logged In** - Excludes system role and managed services roles. This includes users with `LOGIN` rights.
+- **Varchar With Length Limit** - Columns declared `varchar(n)`. The book recommends `text` when in doubt; length limits can cause silent truncation
+- **Serial Column Legacy** - Columns with `nextval()` defaults instead of `GENERATED AS IDENTITY`. Migrate when convenient
+- **Rules On Tables** - Non-view rules on tables. Prefer triggers — rules on tables are an old mechanism
+- **Not In With Subquery** *(pg_stat_statements)* - Queries using `NOT IN (SELECT ...)`. SQL NULL semantics trap returns zero rows if the subquery contains any NULL
 
 ### INFORMATIONAL
 

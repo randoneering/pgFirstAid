@@ -1,7 +1,7 @@
 # Neon Before/After Validation
 #
 # Uses Neon's instant database branching to run before/after health checks
-# on an isolated copy of your data — no production risk. Detects regressions
+# on an isolated copy of your data. No production risk. Detects regressions
 # from any change that affects query behavior on the target database:
 #
 #   - SQL migrations (schema changes, index additions)
@@ -39,9 +39,8 @@
 #     (b) leave it blank and apply changes outside this workflow
 #         (you only need the pre- and post- comparison jobs).
 #
-# Note: pull_request from forks does NOT receive repo secrets (by design),
-# so fork PRs will fail at the "Create Neon branch" step. That is the
-# intended safe failure mode — secrets stay out of untrusted PR code.
+# Note: pull_request from forks gets no repo secrets. Fork PRs fail at
+# "Create Neon branch". That is the intended safe failure mode.
 # Maintainers can validate a fork PR by running workflow_dispatch manually,
 # or by pushing the change to a same-repo branch first.
 

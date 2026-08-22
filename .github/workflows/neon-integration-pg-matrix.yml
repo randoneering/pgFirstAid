@@ -11,9 +11,9 @@
 #   PG17_HOST, PG17_PORT, PG17_USER, PG17_PASSWORD, PG17_DATABASE
 #   PG18_HOST, PG18_PORT, PG18_USER, PG18_PASSWORD, PG18_DATABASE
 #
-# Note: pull_request from forks does NOT receive repo secrets (by design),
-# so fork PRs will fail at "Validate required PG env vars". Maintainers can
-# validate a fork PR by pushing the change to a same-repo branch first.
+# Note: pull_request from forks gets no repo secrets. Fork PRs fail at
+# "Validate required PG env vars". Maintainers can validate by pushing
+# the change to a same-repo branch first.
 
 name: Neon Integration (PG15-PG18)
 
@@ -40,9 +40,9 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
-      # ponytail: explicit per-version secret mapping — any future PG major
-      # added to the matrix without a corresponding leg here will fail closed
-      # (missing secret) instead of silently falling through to PG18.
+      # ponytail: explicit per-version secret mapping. Add a new PG major
+      # here too. Without a matching leg, the job fails closed instead of
+      # silently defaulting to PG18.
       matrix:
         include:
           - postgres_version: "15"

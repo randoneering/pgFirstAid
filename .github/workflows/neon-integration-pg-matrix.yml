@@ -10,12 +10,16 @@
 #   PG16_HOST, PG16_PORT, PG16_USER, PG16_PASSWORD, PG16_DATABASE
 #   PG17_HOST, PG17_PORT, PG17_USER, PG17_PASSWORD, PG17_DATABASE
 #   PG18_HOST, PG18_PORT, PG18_USER, PG18_PASSWORD, PG18_DATABASE
+#
+# Note: pull_request from forks does NOT receive repo secrets (by design),
+# so fork PRs will fail at "Validate required PG env vars". Maintainers can
+# validate a fork PR by pushing the change to a same-repo branch first.
 
 name: Neon Integration (PG15-PG18)
 
 on:
   workflow_dispatch:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize]
     paths:
       - pgFirstAid.sql
@@ -36,8 +40,35 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
+      # ponytail: explicit per-version secret mapping — any future PG major
+      # added to the matrix without a corresponding leg here will fail closed
+      # (missing secret) instead of silently falling through to PG18.
       matrix:
-        postgres_version: ["15", "16", "17", "18"]
+        include:
+          - postgres_version: "15"
+            pg_host_secret: PG15_HOST
+            pg_port_secret: PG15_PORT
+            pg_user_secret: PG15_USER
+            pg_password_secret: PG15_PASSWORD
+            pg_database_secret: PG15_DATABASE
+          - postgres_version: "16"
+            pg_host_secret: PG16_HOST
+            pg_port_secret: PG16_PORT
+            pg_user_secret: PG16_USER
+            pg_password_secret: PG16_PASSWORD
+            pg_database_secret: PG16_DATABASE
+          - postgres_version: "17"
+            pg_host_secret: PG17_HOST
+            pg_port_secret: PG17_PORT
+            pg_user_secret: PG17_USER
+            pg_password_secret: PG17_PASSWORD
+            pg_database_secret: PG17_DATABASE
+          - postgres_version: "18"
+            pg_host_secret: PG18_HOST
+            pg_port_secret: PG18_PORT
+            pg_user_secret: PG18_USER
+            pg_password_secret: PG18_PASSWORD
+            pg_database_secret: PG18_DATABASE
 
     name: PG${{ matrix.postgres_version }} (Neon)
 
@@ -47,11 +78,11 @@ jobs:
         working-directory: testing/integration
 
     env:
-      PGHOST: ${{ matrix.postgres_version == '15' && secrets.PG15_HOST || matrix.postgres_version == '16' && secrets.PG16_HOST || matrix.postgres_version == '17' && secrets.PG17_HOST || secrets.PG18_HOST }}
-      PGPORT: ${{ matrix.postgres_version == '15' && secrets.PG15_PORT || matrix.postgres_version == '16' && secrets.PG16_PORT || matrix.postgres_version == '17' && secrets.PG17_PORT || secrets.PG18_PORT }}
-      PGUSER: ${{ matrix.postgres_version == '15' && secrets.PG15_USER || matrix.postgres_version == '16' && secrets.PG16_USER || matrix.postgres_version == '17' && secrets.PG17_USER || secrets.PG18_USER }}
-      PGPASSWORD: ${{ matrix.postgres_version == '15' && secrets.PG15_PASSWORD || matrix.postgres_version == '16' && secrets.PG16_PASSWORD || matrix.postgres_version == '17' && secrets.PG17_PASSWORD || secrets.PG18_PASSWORD }}
-      PGDATABASE: ${{ matrix.postgres_version == '15' && secrets.PG15_DATABASE || matrix.postgres_version == '16' && secrets.PG16_DATABASE || matrix.postgres_version == '17' && secrets.PG17_DATABASE || secrets.PG18_DATABASE }}
+      PGHOST: ${{ secrets[matrix.pg_host_secret] }}
+      PGPORT: ${{ secrets[matrix.pg_port_secret] }}
+      PGUSER: ${{ secrets[matrix.pg_user_secret] }}
+      PGPASSWORD: ${{ secrets[matrix.pg_password_secret] }}
+      PGDATABASE: ${{ secrets[matrix.pg_database_secret] }}
       PGSSLMODE: require
       PGFA_TEST_VIEW_MODE: managed
       PGFA_TEST_ACTIVE_CONN_TARGET: "52"

@@ -1445,7 +1445,7 @@ union all
     quote_ident(n.nspname) || '.' || quote_ident(c.relname) as object_name,
     'Table has a non-view rule attached. Rules on tables are an old mechanism; triggers are clearer and more flexible. Rules on views (which implement views themselves) are useful and expected.' as issue_description,
     r.rulename as current_value,
-    'Review whether this rule can be replaced with a trigger. Run \d ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' to see the rule definition, then DROP RULE ' || r.rulename || ' ON ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' if safe.' as recommended_action,
+    'Review whether this rule can be replaced with a trigger. Run \d ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' to see the rule definition, then DROP RULE ' || quote_ident(r.rulename) || ' ON ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' if safe.' as recommended_action,
     'https://www.postgresql.org/docs/current/rules.html' as documentation_link,
     4 as severity_order
 from pg_rewrite r

@@ -1,6 +1,17 @@
 # Workflow Notes
 
-This repo keeps `managed-db-validate.yml` as a reusable validation workflow.
+## PR-driven: `neon-integration-pg-matrix.yml`
+
+Runs the full pgFirstAid validation suite against long-lived Neon projects
+on every PR open and push. Matrix covers PG15-18 in parallel on the
+self-hosted NixOS runner. Installs `pg_stat_statements`, then
+`pgFirstAid.sql` + `view_pgFirstAid_managed.sql`, runs the pytest
+integration suite, and finishes with `seed_and_validate.py --managed`.
+
+Required secrets (one set per PG version):
+`PG{15,16,17,18}_{HOST,PORT,USER,PASSWORD,DATABASE}`.
+
+## Reusable: `managed-db-validate.yml`
 
 `managed-db-validate.yml` installs `pgFirstAid.sql`, recreates `view_pgFirstAid_managed.sql`, runs integration tests including the pgTAP-backed checks, and then runs `testing/seed_and_validate.py --managed` against the same target.
 

@@ -1,4 +1,17 @@
-name: Python + pgTAP Integration (PG15-PG18)
+# Neon Integration (PG15-PG18)
+#
+# PR-driven validation against long-lived Neon projects (one per PG major
+# version). Installs pg_stat_statements, then pgFirstAid.sql and
+# view_pgFirstAid_managed.sql, runs the integration + pgTAP suite, and
+# finishes with seed_and_validate.py --managed.
+#
+# Required secrets (one set per PG version):
+#   PG15_HOST, PG15_PORT, PG15_USER, PG15_PASSWORD, PG15_DATABASE
+#   PG16_HOST, PG16_PORT, PG16_USER, PG16_PASSWORD, PG16_DATABASE
+#   PG17_HOST, PG17_PORT, PG17_USER, PG17_PASSWORD, PG17_DATABASE
+#   PG18_HOST, PG18_PORT, PG18_USER, PG18_PASSWORD, PG18_DATABASE
+
+name: Neon Integration (PG15-PG18)
 
 on:
   workflow_dispatch:
@@ -10,10 +23,10 @@ on:
       - view_pgFirstAid_managed.sql
       - testing/integration/**
       - testing/pgTAP/**
-      - .github/workflows/integration-pg-matrix.yml
+      - .github/workflows/neon-integration-pg-matrix.yml
 
 concurrency:
-  group: integration-${{ github.ref }}
+  group: neon-integration-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -26,7 +39,7 @@ jobs:
       matrix:
         postgres_version: ["15", "16", "17", "18"]
 
-    name: PG${{ matrix.postgres_version }} integration
+    name: PG${{ matrix.postgres_version }} (Neon)
 
     defaults:
       run:
@@ -101,6 +114,10 @@ jobs:
               AND usename = current_user
               AND state IN ('idle', 'idle in transaction', 'idle in transaction (aborted)')
           "
+
+      - name: Install pg_stat_statements
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
 
       - name: Install pgFirstAid function
         run: |

@@ -130,7 +130,7 @@ def test_integration_workflows_use_runner_python_on_self_hosted() -> None:
     repo_root = Path(__file__).parent.parent
 
     for workflow_name in [
-        "integration-pg-matrix.yml",
+        "neon-integration-pg-matrix.yml",
         "managed-db-validate.yml",
     ]:
         workflow = (repo_root / ".github" / "workflows" / workflow_name).read_text()

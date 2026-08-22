@@ -1,16 +1,17 @@
 # NixOS Runner — Local Test Workflow
 #
 # Runs all four test suites (health checks, managed DB validation, migration
-# validation, PR audit) on the self-hosted NixOS runner. Point it at any of
-# your PG15-PG18 instances by selecting the postgres_version.
+# validation, PR audit) on the self-hosted NixOS runner against the PG
+# instances your secrets point at (Neon / DigitalOcean / etc.).
+#
+# Triggers:
+#   - pull_request_target [opened, synchronize] — runs the full matrix on
+#     PG15-18 in parallel against the secrets for each version.
+#   - workflow_dispatch — pick a single PG version + cloud_provider label
+#     for an ad-hoc run.
 #
 # The NixOS runner already has psql, uv, and network access to the test PG
-# instances (Neon / DigitalOcean). No Docker or local PG install needed.
-#
-# Usage:
-#   1. Go to Actions → NixOS Local Test Workflow → Run workflow
-#   2. Select postgres_version (15/16/17/18)
-#   3. Optionally set cloud_provider label for the managed DB test
+# instances. No Docker or local PG install needed.
 #
 # The cloud auth steps (AWS/GCP/Azure CLI) in managed-db-validate.yml are
 # NOT replicated here — they require real cloud credentials and live cloud
@@ -41,9 +42,18 @@ on:
           - gcp
           - azure
         default: 'direct'
+  pull_request_target:
+    types: [opened, synchronize]
+    paths:
+      - pgFirstAid.sql
+      - view_pgFirstAid.sql
+      - view_pgFirstAid_managed.sql
+      - workflows/**
+      - testing/local-workflows/**
+      - .github/workflows/nixos-local-test.yml
 
 concurrency:
-  group: nixos-local-test-${{ inputs.postgres_version }}-${{ github.run_id }}
+  group: nixos-local-test-${{ github.ref }}-${{ matrix.postgres_version }}
   cancel-in-progress: true
 
 jobs:
@@ -51,26 +61,34 @@ jobs:
     runs-on: [self-hosted, nix, nixos, x86_64-linux]
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres_version: ["15", "16", "17", "18"]
     defaults:
       run:
         shell: bash -l {0}
 
     env:
-      PG_VERSION: ${{ inputs.postgres_version }}
+      PG_VERSION: ${{ matrix.postgres_version }}
       # Connection — map the selected version to secrets
-      PGHOST: ${{ inputs.postgres_version == '15' && secrets.PG15_HOST || inputs.postgres_version == '16' && secrets.PG16_HOST || inputs.postgres_version == '17' && secrets.PG17_HOST || secrets.PG18_HOST }}
-      PGPORT: ${{ inputs.postgres_version == '15' && secrets.PG15_PORT || inputs.postgres_version == '16' && secrets.PG16_PORT || inputs.postgres_version == '17' && secrets.PG17_PORT || secrets.PG18_PORT }}
-      PGUSER: ${{ inputs.postgres_version == '15' && secrets.PG15_USER || inputs.postgres_version == '16' && secrets.PG16_USER || inputs.postgres_version == '17' && secrets.PG17_USER || secrets.PG18_USER }}
-      PGPASSWORD: ${{ inputs.postgres_version == '15' && secrets.PG15_PASSWORD || inputs.postgres_version == '16' && secrets.PG16_PASSWORD || inputs.postgres_version == '17' && secrets.PG17_PASSWORD || secrets.PG18_PASSWORD }}
-      PGDATABASE: ${{ inputs.postgres_version == '15' && secrets.PG15_DATABASE || inputs.postgres_version == '16' && secrets.PG16_DATABASE || inputs.postgres_version == '17' && secrets.PG17_DATABASE || secrets.PG18_DATABASE }}
+      PGHOST: ${{ matrix.postgres_version == '15' && secrets.PG15_HOST || matrix.postgres_version == '16' && secrets.PG16_HOST || matrix.postgres_version == '17' && secrets.PG17_HOST || secrets.PG18_HOST }}
+      PGPORT: ${{ matrix.postgres_version == '15' && secrets.PG15_PORT || matrix.postgres_version == '16' && secrets.PG16_PORT || matrix.postgres_version == '17' && secrets.PG17_PORT || secrets.PG18_PORT }}
+      PGUSER: ${{ matrix.postgres_version == '15' && secrets.PG15_USER || matrix.postgres_version == '16' && secrets.PG16_USER || matrix.postgres_version == '17' && secrets.PG17_USER || secrets.PG18_USER }}
+      PGPASSWORD: ${{ matrix.postgres_version == '15' && secrets.PG15_PASSWORD || matrix.postgres_version == '16' && secrets.PG16_PASSWORD || matrix.postgres_version == '17' && secrets.PG17_PASSWORD || secrets.PG18_PASSWORD }}
+      PGDATABASE: ${{ matrix.postgres_version == '15' && secrets.PG15_DATABASE || matrix.postgres_version == '16' && secrets.PG16_DATABASE || matrix.postgres_version == '17' && secrets.PG17_DATABASE || secrets.PG18_DATABASE }}
       PGSSLMODE: require
-      DATABASE_URL: ${{ inputs.postgres_version == '15' && secrets.PG15_DATABASE_URL || inputs.postgres_version == '16' && secrets.PG16_DATABASE_URL || inputs.postgres_version == '17' && secrets.PG17_DATABASE_URL || secrets.PG18_DATABASE_URL }}
-      CLOUD_PROVIDER: ${{ inputs.cloud_provider }}
+      DATABASE_URL: ${{ matrix.postgres_version == '15' && secrets.PG15_DATABASE_URL || matrix.postgres_version == '16' && secrets.PG16_DATABASE_URL || matrix.postgres_version == '17' && secrets.PG17_DATABASE_URL || secrets.PG18_DATABASE_URL }}
+      # cloud_provider input is undefined on pull_request_target — default to 'direct'
+      CLOUD_PROVIDER: ${{ inputs.cloud_provider || 'direct' }}
       PGFIRSTAID_FAIL_SEVERITY: HIGH
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
       - name: Add Nix profile paths
         run: |
@@ -84,12 +102,12 @@ jobs:
           missing=0
           for var in PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE; do
             if [ -z "${!var}" ]; then
-              echo "::error::Missing required secret/env: ${var} for PG${{ inputs.postgres_version }}"
+              echo "::error::Missing required secret/env: ${var} for PG${{ matrix.postgres_version }}"
               missing=1
             fi
           done
           if [ "$missing" -ne 0 ]; then exit 1; fi
-          echo "Target: PG${{ inputs.postgres_version }} @ $PGHOST:$PGPORT"
+          echo "Target: PG${{ matrix.postgres_version }} @ $PGHOST:$PGPORT"
 
       - name: Verify psql + uv
         run: |
@@ -126,7 +144,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-reports-pg${{ inputs.postgres_version }}
+          name: test-reports-pg${{ matrix.postgres_version }}
           path: testing/local-workflows/reports/
           retention-days: 14
 
@@ -134,7 +152,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## NixOS Local Test Results — PG${{ inputs.postgres_version }}"
+            echo "## NixOS Local Test Results — PG${{ matrix.postgres_version }}"
             echo ""
             echo "| Suite | Status |"
             echo "|-------|--------|"
@@ -143,5 +161,5 @@ jobs:
             echo "| Migration Validate | ${{ job.status == 'success' && '✅' || '❌' }} |"
             echo "| PR Audit | ${{ job.status == 'success' && '✅' || '❌' }} |"
             echo ""
-            echo "Cloud provider label: ${{ inputs.cloud_provider }}"
+            echo "Cloud provider label: ${{ inputs.cloud_provider || 'direct' }}"
           } >> "$GITHUB_STEP_SUMMARY"

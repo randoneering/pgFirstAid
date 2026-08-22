@@ -58,6 +58,7 @@ concurrency:
 jobs:
   local-test:
     runs-on: [self-hosted, nix, nixos, x86_64-linux]
+    if: ${{ github.event_name != 'workflow_dispatch' || matrix.postgres_version == inputs.postgres_version }}
     permissions:
       contents: read
     concurrency:

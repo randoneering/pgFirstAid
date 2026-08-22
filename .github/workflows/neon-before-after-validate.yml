@@ -32,17 +32,23 @@
 #   NEON_PROJECT_ID -- from your Neon project's Settings page
 #
 # Change files:
-#   When triggered on pull_request_target, the workflow auto-discovers .sql files
+#   When triggered on pull_request, the workflow auto-discovers .sql files
 #   under migrations/ and applies them as the change. For app or infra
 #   changes, use workflow_dispatch and either:
 #     (a) pass your SQL files via the `change_files` input, or
 #     (b) leave it blank and apply changes outside this workflow
 #         (you only need the pre- and post- comparison jobs).
+#
+# Note: pull_request from forks does NOT receive repo secrets (by design),
+# so fork PRs will fail at the "Create Neon branch" step. That is the
+# intended safe failure mode — secrets stay out of untrusted PR code.
+# Maintainers can validate a fork PR by running workflow_dispatch manually,
+# or by pushing the change to a same-repo branch first.
 
 name: Neon Before/After Validation
 
 on:
-  pull_request_target:
+  pull_request:
     paths:
       - 'migrations/**'
       - 'pgFirstAid.sql'

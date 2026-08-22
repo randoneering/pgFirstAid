@@ -1176,12 +1176,12 @@ select
     'Security Health' as category,
     'listen_addresses Wildcard' as check_name,
     'System' as object_name,
-    'listen_addresses is set to *, so PostgreSQL accepts connections on every network interface. This exposes the server to every network reachable to the host.' as issue_description,
+    'listen_addresses includes *, so PostgreSQL accepts connections on every network interface. This exposes the server to every network reachable to the host.' as issue_description,
     current_setting('listen_addresses') as current_value,
     'Set listen_addresses to the specific IP(s) the server should bind to (e.g., localhost,127.0.0.1,10.0.0.5). Requires a PostgreSQL restart.' as recommended_action,
     'https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-LISTEN-ADDRESSES' as documentation_link,
     2 as severity_order
-where current_setting('listen_addresses') = '*'
+where current_setting('listen_addresses') ~ '(^|,)\s*\*\s*(,|$)'
 union all
 -- LOW: Missing indexes on foreign keys
     select

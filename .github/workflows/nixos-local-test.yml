@@ -5,8 +5,9 @@
 # instances your secrets point at (Neon / DigitalOcean / etc.).
 #
 # Triggers:
-#   - pull_request_target [opened, synchronize] — runs the full matrix on
-#     PG15-18 in parallel against the secrets for each version.
+#   - pull_request [opened, synchronize] — runs the full matrix on PG15-18
+#     in parallel against the secrets for each version. Fork PRs do NOT
+#     receive secrets (by design — secrets stay out of untrusted PR code).
 #   - workflow_dispatch — pick a single PG version + cloud_provider label
 #     for an ad-hoc run.
 #
@@ -42,13 +43,13 @@ on:
           - gcp
           - azure
         default: 'direct'
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize]
     paths:
       - pgFirstAid.sql
       - view_pgFirstAid.sql
       - view_pgFirstAid_managed.sql
-      - workflows/**
+      - .github/workflows/**
       - testing/local-workflows/**
       - .github/workflows/nixos-local-test.yml
 
@@ -63,23 +64,53 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
+      # ponytail: explicit per-version secret mapping — any future PG major
+      # added to the matrix without a corresponding leg here will fail closed
+      # (missing secret) instead of silently falling through to PG18.
       matrix:
-        postgres_version: ["15", "16", "17", "18"]
+        include:
+          - postgres_version: "15"
+            pg_host_secret: PG15_HOST
+            pg_port_secret: PG15_PORT
+            pg_user_secret: PG15_USER
+            pg_password_secret: PG15_PASSWORD
+            pg_database_secret: PG15_DATABASE
+            pg_database_url_secret: PG15_DATABASE_URL
+          - postgres_version: "16"
+            pg_host_secret: PG16_HOST
+            pg_port_secret: PG16_PORT
+            pg_user_secret: PG16_USER
+            pg_password_secret: PG16_PASSWORD
+            pg_database_secret: PG16_DATABASE
+            pg_database_url_secret: PG16_DATABASE_URL
+          - postgres_version: "17"
+            pg_host_secret: PG17_HOST
+            pg_port_secret: PG17_PORT
+            pg_user_secret: PG17_USER
+            pg_password_secret: PG17_PASSWORD
+            pg_database_secret: PG17_DATABASE
+            pg_database_url_secret: PG17_DATABASE_URL
+          - postgres_version: "18"
+            pg_host_secret: PG18_HOST
+            pg_port_secret: PG18_PORT
+            pg_user_secret: PG18_USER
+            pg_password_secret: PG18_PASSWORD
+            pg_database_secret: PG18_DATABASE
+            pg_database_url_secret: PG18_DATABASE_URL
     defaults:
       run:
         shell: bash -l {0}
 
     env:
       PG_VERSION: ${{ matrix.postgres_version }}
-      # Connection — map the selected version to secrets
-      PGHOST: ${{ matrix.postgres_version == '15' && secrets.PG15_HOST || matrix.postgres_version == '16' && secrets.PG16_HOST || matrix.postgres_version == '17' && secrets.PG17_HOST || secrets.PG18_HOST }}
-      PGPORT: ${{ matrix.postgres_version == '15' && secrets.PG15_PORT || matrix.postgres_version == '16' && secrets.PG16_PORT || matrix.postgres_version == '17' && secrets.PG17_PORT || secrets.PG18_PORT }}
-      PGUSER: ${{ matrix.postgres_version == '15' && secrets.PG15_USER || matrix.postgres_version == '16' && secrets.PG16_USER || matrix.postgres_version == '17' && secrets.PG17_USER || secrets.PG18_USER }}
-      PGPASSWORD: ${{ matrix.postgres_version == '15' && secrets.PG15_PASSWORD || matrix.postgres_version == '16' && secrets.PG16_PASSWORD || matrix.postgres_version == '17' && secrets.PG17_PASSWORD || secrets.PG18_PASSWORD }}
-      PGDATABASE: ${{ matrix.postgres_version == '15' && secrets.PG15_DATABASE || matrix.postgres_version == '16' && secrets.PG16_DATABASE || matrix.postgres_version == '17' && secrets.PG17_DATABASE || secrets.PG18_DATABASE }}
+      PGHOST: ${{ secrets[matrix.pg_host_secret] }}
+      PGPORT: ${{ secrets[matrix.pg_port_secret] }}
+      PGUSER: ${{ secrets[matrix.pg_user_secret] }}
+      PGPASSWORD: ${{ secrets[matrix.pg_password_secret] }}
+      PGDATABASE: ${{ secrets[matrix.pg_database_secret] }}
       PGSSLMODE: require
-      DATABASE_URL: ${{ matrix.postgres_version == '15' && secrets.PG15_DATABASE_URL || matrix.postgres_version == '16' && secrets.PG16_DATABASE_URL || matrix.postgres_version == '17' && secrets.PG17_DATABASE_URL || secrets.PG18_DATABASE_URL }}
-      # cloud_provider input is undefined on pull_request_target — default to 'direct'
+      DATABASE_URL: ${{ secrets[matrix.pg_database_url_secret] }}
+      # cloud_provider input is undefined on pull_request — default to 'direct'
       CLOUD_PROVIDER: ${{ inputs.cloud_provider || 'direct' }}
       PGFIRSTAID_FAIL_SEVERITY: HIGH
 

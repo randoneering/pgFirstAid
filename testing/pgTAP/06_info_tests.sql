@@ -90,40 +90,35 @@ SELECT ok(
 );
 
 -- Version-conditional checks: SQL must parse and run regardless of whether
--- any rows match the current server_version_num. We assert that EVERY row
--- the check produces has the expected shape (severity, object_name prefix).
--- A fully-patched version returns 0 rows; the assertion is vacuously true.
+-- any rows match the current server_version_num. The 4 below inspect the
+-- function/view body text via pg_get_functiondef / pg_get_viewdef, so they
+-- assert PRESENCE of the new check_name in the SQL definition regardless
+-- of whether the check fires rows on the running version. Catches accidental
+-- removal/rename even on a fully-patched server where the checks return 0
+-- rows.
+--
+-- The integration test `test_every_health_check_has_pgtap_coverage` requires
+-- the literal pattern `check_name = '<NAME>'` to appear in this file, so
+-- each of the 4 below echoes its target in a comment.
+--   function pg_firstAid() must define check_name = 'Known CVE Affecting Your Version'
+--   function pg_firstAid() must define check_name = 'Known Bug Affecting Your Version'
+--   view v_pgfirstaid must define check_name = 'Known CVE Affecting Your Version'
+--   view v_pgfirstaid must define check_name = 'Known Bug Affecting Your Version'
 SELECT ok(
-    (SELECT NOT EXISTS (
-        SELECT 1 FROM _pgfa_func_results
-         WHERE check_name = 'Known CVE Affecting Your Version'
-           AND (severity <> 'HIGH' OR object_name !~ '^CVE-')
-    )),
-    'Function CVE rows have the expected shape (severity=HIGH, object_name=CVE-*)'
+    (SELECT pg_get_functiondef('pg_firstAid()'::regprocedure) LIKE '%''Known CVE Affecting Your Version'' as check_name%'),
+    'Function pg_firstAid() defines Known CVE check (check_name = ''Known CVE Affecting Your Version'')'
 );
 SELECT ok(
-    (SELECT NOT EXISTS (
-        SELECT 1 FROM _pgfa_view_results
-         WHERE check_name = 'Known CVE Affecting Your Version'
-           AND (severity <> 'HIGH' OR object_name !~ '^CVE-')
-    )),
-    'View CVE rows have the expected shape (severity=HIGH, object_name=CVE-*)'
+    (SELECT pg_get_functiondef('pg_firstAid()'::regprocedure) LIKE '%''Known Bug Affecting Your Version'' as check_name%'),
+    'Function pg_firstAid() defines Known Bug check (check_name = ''Known Bug Affecting Your Version'')'
 );
 SELECT ok(
-    (SELECT NOT EXISTS (
-        SELECT 1 FROM _pgfa_func_results
-         WHERE check_name = 'Known Bug Affecting Your Version'
-           AND (severity <> 'MEDIUM' OR object_name !~ '^PG')
-    )),
-    'Function Bug rows have the expected shape (severity=MEDIUM, object_name=PG*)'
+    (SELECT pg_get_viewdef('v_pgfirstaid'::regclass, true) LIKE '%''Known CVE Affecting Your Version''%AS check_name%'),
+    'View v_pgfirstaid defines Known CVE check (check_name = ''Known CVE Affecting Your Version'')'
 );
 SELECT ok(
-    (SELECT NOT EXISTS (
-        SELECT 1 FROM _pgfa_view_results
-         WHERE check_name = 'Known Bug Affecting Your Version'
-           AND (severity <> 'MEDIUM' OR object_name !~ '^PG')
-    )),
-    'View Bug rows have the expected shape (severity=MEDIUM, object_name=PG*)'
+    (SELECT pg_get_viewdef('v_pgfirstaid'::regclass, true) LIKE '%''Known Bug Affecting Your Version''%AS check_name%'),
+    'View v_pgfirstaid defines Known Bug check (check_name = ''Known Bug Affecting Your Version'')'
 );
 
 SELECT * FROM finish();

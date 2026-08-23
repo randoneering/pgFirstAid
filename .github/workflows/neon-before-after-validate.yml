@@ -1,7 +1,7 @@
 # Neon Before/After Validation
 #
 # Uses Neon's instant database branching to run before/after health checks
-# on an isolated copy of your data — no production risk. Detects regressions
+# on an isolated copy of your data. No production risk. Detects regressions
 # from any change that affects query behavior on the target database:
 #
 #   - SQL migrations (schema changes, index additions)
@@ -32,17 +32,22 @@
 #   NEON_PROJECT_ID -- from your Neon project's Settings page
 #
 # Change files:
-#   When triggered on pull_request_target, the workflow auto-discovers .sql files
+#   When triggered on pull_request, the workflow auto-discovers .sql files
 #   under migrations/ and applies them as the change. For app or infra
 #   changes, use workflow_dispatch and either:
 #     (a) pass your SQL files via the `change_files` input, or
 #     (b) leave it blank and apply changes outside this workflow
 #         (you only need the pre- and post- comparison jobs).
+#
+# Note: pull_request from forks gets no repo secrets. Fork PRs fail at
+# "Create Neon branch". That is the intended safe failure mode.
+# Maintainers can validate a fork PR by running workflow_dispatch manually,
+# or by pushing the change to a same-repo branch first.
 
 name: Neon Before/After Validation
 
 on:
-  pull_request_target:
+  pull_request:
     paths:
       - 'migrations/**'
       - 'pgFirstAid.sql'
@@ -169,7 +174,7 @@ jobs:
           echo "  Pre-change baseline captured above."
           echo ""
           echo "  The change being tested:"
-          echo "    ${{ github.event_name == 'pull_request_target' && format('PR #{0}', github.event.number) || 'manual dispatch' }}"
+          echo "    ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || 'manual dispatch' }}"
           echo ""
           echo "  Now applying SQL changes..."
           echo ""
@@ -246,7 +251,7 @@ jobs:
           fi
 
       - name: Post PR comment
-        if: ${{ github.event_name == 'pull_request_target' }}
+        if: ${{ github.event_name == 'pull_request' }}
         uses: actions/github-script@v7
         with:
           script: |

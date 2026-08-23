@@ -1,8 +1,25 @@
-name: Python + pgTAP Integration (PG15-PG18)
+# Neon Integration (PG15-PG18)
+#
+# PR-driven validation against long-lived Neon projects (one per PG major
+# version). Installs pg_stat_statements, then pgFirstAid.sql and
+# view_pgFirstAid_managed.sql, runs the integration + pgTAP suite, and
+# finishes with seed_and_validate.py --managed.
+#
+# Required secrets (one set per PG version):
+#   PG15_HOST, PG15_PORT, PG15_USER, PG15_PASSWORD, PG15_DATABASE
+#   PG16_HOST, PG16_PORT, PG16_USER, PG16_PASSWORD, PG16_DATABASE
+#   PG17_HOST, PG17_PORT, PG17_USER, PG17_PASSWORD, PG17_DATABASE
+#   PG18_HOST, PG18_PORT, PG18_USER, PG18_PASSWORD, PG18_DATABASE
+#
+# Note: pull_request from forks gets no repo secrets. Fork PRs fail at
+# "Validate required PG env vars". Maintainers can validate by pushing
+# the change to a same-repo branch first.
+
+name: Neon Integration (PG15-PG18)
 
 on:
   workflow_dispatch:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize]
     paths:
       - pgFirstAid.sql
@@ -10,10 +27,10 @@ on:
       - view_pgFirstAid_managed.sql
       - testing/integration/**
       - testing/pgTAP/**
-      - .github/workflows/integration-pg-matrix.yml
+      - .github/workflows/neon-integration-pg-matrix.yml
 
 concurrency:
-  group: integration-${{ github.ref }}
+  group: neon-integration-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,10 +40,36 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
+      # here too. Without a matching leg, the job fails closed instead of
+      # silently defaulting to PG18.
       matrix:
-        postgres_version: ["15", "16", "17", "18"]
+        include:
+          - postgres_version: "15"
+            pg_host_secret: PG15_HOST
+            pg_port_secret: PG15_PORT
+            pg_user_secret: PG15_USER
+            pg_password_secret: PG15_PASSWORD
+            pg_database_secret: PG15_DATABASE
+          - postgres_version: "16"
+            pg_host_secret: PG16_HOST
+            pg_port_secret: PG16_PORT
+            pg_user_secret: PG16_USER
+            pg_password_secret: PG16_PASSWORD
+            pg_database_secret: PG16_DATABASE
+          - postgres_version: "17"
+            pg_host_secret: PG17_HOST
+            pg_port_secret: PG17_PORT
+            pg_user_secret: PG17_USER
+            pg_password_secret: PG17_PASSWORD
+            pg_database_secret: PG17_DATABASE
+          - postgres_version: "18"
+            pg_host_secret: PG18_HOST
+            pg_port_secret: PG18_PORT
+            pg_user_secret: PG18_USER
+            pg_password_secret: PG18_PASSWORD
+            pg_database_secret: PG18_DATABASE
 
-    name: PG${{ matrix.postgres_version }} integration
+    name: PG${{ matrix.postgres_version }} (Neon)
 
     defaults:
       run:
@@ -34,11 +77,11 @@ jobs:
         working-directory: testing/integration
 
     env:
-      PGHOST: ${{ matrix.postgres_version == '15' && secrets.PG15_HOST || matrix.postgres_version == '16' && secrets.PG16_HOST || matrix.postgres_version == '17' && secrets.PG17_HOST || secrets.PG18_HOST }}
-      PGPORT: ${{ matrix.postgres_version == '15' && secrets.PG15_PORT || matrix.postgres_version == '16' && secrets.PG16_PORT || matrix.postgres_version == '17' && secrets.PG17_PORT || secrets.PG18_PORT }}
-      PGUSER: ${{ matrix.postgres_version == '15' && secrets.PG15_USER || matrix.postgres_version == '16' && secrets.PG16_USER || matrix.postgres_version == '17' && secrets.PG17_USER || secrets.PG18_USER }}
-      PGPASSWORD: ${{ matrix.postgres_version == '15' && secrets.PG15_PASSWORD || matrix.postgres_version == '16' && secrets.PG16_PASSWORD || matrix.postgres_version == '17' && secrets.PG17_PASSWORD || secrets.PG18_PASSWORD }}
-      PGDATABASE: ${{ matrix.postgres_version == '15' && secrets.PG15_DATABASE || matrix.postgres_version == '16' && secrets.PG16_DATABASE || matrix.postgres_version == '17' && secrets.PG17_DATABASE || secrets.PG18_DATABASE }}
+      PGHOST: ${{ secrets[matrix.pg_host_secret] }}
+      PGPORT: ${{ secrets[matrix.pg_port_secret] }}
+      PGUSER: ${{ secrets[matrix.pg_user_secret] }}
+      PGPASSWORD: ${{ secrets[matrix.pg_password_secret] }}
+      PGDATABASE: ${{ secrets[matrix.pg_database_secret] }}
       PGSSLMODE: require
       PGFA_TEST_VIEW_MODE: managed
       PGFA_TEST_ACTIVE_CONN_TARGET: "52"
@@ -101,6 +144,10 @@ jobs:
               AND usename = current_user
               AND state IN ('idle', 'idle in transaction', 'idle in transaction (aborted)')
           "
+
+      - name: Install pg_stat_statements
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
 
       - name: Install pgFirstAid function
         run: |

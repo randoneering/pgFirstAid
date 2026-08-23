@@ -58,6 +58,11 @@ jobs:
         if: steps.scout.outputs.needs_pr == 'true'
         uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6.1.0
         with:
+          # Explicit base is required when the push event delivers a merge
+          # commit (detached HEAD), e.g. after merging main into the source
+          # branch on a feature PR. Default would otherwise fail with
+          # "the 'base' input must be supplied."
+          base: ${{ github.event.repository.default_branch }}
           branch: chore/release-notes-scout
           title: "chore: add notable PostgreSQL bug fixes"
           body: |

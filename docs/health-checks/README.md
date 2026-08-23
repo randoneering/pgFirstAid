@@ -20,6 +20,7 @@ A check only fires when its conditions are met, so an empty result for any check
 - **Autovacuum Disabled On Table** - User tables with `autovacuum_enabled = false`. Bloat, XID wraparound risk, and stale stats accumulate silently
 - **listen_addresses Wildcard** - `listen_addresses = '*'` exposes PostgreSQL on every network interface; bind to specific IPs only
 - **Timestamp Without Time Zone** - User columns typed `timestamp without time zone`. PostgreSQL silently strips TZ info; cross-region and DST reads can produce wrong results
+- **Known CVE Affecting Your Version** - Curated CVEs from the PostgreSQL security index matching your running version. One row per CVE that affects a version range containing `server_version_num`; upgrade to the first fixed minor to remediate. Covers PG 15-18.
 
 ## MEDIUM Priority Issues
 
@@ -46,6 +47,7 @@ A check only fires when its conditions are met, so an empty result for any check
 - **Tables With More Than 50 Columns** - List tables with more than 50 columns (but less than 200)
 - **Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
 - **Query Duration Logging Disabled** - `log_min_duration_statement = -1` so slow queries never get logged
+- **Known Bug Affecting Your Version** - Notable non-CVE bugs from PostgreSQL release notes that match your running version (data integrity, replication, vacuum). Covers PG 15-18.
 
 ## LOW Priority Issues
 
@@ -58,7 +60,7 @@ A check only fires when its conditions are met, so an empty result for any check
 - **Roles That Have Never Logged In** - Excludes system role and managed services roles. This includes users with `LOGIN` rights.
 - **Varchar With Length Limit** - Columns declared `varchar(n)`. The book recommends `text` when in doubt; length limits can cause silent truncation
 - **Serial Column Legacy** - Columns with `nextval()` defaults instead of `GENERATED AS IDENTITY`. Migrate when convenient
-- **Rules On Tables** - Non-view rules on tables. Prefer triggers — rules on tables are an old mechanism
+- **Rules On Tables** - Non-view rules on tables. Prefer triggers: rules on tables are an old mechanism
 - **Not In With Subquery** *(pg_stat_statements)* - Queries using `NOT IN (SELECT ...)`. SQL NULL semantics trap returns zero rows if the subquery contains any NULL
 
 ## INFORMATIONAL

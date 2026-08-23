@@ -1,0 +1,64 @@
+{
+  "_comment": [
+    "Curated, hand-picked release-note bugs for pgFirstAid.",
+    "Edit this file; regenerate with `python tools/generate_cve_sql.py`."
+  ],
+  "version": 1,
+  "last_reviewed": "2026-08-23",
+  "bugs": [
+    {
+      "issue_id": "PG15-INSERT-CONFLICT-VISIBLE-01",
+      "summary": "INSERT ... ON CONFLICT can fail to enforce unique-constraint visibility checks in some MVCC edge cases",
+      "doc_link": "https://www.postgresql.org/docs/release/15.1/",
+      "fixed_in_minor": 1
+    },
+    {
+      "issue_id": "PG15-BTREE-PAGE-LEAK-02",
+      "summary": "B-tree page deletion can leak pages on workloads with heavy concurrent UPDATEs",
+      "doc_link": "https://www.postgresql.org/docs/release/15.2/",
+      "fixed_in_minor": 2
+    },
+    {
+      "issue_id": "PG15-LOGREP-SUBSCRIBER-CRASH-03",
+      "summary": "Logical replication subscriber can crash mid-transaction on large in-progress changes",
+      "doc_link": "https://www.postgresql.org/docs/release/15.5/",
+      "fixed_in_minor": 5
+    },
+    {
+      "issue_id": "PG16-BTREE-CORRUPT-04",
+      "summary": "B-tree index page splits could corrupt the tree on high-concurrency inserts",
+      "doc_link": "https://www.postgresql.org/docs/release/16.2/",
+      "fixed_in_minor": 2
+    },
+    {
+      "issue_id": "PG16-LOGICAL-DECODING-SUBXACT-05",
+      "summary": "Logical decoding can miss subtransaction changes for aborted DDL",
+      "doc_link": "https://www.postgresql.org/docs/release/16.3/",
+      "fixed_in_minor": 3
+    },
+    {
+      "issue_id": "PG16-VACUUM-MEMORY-LEAK-06",
+      "summary": "Vacuum memory accounting leaks over many iterations of aggressive autovacuum",
+      "doc_link": "https://www.postgresql.org/docs/release/16.5/",
+      "fixed_in_minor": 5
+    },
+    {
+      "issue_id": "PG17-COPY-PARTITION-ROUTING-07",
+      "summary": "COPY FROM routing into partitioned tables can drop rows under concurrent partition attach",
+      "doc_link": "https://www.postgresql.org/docs/release/17.1/",
+      "fixed_in_minor": 1
+    },
+    {
+      "issue_id": "PG17-PG-CREATESUBSCRIBER-08",
+      "summary": "pg_createsubscriber can leave slots uninitialized, breaking logical failover on first switchover",
+      "doc_link": "https://www.postgresql.org/docs/release/17.4/",
+      "fixed_in_minor": 4
+    },
+    {
+      "issue_id": "PG18-MERGE-UPSERT-VIEW-09",
+      "summary": "MERGE ... WHEN NOT MATCHED against an inheritance child can produce duplicate rows under concurrent INSERT",
+      "doc_link": "https://www.postgresql.org/docs/release/18.1/",
+      "fixed_in_minor": 1
+    }
+  ]
+}

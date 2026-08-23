@@ -1,296 +1,296 @@
 create or replace
 function pgfirstaid_pg_stat_statements_checks()
 returns table (
-    severity TEXT,
-    category TEXT,
-    check_name TEXT,
-    object_name TEXT,
-    issue_description TEXT,
-    current_value TEXT,
-    recommended_action TEXT,
-    documentation_link TEXT,
-    severity_order INTEGER
+ severity TEXT,
+ category TEXT,
+ check_name TEXT,
+ object_name TEXT,
+ issue_description TEXT,
+ current_value TEXT,
+ recommended_action TEXT,
+ documentation_link TEXT,
+ severity_order INTEGER
 ) as $$
 begin
-    if not exists (
-    select
-        1
-    from
-        pg_extension
-    where
-        extname = 'pg_stat_statements') then
-        return;
-    end if;
+ if not exists (
+ select
+ 1
+ from
+ pg_extension
+ where
+ extname = 'pg_stat_statements') then
+ return;
+ end if;
 
-    begin
-    return query
+ begin
+ return query
 with pss as (
-    select
-        queryid,
-        query,
-        calls,
-        total_exec_time,
-        mean_exec_time,
-        rows
-    from
-        pg_stat_statements
-    where
-        calls > 0
-    order by
-        total_exec_time desc
-    limit 10)
-    select
-        'MEDIUM' as severity,
-        'Query Health' as category,
-        'Top 10 Queries by Total Execution Time' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'Queries with the highest total execution time are usually the best optimization targets for overall workload improvement' as issue_description,
-        'calls: ' || pss.calls || ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
-        ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) || ', rows: ' || pss.rows ||
-        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Run EXPLAIN (ANALYZE, BUFFERS) and focus on reducing total runtime for these fingerprints first' as recommended_action,
-        'https://www.postgresql.org/docs/current/pgstatstatements.html \
-         https://www.postgresql.org/docs/current/using-explain.html \
-         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
-        3 as severity_order
-    from
-        pss;
+ select
+ queryid,
+ query,
+ calls,
+ total_exec_time,
+ mean_exec_time,
+ rows
+ from
+ pg_stat_statements
+ where
+ calls > 0
+ order by
+ total_exec_time desc
+ limit 10)
+ select
+ 'MEDIUM' as severity,
+ 'Query Health' as category,
+ 'Top 10 Queries by Total Execution Time' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'Queries with the highest total execution time are usually the best optimization targets for overall workload improvement' as issue_description,
+ 'calls: ' || pss.calls || ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+ ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) || ', rows: ' || pss.rows ||
+ ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Run EXPLAIN (ANALYZE, BUFFERS) and focus on reducing total runtime for these fingerprints first' as recommended_action,
+ 'https://www.postgresql.org/docs/current/pgstatstatements.html \
+ https://www.postgresql.org/docs/current/using-explain.html \
+ https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+ 3 as severity_order
+ from
+ pss;
 
-    return query
-    select
-        'MEDIUM' as severity,
-        'Query Health' as category,
-        'High Mean Execution Time Queries' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'Queries with high average runtime and enough call volume are underperforming and likely user-visible' as issue_description,
-        'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
-        ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
-        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Add or improve indexes and rewrite query predicates to reduce per-execution latency' as recommended_action,
-        'https://www.postgresql.org/docs/current/pgstatstatements.html \
-         https://www.postgresql.org/docs/current/using-explain.html \
-         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
-        3 as severity_order
-    from
-        pg_stat_statements pss
-    where
-        pss.calls >= 20
-        and pss.mean_exec_time > 100
-    order by
-        pss.mean_exec_time desc
-    limit 10;
+ return query
+ select
+ 'MEDIUM' as severity,
+ 'Query Health' as category,
+ 'High Mean Execution Time Queries' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'Queries with high average runtime and enough call volume are underperforming and likely user-visible' as issue_description,
+ 'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+ ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+ ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Add or improve indexes and rewrite query predicates to reduce per-execution latency' as recommended_action,
+ 'https://www.postgresql.org/docs/current/pgstatstatements.html \
+ https://www.postgresql.org/docs/current/using-explain.html \
+ https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+ 3 as severity_order
+ from
+ pg_stat_statements pss
+ where
+ pss.calls >= 20
+ and pss.mean_exec_time > 100
+ order by
+ pss.mean_exec_time desc
+ limit 10;
 
-    return query
+ return query
 with pss as (
-    select
-        queryid,
-        query,
-        calls,
-        temp_blks_read,
-        temp_blks_written,
-        total_exec_time
-    from
-        pg_stat_statements
-    where
-        (temp_blks_read + temp_blks_written) > 0
-    order by
-        (temp_blks_read + temp_blks_written) desc
-    limit 10)
-    select
-        'MEDIUM' as severity,
-        'Query Health' as category,
-        'Top 10 Queries by Temp Block Spills' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'Frequent temp block usage points to sort or hash operations spilling to disk and causing avoidable latency' as issue_description,
-        'calls: ' || pss.calls || ', temp_blks_read: ' || pss.temp_blks_read ||
-        ', temp_blks_written: ' || pss.temp_blks_written || ', total_exec_time_ms: ' ||
-        round(pss.total_exec_time::numeric, 2) || ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Reduce row width, improve index support for sort or group patterns, and tune work_mem cautiously' as recommended_action,
-        'https://www.postgresql.org/docs/current/pgstatstatements.html \
-         https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM \
-         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
-        3 as severity_order
-    from
-        pss;
+ select
+ queryid,
+ query,
+ calls,
+ temp_blks_read,
+ temp_blks_written,
+ total_exec_time
+ from
+ pg_stat_statements
+ where
+ (temp_blks_read + temp_blks_written) > 0
+ order by
+ (temp_blks_read + temp_blks_written) desc
+ limit 10)
+ select
+ 'MEDIUM' as severity,
+ 'Query Health' as category,
+ 'Top 10 Queries by Temp Block Spills' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'Frequent temp block usage points to sort or hash operations spilling to disk and causing avoidable latency' as issue_description,
+ 'calls: ' || pss.calls || ', temp_blks_read: ' || pss.temp_blks_read ||
+ ', temp_blks_written: ' || pss.temp_blks_written || ', total_exec_time_ms: ' ||
+ round(pss.total_exec_time::numeric, 2) || ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Reduce row width, improve index support for sort or group patterns, and tune work_mem cautiously' as recommended_action,
+ 'https://www.postgresql.org/docs/current/pgstatstatements.html \
+ https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM \
+ https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+ 3 as severity_order
+ from
+ pss;
 
-    return query
-    select
-        'MEDIUM' as severity,
-        'Query Health' as category,
-        'Low Cache Hit Ratio Queries' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'Low buffer cache hit ratio indicates heavy physical reads and likely missing indexes or poor filtering' as issue_description,
-        'calls: ' || pss.calls || ', cache_hit_pct: ' || round(
-            100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0),
-            2
-        ) || ', shared_blks_read: ' || pss.shared_blks_read || ', shared_blks_hit: ' || pss.shared_blks_hit ||
-        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Prioritize index tuning and query filtering to reduce disk reads for these statements' as recommended_action,
-        'https://www.postgresql.org/docs/current/pgstatstatements.html \
-         https://www.postgresql.org/docs/current/using-explain.html \
-         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
-        3 as severity_order
-    from
-        pg_stat_statements pss
-    where
-        pss.calls >= 20
-        and (pss.shared_blks_hit + pss.shared_blks_read) > 0
-        and (100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0)) < 90
-    order by
-        (100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0)) asc
-    limit 10;
+ return query
+ select
+ 'MEDIUM' as severity,
+ 'Query Health' as category,
+ 'Low Cache Hit Ratio Queries' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'Low buffer cache hit ratio indicates heavy physical reads and likely missing indexes or poor filtering' as issue_description,
+ 'calls: ' || pss.calls || ', cache_hit_pct: ' || round(
+ 100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0),
+ 2
+ ) || ', shared_blks_read: ' || pss.shared_blks_read || ', shared_blks_hit: ' || pss.shared_blks_hit ||
+ ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Prioritize index tuning and query filtering to reduce disk reads for these statements' as recommended_action,
+ 'https://www.postgresql.org/docs/current/pgstatstatements.html \
+ https://www.postgresql.org/docs/current/using-explain.html \
+ https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+ 3 as severity_order
+ from
+ pg_stat_statements pss
+ where
+ pss.calls >= 20
+ and (pss.shared_blks_hit + pss.shared_blks_read) > 0
+ and (100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0)) < 90
+ order by
+ (100.0 * pss.shared_blks_hit / NULLIF(pss.shared_blks_hit + pss.shared_blks_read, 0)) asc
+ limit 10;
 
-    return query
-    select
-        'MEDIUM' as severity,
-        'Query Health' as category,
-        'High Runtime Variance Queries' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'High runtime variance can indicate plan instability, skewed data distribution, or parameter sensitivity' as issue_description,
-        'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
-        ', stddev_exec_time_ms: ' || round(pss.stddev_exec_time::numeric, 2) ||
-        ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) || ', query: ' ||
-        left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Check plan stability with EXPLAIN (ANALYZE, BUFFERS), update statistics, and review parameterized execution paths' as recommended_action,
-        'https://www.postgresql.org/docs/current/pgstatstatements.html \
-         https://www.postgresql.org/docs/current/routine-vacuuming.html \
-         https://www.postgresql.org/docs/current/using-explain.html' as documentation_link,
-        3 as severity_order
-    from
-        pg_stat_statements pss
-    where
-        pss.calls >= 20
-        and pss.stddev_exec_time > pss.mean_exec_time
-    order by
-        pss.stddev_exec_time desc
-    limit 10;
+ return query
+ select
+ 'MEDIUM' as severity,
+ 'Query Health' as category,
+ 'High Runtime Variance Queries' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'High runtime variance can indicate plan instability, skewed data distribution, or parameter sensitivity' as issue_description,
+ 'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+ ', stddev_exec_time_ms: ' || round(pss.stddev_exec_time::numeric, 2) ||
+ ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) || ', query: ' ||
+ left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Check plan stability with EXPLAIN (ANALYZE, BUFFERS), update statistics, and review parameterized execution paths' as recommended_action,
+ 'https://www.postgresql.org/docs/current/pgstatstatements.html \
+ https://www.postgresql.org/docs/current/routine-vacuuming.html \
+ https://www.postgresql.org/docs/current/using-explain.html' as documentation_link,
+ 3 as severity_order
+ from
+ pg_stat_statements pss
+ where
+ pss.calls >= 20
+ and pss.stddev_exec_time > pss.mean_exec_time
+ order by
+ pss.stddev_exec_time desc
+ limit 10;
 
-    return query
-    select
-        'MEDIUM' as severity,
-        'Query Health' as category,
-        'High Calls Low Value Queries' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'Very high call volume with low per-call value can create avoidable overhead and crowd out expensive work' as issue_description,
-        'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 3) ||
-        ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
-        ', rows_per_call: ' || round((pss.rows::numeric / NULLIF(pss.calls, 0)), 2) ||
-        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Batch repeated requests, cache stable lookups, and reduce N+1 query patterns in the application layer' as recommended_action,
-        'https://www.postgresql.org/docs/current/pgstatstatements.html \
-         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
-        3 as severity_order
-    from
-        pg_stat_statements pss
-    where
-        pss.calls >= 5000
-        and pss.mean_exec_time <= 2
-        and (pss.rows::numeric / NULLIF(pss.calls, 0)) <= 2
-    order by
-        pss.calls desc
-    limit 10;
+ return query
+ select
+ 'MEDIUM' as severity,
+ 'Query Health' as category,
+ 'High Calls Low Value Queries' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'Very high call volume with low per-call value can create avoidable overhead and crowd out expensive work' as issue_description,
+ 'calls: ' || pss.calls || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 3) ||
+ ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+ ', rows_per_call: ' || round((pss.rows::numeric / NULLIF(pss.calls, 0)), 2) ||
+ ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Batch repeated requests, cache stable lookups, and reduce N+1 query patterns in the application layer' as recommended_action,
+ 'https://www.postgresql.org/docs/current/pgstatstatements.html \
+ https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+ 3 as severity_order
+ from
+ pg_stat_statements pss
+ where
+ pss.calls >= 5000
+ and pss.mean_exec_time <= 2
+ and (pss.rows::numeric / NULLIF(pss.calls, 0)) <= 2
+ order by
+ pss.calls desc
+ limit 10;
 
-    return query
-    select
-        'MEDIUM' as severity,
-        'Query Health' as category,
-        'High Rows Per Call Queries' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'High rows returned per execution often indicates over-fetching or missing selective filters' as issue_description,
-        'calls: ' || pss.calls || ', rows_per_call: ' || round((pss.rows::numeric / NULLIF(pss.calls, 0)), 2) ||
-        ', total_rows: ' || pss.rows || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
-        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Add tighter predicates, pagination, and narrower SELECT lists to reduce unnecessary row transfer' as recommended_action,
-        'https://www.postgresql.org/docs/current/pgstatstatements.html \
-         https://www.postgresql.org/docs/current/queries-limit.html \
-         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
-        3 as severity_order
-    from
-        pg_stat_statements pss
-    where
-        pss.calls >= 20
-        and (pss.rows::numeric / NULLIF(pss.calls, 0)) > 10000
-    order by
-        (pss.rows::numeric / NULLIF(pss.calls, 0)) desc
-    limit 10;
+ return query
+ select
+ 'MEDIUM' as severity,
+ 'Query Health' as category,
+ 'High Rows Per Call Queries' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'High rows returned per execution often indicates over-fetching or missing selective filters' as issue_description,
+ 'calls: ' || pss.calls || ', rows_per_call: ' || round((pss.rows::numeric / NULLIF(pss.calls, 0)), 2) ||
+ ', total_rows: ' || pss.rows || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+ ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Add tighter predicates, pagination, and narrower SELECT lists to reduce unnecessary row transfer' as recommended_action,
+ 'https://www.postgresql.org/docs/current/pgstatstatements.html \
+ https://www.postgresql.org/docs/current/queries-limit.html \
+ https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+ 3 as severity_order
+ from
+ pg_stat_statements pss
+ where
+ pss.calls >= 20
+ and (pss.rows::numeric / NULLIF(pss.calls, 0)) > 10000
+ order by
+ (pss.rows::numeric / NULLIF(pss.calls, 0)) desc
+ limit 10;
 
-    return query
-    select
-        'MEDIUM' as severity,
-        'Query Health' as category,
-        'High Shared Block Reads Per Call Queries' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'High shared block reads per call usually points to heavy table or index scans and poor locality' as issue_description,
-        'calls: ' || pss.calls || ', shared_blks_read_per_call: ' || round((pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)), 2) ||
-        ', shared_blks_read: ' || pss.shared_blks_read || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
-        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Use EXPLAIN (ANALYZE, BUFFERS) to add selective indexes and reduce pages read per execution' as recommended_action,
-        'https://www.postgresql.org/docs/current/pgstatstatements.html \
-         https://www.postgresql.org/docs/current/using-explain.html \
-         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
-        3 as severity_order
-    from
-        pg_stat_statements pss
-    where
-        pss.calls >= 20
-        and (pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)) > 1000
-    order by
-        (pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)) desc
-    limit 10;
+ return query
+ select
+ 'MEDIUM' as severity,
+ 'Query Health' as category,
+ 'High Shared Block Reads Per Call Queries' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'High shared block reads per call usually points to heavy table or index scans and poor locality' as issue_description,
+ 'calls: ' || pss.calls || ', shared_blks_read_per_call: ' || round((pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)), 2) ||
+ ', shared_blks_read: ' || pss.shared_blks_read || ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+ ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Use EXPLAIN (ANALYZE, BUFFERS) to add selective indexes and reduce pages read per execution' as recommended_action,
+ 'https://www.postgresql.org/docs/current/pgstatstatements.html \
+ https://www.postgresql.org/docs/current/using-explain.html \
+ https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+ 3 as severity_order
+ from
+ pg_stat_statements pss
+ where
+ pss.calls >= 20
+ and (pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)) > 1000
+ order by
+ (pss.shared_blks_read::numeric / NULLIF(pss.calls, 0)) desc
+ limit 10;
 
-    return query
-    select
-        'MEDIUM' as severity,
-        'Query Health' as category,
-        'Top Queries by WAL Bytes Per Call' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'High WAL generation per execution can indicate heavy write amplification and expensive update patterns' as issue_description,
-        'calls: ' || pss.calls || ', wal_bytes_per_call: ' || round(
-            ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)),
-            2
-        ) || ', wal_bytes_total: ' || round((to_jsonb(pss)->>'wal_bytes')::numeric, 2) ||
-        ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
-        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Reduce row churn, batch writes where possible, and review index maintenance cost for heavy write queries' as recommended_action,
-        'https://www.postgresql.org/docs/current/pgstatstatements.html \
-         https://www.postgresql.org/docs/current/wal-intro.html \
-         https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
-        3 as severity_order
-    from
-        pg_stat_statements pss
-    where
-        pss.calls >= 20
-        and coalesce((to_jsonb(pss)->>'wal_bytes')::numeric, 0) > 0
-        and ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) > 1048576
-    order by
-        ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) desc
-    limit 10;
+ return query
+ select
+ 'MEDIUM' as severity,
+ 'Query Health' as category,
+ 'Top Queries by WAL Bytes Per Call' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'High WAL generation per execution can indicate heavy write amplification and expensive update patterns' as issue_description,
+ 'calls: ' || pss.calls || ', wal_bytes_per_call: ' || round(
+ ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)),
+ 2
+ ) || ', wal_bytes_total: ' || round((to_jsonb(pss)->>'wal_bytes')::numeric, 2) ||
+ ', mean_exec_time_ms: ' || round(pss.mean_exec_time::numeric, 2) ||
+ ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Reduce row churn, batch writes where possible, and review index maintenance cost for heavy write queries' as recommended_action,
+ 'https://www.postgresql.org/docs/current/pgstatstatements.html \
+ https://www.postgresql.org/docs/current/wal-intro.html \
+ https://www.tigerdata.com/blog/using-pg-stat-statements-to-optimize-queries' as documentation_link,
+ 3 as severity_order
+ from
+ pg_stat_statements pss
+ where
+ pss.calls >= 20
+ and coalesce((to_jsonb(pss)->>'wal_bytes')::numeric, 0) > 0
+ and ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) > 1048576
+ order by
+ ((to_jsonb(pss)->>'wal_bytes')::numeric / NULLIF(pss.calls, 0)) desc
+ limit 10;
 
-    return query
-    select
-        'LOW' as severity,
-        'Query Health' as category,
-        'Not In With Subquery' as check_name,
-        'queryid: ' || pss.queryid::text as object_name,
-        'Query uses NOT IN (SELECT ...). The SQL NULL semantics trap returns zero rows if the subquery returns any NULL — even if the row exists. Common bug class per the Postgres Mistakes book §2.1.' as issue_description,
-        'calls: ' || pss.calls || ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
-        ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
-        'Rewrite as NOT EXISTS (SELECT 1 FROM ... WHERE ...), which handles NULLs correctly. Alternatively filter NULLs in the subquery with WHERE col IS NOT NULL.' as recommended_action,
-        'https://www.postgresql.org/docs/current/functions-comparison.html \
-         https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-EXPRESSIONS' as documentation_link,
-        4 as severity_order
-    from
-        pg_stat_statements pss
-    where
-        pss.calls >= 1
-        and pss.query ~* '^\s*(select|insert|update|delete|with|merge)'
-        and pss.query ~* '\mNOT\s+IN\s*\(\s*(WITH|SELECT)'
-    order by
-        pss.total_exec_time desc
-    limit 10;
-    exception when object_not_in_prerequisite_state then
-        return;
-    end;
+ return query
+ select
+ 'LOW' as severity,
+ 'Query Health' as category,
+ 'Not In With Subquery' as check_name,
+ 'queryid: ' || pss.queryid::text as object_name,
+ 'Query uses NOT IN (SELECT ...). The SQL NULL semantics trap returns zero rows if the subquery returns any NULL: even if the row exists. Common bug class per the Postgres Mistakes book sec. 2.1.' as issue_description,
+ 'calls: ' || pss.calls || ', total_exec_time_ms: ' || round(pss.total_exec_time::numeric, 2) ||
+ ', query: ' || left(regexp_replace(pss.query, E'[\n\r\t]+', ' ', 'g'), 350) as current_value,
+ 'Rewrite as NOT EXISTS (SELECT 1 FROM ... WHERE ...), which handles NULLs correctly. Alternatively filter NULLs in the subquery with WHERE col IS NOT NULL.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/functions-comparison.html \
+ https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-EXPRESSIONS' as documentation_link,
+ 4 as severity_order
+ from
+ pg_stat_statements pss
+ where
+ pss.calls >= 1
+ and pss.query ~* '^\s*(select|insert|update|delete|with|merge)'
+ and pss.query ~* '\mNOT\s+IN\s*\(\s*(WITH|SELECT)'
+ order by
+ pss.total_exec_time desc
+ limit 10;
+ exception when object_not_in_prerequisite_state then
+ return;
+ end;
 end;
 $$ language plpgsql;
 
@@ -303,59 +303,59 @@ language plpgsql
 stable
 as $$
 declare
-    v_timed bigint;
-    v_forced bigint;
+ v_timed bigint;
+ v_forced bigint;
 begin
-    if current_setting('server_version_num')::int >= 170000 then
-        select num_timed, num_requested
-        into v_timed, v_forced
-        from pg_stat_checkpointer;
-    else
-        select checkpoints_timed, checkpoints_req
-        into v_timed, v_forced
-        from pg_stat_bgwriter;
-    end if;
+ if current_setting('server_version_num')::int >= 170000 then
+ select num_timed, num_requested
+ into v_timed, v_forced
+ from pg_stat_checkpointer;
+ else
+ select checkpoints_timed, checkpoints_req
+ into v_timed, v_forced
+ from pg_stat_bgwriter;
+ end if;
 
-    return 'timed: ' || v_timed::text ||
-           ', forced: ' || v_forced::text ||
-           ', forced ratio: ' ||
-           case
-               when v_timed + v_forced = 0 then '0%'
-               else round(100.0 * v_forced / (v_timed + v_forced), 1)::text || '%'
-           end;
+ return 'timed: ' || v_timed::text ||
+ ', forced: ' || v_forced::text ||
+ ', forced ratio: ' ||
+ case
+ when v_timed + v_forced = 0 then '0%'
+ else round(100.0 * v_forced / (v_timed + v_forced), 1)::text || '%'
+ end;
 end;
 $$;
 
 create or replace
 function pg_firstAid()
 returns table (
-    severity TEXT,
-    category TEXT,
-    check_name TEXT,
-    object_name TEXT,
-    issue_description TEXT,
-    current_value TEXT,
-    recommended_action TEXT,
-    documentation_link TEXT
+ severity TEXT,
+ category TEXT,
+ check_name TEXT,
+ object_name TEXT,
+ issue_description TEXT,
+ current_value TEXT,
+ recommended_action TEXT,
+ documentation_link TEXT
 ) as $$
 begin
 -- Create temporary table to collect all health check results
-    create temp table health_results (
-        severity TEXT,
-        category TEXT,
-        check_name TEXT,
-        object_name TEXT,
-        issue_description TEXT,
-        current_value TEXT,
-        recommended_action TEXT,
-        documentation_link TEXT,
-        severity_order INTEGER
-    );
+ create temp table health_results (
+ severity TEXT,
+ category TEXT,
+ check_name TEXT,
+ object_name TEXT,
+ issue_description TEXT,
+ current_value TEXT,
+ recommended_action TEXT,
+ documentation_link TEXT,
+ severity_order INTEGER
+ );
 -- CRITICAL: Tables without primary keys
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'CRITICAL' as severity,
 	'Table Health' as category,
 	'Missing Primary Key' as check_name,
@@ -382,9 +382,9 @@ where
 		pc.contype = 'p'
 		and n.nspname = pt.schemaname
 		and c.relname = pt.tablename
-    );
+ );
 -- CRITICAL: Unused indexes consuming significant space
-    insert
+ insert
 	into
 	health_results
 	select
@@ -406,7 +406,7 @@ where
 	and pg_relation_size(psi.indexrelid) > 104857600;
 -- 100MB
 -- HIGH: Inactive Replication slots
-    insert
+ insert
 	into
 	health_results
 with q as (
@@ -420,15 +420,15 @@ with q as (
 			else 'inactive'
 		end as "status",
 		pg_size_pretty(
-        pg_wal_lsn_diff(
-          pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
+ pg_wal_lsn_diff(
+ pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
 		pg_size_pretty(safe_wal_size) as "safe_wal_size"
 	from
 		pg_replication_slots
 	where
 		active = false
-    )
-    select
+ )
+ select
 	'HIGH' as severity,
 	'Replication Health' as category,
 	'Inactive Replication Slots' as check_name,
@@ -457,19 +457,19 @@ with q as (
 		case
 			when tblpages > 0
 				and tblpages - est_tblpages > 0
-    then 100 * (tblpages - est_tblpages)/ tblpages::float
+ then 100 * (tblpages - est_tblpages)/ tblpages::float
 				else 0
 			end as extra_pct,
 			fillfactor,
 			case
 				when tblpages - est_tblpages_ff > 0
-    then (tblpages-est_tblpages_ff)* bs
+ then (tblpages-est_tblpages_ff)* bs
 				else 0
 			end as bloat_size,
 			case
 				when tblpages > 0
 					and tblpages - est_tblpages_ff > 0
-    then 100 * (tblpages - est_tblpages_ff)/ tblpages::float
+ then 100 * (tblpages - est_tblpages_ff)/ tblpages::float
 					else 0
 				end as bloat_pct,
 				is_na
@@ -491,15 +491,15 @@ with q as (
 					(
 					select
 						( 4 + tpl_hdr_size + tpl_data_size + (2 * ma)
-        - case
+ - case
 							when tpl_hdr_size%ma = 0 then ma
 							else tpl_hdr_size%ma
 						end
-        - case
+ - case
 							when ceil(tpl_data_size)::int%ma = 0 then ma
 							else ceil(tpl_data_size)::int%ma
 						end
-      ) as tpl_size,
+ ) as tpl_size,
 						bs - page_hdr as size_per_block,
 						(heappages + toastpages) as tblpages,
 						heappages,
@@ -524,8 +524,8 @@ with q as (
 							coalesce(toast.relpages, 0) as toastpages,
 							coalesce(toast.reltuples, 0) as toasttuples,
 							coalesce(substring(
-          array_to_string(tbl.reloptions, ' ')
-          from 'fillfactor=([0-9]+)')::smallint, 100) as fillfactor,
+ array_to_string(tbl.reloptions, ' ')
+ from 'fillfactor=([0-9]+)')::smallint, 100) as fillfactor,
 							current_setting('block_size')::numeric as bs,
 							case
 								when version()~ 'mingw32'
@@ -537,7 +537,7 @@ with q as (
 									when MAX(coalesce(s.null_frac, 0)) > 0 then ( 7 + count(s.attname) ) / 8
 									else 0::int
 								end
-           + case
+ + case
 									when bool_or(att.attname = 'oid' and att.attnum < 0) then 4
 									else 0
 								end as tpl_hdr_size,
@@ -574,8 +574,8 @@ with q as (
 								order by
 									2,
 									3
-    ) as s
-  ) as s2
+ ) as s
+ ) as s2
 ) as s3)
 select
 	'HIGH' as severity,
@@ -584,11 +584,11 @@ select
 	quote_ident(schemaname) || '.' || quote_ident(tblname) as object_name,
 	'Table has significant bloat (>50%) affecting performance and storage' as issue_description,
 	'Real size: ' || pg_size_pretty(real_size::bigint) ||
-    ', Bloat: ' || pg_size_pretty(bloat_size::bigint) ||
-    ' (' || ROUND(bloat_pct::numeric, 2) || '%)' as current_value,
+ ', Bloat: ' || pg_size_pretty(bloat_size::bigint) ||
+ ' (' || ROUND(bloat_pct::numeric, 2) || '%)' as current_value,
 	'Run VACUUM FULL to reclaim space' as recommended_action,
 	'https://www.postgresql.org/docs/current/sql-vacuum.html,
-    https://github.com/ioguix/pgsql-bloat-estimation/' as documentation_link,
+ https://github.com/ioguix/pgsql-bloat-estimation/' as documentation_link,
 	2 as severity_order
 from
 	q
@@ -601,10 +601,10 @@ order by
 	quote_ident(tblname);
 --Credit: https://github.com/ioguix/pgsql-bloat-estimation -- Jehan-Guillaume (ioguix) de Rorthais!
 -- HIGH: Tables never analyzed
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'HIGH' as severity,
 	'Table Health' as category,
 	'Missing Statistics' as check_name,
@@ -635,10 +635,10 @@ where
 	-- 100GB in bytes
 order by
 	size_bytes desc)
-    insert
+ insert
 	into
 	health_results
-   select
+ select
 	'HIGH' as severity,
 	'Table Health' as category,
 	'Tables larger than 100GB' as check_name,
@@ -652,10 +652,10 @@ from
 	ts;
 -- HIGH: Duplicate or redundant indexes
 -- Compare actual index structure (columns, operator class) not string definitions
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'HIGH' as severity,
 	'Table Health' as category,
 	'Duplicate Index' as check_name,
@@ -671,37 +671,37 @@ join pg_class i1 on idx1.indexrelid = i1.oid
 join pg_class c1 on idx1.indrelid = c1.oid
 join pg_namespace n1 on c1.relnamespace = n1.oid
 join pg_index idx2 on
-	idx1.indrelid = idx2.indrelid  -- same table
-	and idx1.indexrelid < idx2.indexrelid  -- avoid duplicates
-	and idx1.indkey = idx2.indkey  -- same columns
-	and idx1.indclass = idx2.indclass  -- same operator classes
-	and idx1.indoption = idx2.indoption  -- same options
+	idx1.indrelid = idx2.indrelid -- same table
+	and idx1.indexrelid < idx2.indexrelid -- avoid duplicates
+	and idx1.indkey = idx2.indkey -- same columns
+	and idx1.indclass = idx2.indclass -- same operator classes
+	and idx1.indoption = idx2.indoption -- same options
 join pg_class i2 on idx2.indexrelid = i2.oid
 where
 	n1.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%']);
 -- HIGH: Autovacuum disabled on table
 insert into health_results
 select
-    'HIGH' as severity,
-    'Table Health' as category,
-    'Autovacuum Disabled On Table' as check_name,
-    quote_ident(n.nspname) || '.' || quote_ident(c.relname) as object_name,
-    'Autovacuum is disabled at the table level. Bloat, transaction ID wraparound, and outdated planner statistics will accumulate without manual intervention.' as issue_description,
-    pg_size_pretty(pg_relation_size(c.oid)) as current_value,
-    'Re-enable autovacuum: ALTER TABLE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' SET (autovacuum_enabled = true). If this table genuinely needs autovacuum off, document the reason and schedule manual VACUUM ANALYZE.' as recommended_action,
-    'https://www.postgresql.org/docs/current/sql-createtable.html#SQL-CREATETABLE-STORAGE-PARAMETERS' as documentation_link,
-    2 as severity_order
+ 'HIGH' as severity,
+ 'Table Health' as category,
+ 'Autovacuum Disabled On Table' as check_name,
+ quote_ident(n.nspname) || '.' || quote_ident(c.relname) as object_name,
+ 'Autovacuum is disabled at the table level. Bloat, transaction ID wraparound, and outdated planner statistics will accumulate without manual intervention.' as issue_description,
+ pg_size_pretty(pg_relation_size(c.oid)) as current_value,
+ 'Re-enable autovacuum: ALTER TABLE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' SET (autovacuum_enabled = true). If this table genuinely needs autovacuum off, document the reason and schedule manual VACUUM ANALYZE.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/sql-createtable.html#SQL-CREATETABLE-STORAGE-PARAMETERS' as documentation_link,
+ 2 as severity_order
 from pg_class c
 join pg_namespace n on c.relnamespace = n.oid
 where c.relkind in ('r', 'p')
-  and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
-  and n.nspname not like 'pg_temp_%'
-  and c.reloptions is not null
-  and exists (
-      select 1 from unnest(c.reloptions) opt
-      where split_part(opt, '=', 1) = 'autovacuum_enabled'
-        and split_part(opt, '=', 2) = 'false'
-  )
+ and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+ and n.nspname not like 'pg_temp_%'
+ and c.reloptions is not null
+ and exists (
+ select 1 from unnest(c.reloptions) opt
+ where split_part(opt, '=', 1) = 'autovacuum_enabled'
+ and split_part(opt, '=', 2) = 'false'
+ )
 order by pg_relation_size(c.oid) desc
 limit 100;
 -- HIGH: Table with more than 200 columns
@@ -732,7 +732,7 @@ select
 	'Yikes-it is about time you put a hard stop on widing your tables and begin breaking this table into several tables. I once worked on a table with over 300 columns before.......' as recommended_action,
 	'https://www.tigerdata.com/learn/designing-your-database-schema-wide-vs-narrow-postgres-tables \
 	 https://nerderati.com/postgresql-tables-can-have-at-most-1600-columns \
-     https://www.postgresql.org/docs/current/limits.html' as documentation_link,
+ https://www.postgresql.org/docs/current/limits.html' as documentation_link,
 	2 as severity_order
 from
 	cc
@@ -766,7 +766,7 @@ select
 	'Query Health' as category,
 	'Current Blocked/Blocking Queries' as check_name,
 	'Blocked PID: ' || bq.blocked_pid || chr(10) ||
-    'Blocked Query: ' || bq.blocked_query as object_name,
+ 'Blocked Query: ' || bq.blocked_query as object_name,
 	'The following query is being blocked by an already running query' as issue_description,
 	'Blocking PID: ' || bq.blocking_pid || chr(10) ||
 	'Blocking Query: ' || bq.blocking_query as current_value,
@@ -785,7 +785,7 @@ insert
 		current_setting('autovacuum_analyze_threshold')::float8 as analyze_threshold,
 		current_setting('autovacuum_vacuum_scale_factor')::float8 as vacuum_factor,
 		current_setting('autovacuum_vacuum_threshold')::float8 as vacuum_threshold
-    ),
+ ),
 	tt as (
 	select
 		n.nspname,
@@ -805,15 +805,15 @@ insert
 	where
 		c.relkind = 'r'
 		and n.nspname not like all(array['information_schema', 'pg_catalog', 'pg_toast', 'pg_temp%'])
-    )
-    select
+ )
+ select
 	'MEDIUM' as severity,
 	'Table Health' as category,
 	'Outdated Statistics' as check_name,
 	quote_ident(nspname) || '.' || quote_ident(relname) as object_name,
 	'Table statistics are outdated, which can lead to poor query plans' as issue_description,
 	'Dead tuples: ' || n_dead_tup || ' (threshold: ' || round(v_threshold) || '), ' ||
-        'Modifications since analyze: ' || n_mod_since_analyze || ' (threshold: ' || round(a_threshold) || ')' as current_value,
+ 'Modifications since analyze: ' || n_mod_since_analyze || ' (threshold: ' || round(a_threshold) || ')' as current_value,
 	case
 		when n_dead_tup > v_threshold
 		and n_mod_since_analyze > a_threshold then 'Run VACUUM ANALYZE'
@@ -821,7 +821,7 @@ insert
 		when n_mod_since_analyze > a_threshold then 'Run ANALYZE'
 	end as recommended_action,
 	'https://www.postgresql.org/docs/current/routine-vacuuming.html,
-        https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
+ https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed/' as documentation_link,
 	3 as severity_order
 from
 	tt
@@ -833,17 +833,17 @@ order by
 	relname;
 -- credit: https://www.depesz.com/2020/01/29/which-tables-should-be-auto-vacuumed-or-auto-analyzed -- Thanks depesz!
 -- MEDIUM: Low index usage efficiency
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'MEDIUM' as severity,
 	'Table Health' as category,
 	'Low Index Efficiency' as check_name,
 	quote_ident(schemaname) || '.' || quote_ident(indexrelname) as object_name,
 	'Index has low scan to tuple read ratio indicating poor selectivity' as issue_description,
 	'Scans: ' || idx_scan || ', Tuples: ' || idx_tup_read ||
-        ' (Ratio: ' || ROUND(idx_tup_read::numeric / nullif(idx_scan, 0), 2) || ')' as current_value,
+ ' (Ratio: ' || ROUND(idx_tup_read::numeric / nullif(idx_scan, 0), 2) || ')' as current_value,
 	'Review index definition and query patterns, consider partial indexes' as recommended_action,
 	'https://www.postgresql.org/docs/current/indexes-partial.html' as documentation_link,
 	3 as severity_order
@@ -867,8 +867,8 @@ with q as (
 			else 'inactive'
 		end as "status",
 		pg_size_pretty(
-    pg_wal_lsn_diff(
-      pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
+ pg_wal_lsn_diff(
+ pg_current_wal_lsn(), restart_lsn)) as "retained_wal",
 		pg_size_pretty(safe_wal_size) as "safe_wal_size"
 	from
 		pg_replication_slots
@@ -890,10 +890,10 @@ from
 order by
 		slot_name;
 -- MEDIUM: Large sequential scans
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'MEDIUM' as severity,
 	'Query Health' as category,
 	'Excessive Sequential Scans' as check_name,
@@ -936,17 +936,17 @@ select
 	'The most straightforward recommendation is to split your table into more tables connected via foreign keys. However, your situation may very based on the type of data stored. Consider the documentation links to learn more.' as recommended_action,
 	'https://www.tigerdata.com/learn/designing-your-database-schema-wide-vs-narrow-postgres-tables \
 	 https://nerderati.com/postgresql-tables-can-have-at-most-1600-columns \
-     https://www.postgresql.org/docs/current/limits.html' as documentation_link,
+ https://www.postgresql.org/docs/current/limits.html' as documentation_link,
 	3 as severity_order
 from
 	cc
 where
 	cc.column_count between 50 and 199;
 -- MEDIUM: Connection and lock monitoring
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'MEDIUM' as severity,
 	'System Health' as category,
 	'High Connection Count' as check_name,
@@ -988,7 +988,7 @@ order by
 insert
 	into
 	health_results
-   select
+ select
 	'MEDIUM' as severity,
 	'Table Health' as category,
 	'Tables larger than 50GB' as check_name,
@@ -1001,21 +1001,21 @@ insert
 from
 	ts;
 -- MEDIUM: Queries running longer than 5 minutes
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'MEDIUM' as severity,
 	'Query Health' as category,
 	'Long Running Queries' as check_name,
 	concat_ws(' | ',
-            'pid: ' || pgs.pid::text,
-            'usename: ' || pgs.usename,
-            'datname: ' || pgs.datname,
-            'client_address: ' || pgs.client_addr::text,
-            'state: ' || pgs.state,
-            'duration: ' || to_char(now() - query_start, 'HH24:MI:SS')
-        ) as object_name,
+ 'pid: ' || pgs.pid::text,
+ 'usename: ' || pgs.usename,
+ 'datname: ' || pgs.datname,
+ 'client_address: ' || pgs.client_addr::text,
+ 'state: ' || pgs.state,
+ 'duration: ' || to_char(now() - query_start, 'HH24:MI:SS')
+ ) as object_name,
 	'The following query has been running for more than 5 minutes. Might be helpful to see if this is expected behavior' as issue_description,
 	query as current_value,
 	'Review query using EXPLAIN ANALYZE to identify any bottlenecks, such as full table scans, missing indexes, etc' as recommended_action,
@@ -1180,10 +1180,10 @@ where
 order by
 	now() - psa.state_change desc;
 -- LOW: Missing indexes on foreign keys
-     insert
+ insert
 	into
 	health_results
-    select
+ select
 	'LOW' as severity,
 	'Table Health' as category,
 	'Missing FK Index' as check_name,
@@ -1213,7 +1213,7 @@ where
 	where
 		i.indrelid = c.conrelid
 		and i.indkey::int2[] @> c.conkey::int2[]
-    )
+ )
 group by
 	n.nspname,
 	t.relname,
@@ -1227,7 +1227,7 @@ group by
 	8,
 	9;
 -- LOW: Connections IDLE for > 1 hour
-    with ic as (
+ with ic as (
 select
 	pid,
 	usename,
@@ -1242,20 +1242,20 @@ where
 	state = 'idle'
 	and state_change < now() - interval '1 hour'
 	and pid <> pg_backend_pid()
-    )
-    insert
+ )
+ insert
 	into
 	health_results
-    select
+ select
 	'LOW' as severity,
 	'Connection Health' as category,
 	'Idle Connections Over 1 Hour' as check_name,
 	ic.usename || ' (PID: ' || ic.pid || ')' as object_name,
 	'Connection has been idle for ' ||
-            extract(epoch from ic.idle_duration)::int / 3600 || ' hours ' ||
-            (extract(epoch from ic.idle_duration)::int % 3600) / 60 || ' minutes. ' ||
-            'Application: ' || coalesce(ic.application_name, 'unknown') ||
-            ', Client: ' || coalesce(ic.client_addr::text, 'local') as issue_description,
+ extract(epoch from ic.idle_duration)::int / 3600 || ' hours ' ||
+ (extract(epoch from ic.idle_duration)::int % 3600) / 60 || ' minutes. ' ||
+ 'Application: ' || coalesce(ic.application_name, 'unknown') ||
+ ', Client: ' || coalesce(ic.client_addr::text, 'local') as issue_description,
 	ic.idle_duration::text as current_value,
 	'Review if this connection is still needed. Consider implementing connection pooling (PgBouncer), setting idle_session_timeout, or terminating with pg_terminate_backend(' || ic.pid || ')' as recommended_action,
 	'https://www.postgresql.org/docs/current/runtime-config-client.html' as documentation_link,
@@ -1272,10 +1272,10 @@ select
 from
 	pg_catalog.pg_class pc
 inner join
-        pg_catalog.pg_namespace nsp on
+ pg_catalog.pg_namespace nsp on
 	nsp.oid = pc.relnamespace
 left join
-        pg_catalog.pg_attribute a on
+ pg_catalog.pg_attribute a on
 	a.attrelid = pc.oid
 	and a.attnum > 0
 	and not a.attisdropped
@@ -1331,9 +1331,9 @@ select
 	'Table With No Activity Since Stats Reset' as check_name,
 	quote_ident(it.table_name) as object_name,
 	'Table has had no reads or writes since stats were last reset. Last maintenance: ' ||
-        coalesce(it.last_maintenance::text, 'never') as issue_description,
+ coalesce(it.last_maintenance::text, 'never') as issue_description,
 	'Total scans: ' || it.total_scans || ', Total writes: ' || it.total_writes ||
-        ', Size: ' || it.table_size as current_value,
+ ', Size: ' || it.table_size as current_value,
 	'Review if this table is still needed. Check pg_stat_reset() history to determine stats age. Consider archiving or dropping if no longer in use.' as recommended_action,
 	'https://www.postgresql.org/docs/current/monitoring-stats.html' as documentation_link,
 	4 as severity_order
@@ -1354,10 +1354,10 @@ select
 from
 	pg_roles r
 left join
-        pg_auth_members am on
+ pg_auth_members am on
 	am.member = r.oid
 left join
-        pg_roles m on
+ pg_roles m on
 	m.oid = am.roleid
 where
 	r.rolcanlogin = true
@@ -1370,7 +1370,7 @@ where
 			pg_stat_activity psa
 		where
 			psa.usename = r.rolname
-        )
+ )
 		and (
 		select
 			coalesce(max(backend_start), '1970-01-01')
@@ -1378,7 +1378,7 @@ where
 			pg_stat_activity
 		where
 			usename = r.rolname
-        ) = '1970-01-01'
+ ) = '1970-01-01'
 	group by
 		r.rolname,
 		r.rolcreaterole,
@@ -1395,11 +1395,11 @@ select
 	'Role Never Logged In' as check_name,
 	ur.role_name as object_name,
 	'Role has LOGIN privilege but has never connected (since stats reset). ' ||
-        case
+ case
 		when ur.rolsuper then 'WARNING: Has SUPERUSER privilege. '
 		else ''
 	end ||
-        case
+ case
 		when ur.rolvaliduntil is not null then 'Expires: ' || ur.rolvaliduntil::text
 		else 'No expiration set'
 	end as issue_description,
@@ -1415,15 +1415,15 @@ order by
 -- HIGH: listen_addresses wildcard
 insert into health_results
 select
-    'HIGH' as severity,
-    'Security Health' as category,
-    'listen_addresses Wildcard' as check_name,
-    'System' as object_name,
-    'listen_addresses includes *, so PostgreSQL accepts connections on every network interface. This exposes the server to every network reachable to the host.' as issue_description,
-    current_setting('listen_addresses') as current_value,
-    'Set listen_addresses to the specific IP(s) the server should bind to (e.g., localhost,127.0.0.1,10.0.0.5). Requires a PostgreSQL restart.' as recommended_action,
-    'https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-LISTEN-ADDRESSES' as documentation_link,
-    2 as severity_order
+ 'HIGH' as severity,
+ 'Security Health' as category,
+ 'listen_addresses Wildcard' as check_name,
+ 'System' as object_name,
+ 'listen_addresses includes *, so PostgreSQL accepts connections on every network interface. This exposes the server to every network reachable to the host.' as issue_description,
+ current_setting('listen_addresses') as current_value,
+ 'Set listen_addresses to the specific IP(s) the server should bind to (e.g., localhost,127.0.0.1,10.0.0.5). Requires a PostgreSQL restart.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-LISTEN-ADDRESSES' as documentation_link,
+ 2 as severity_order
 where current_setting('listen_addresses') ~ '(^|,)\s*\*\s*(,|$)';
 -- LOW: Indexes with low usage
 with lui as (
@@ -1452,9 +1452,9 @@ select
 	'Index With Very Low Usage' as check_name,
 	lui.index_name as object_name,
 	'Index on ' || lui.table_name || ' has been scanned only ' || lui.idx_scan ||
-        ' times since stats reset. May not be worth the maintenance overhead.' as issue_description,
+ ' times since stats reset. May not be worth the maintenance overhead.' as issue_description,
 	'Scans: ' || lui.idx_scan || ', Tuples read: ' || lui.idx_tup_read ||
-        ', Size: ' || lui.index_size as current_value,
+ ', Size: ' || lui.index_size as current_value,
 	'Monitor usage over a full business cycle before removing. Verify index is not used for constraints or infrequent but critical queries.' as recommended_action,
 	'https://www.postgresql.org/docs/current/monitoring-stats.html' as documentation_link,
 	4 as severity_order
@@ -1474,10 +1474,10 @@ select
 from
 	pg_class c
 join
-        pg_namespace n on
+ pg_namespace n on
 	n.oid = c.relnamespace
 left join
-        pg_stat_user_tables s on
+ pg_stat_user_tables s on
 	s.relid = c.oid
 where
 	c.relkind = 'r'
@@ -1494,7 +1494,7 @@ select
 	'Empty Table' as check_name,
 	et.table_name as object_name,
 	'Table contains no rows. Last vacuum: ' || coalesce(et.last_vacuum::text, 'never') ||
-        ', Last analyze: ' || coalesce(et.last_analyze::text, 'never') as issue_description,
+ ', Last analyze: ' || coalesce(et.last_analyze::text, 'never') as issue_description,
 	'0 rows, Size: ' || et.table_size as current_value,
 	'Review if this table is still needed. May be an abandoned table, pending migration, or staging table that was never cleaned up.' as recommended_action,
 	'https://www.postgresql.org/docs/current/routine-vacuuming.html' as documentation_link,
@@ -1506,98 +1506,98 @@ order by
 -- HIGH: Timestamp without time zone
 insert into health_results
 select
-    'HIGH' as severity,
-    'Table Health' as category,
-    'Timestamp Without Time Zone' as check_name,
-    quote_ident(n.nspname) || '.' || quote_ident(c.relname) || '.' || quote_ident(a.attname) as object_name,
-    'Column uses timestamp without time zone. PostgreSQL silently strips timezone info on storage; cross-timezone reads and DST transitions can produce wrong results.' as issue_description,
-    format_type(a.atttypid, a.atttypmod) as current_value,
-    'Migrate to timestamptz: ALTER TABLE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' ALTER COLUMN ' || quote_ident(a.attname) || ' TYPE timestamptz USING ' || quote_ident(a.attname) || ' AT TIME ZONE ''UTC''. Verify application code handles timezone-aware values.' as recommended_action,
-    'https://www.postgresql.org/docs/current/datatype-datetime.html' as documentation_link,
-    2 as severity_order
+ 'HIGH' as severity,
+ 'Table Health' as category,
+ 'Timestamp Without Time Zone' as check_name,
+ quote_ident(n.nspname) || '.' || quote_ident(c.relname) || '.' || quote_ident(a.attname) as object_name,
+ 'Column uses timestamp without time zone. PostgreSQL silently strips timezone info on storage; cross-timezone reads and DST transitions can produce wrong results.' as issue_description,
+ format_type(a.atttypid, a.atttypmod) as current_value,
+ 'Migrate to timestamptz: ALTER TABLE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' ALTER COLUMN ' || quote_ident(a.attname) || ' TYPE timestamptz USING ' || quote_ident(a.attname) || ' AT TIME ZONE ''UTC''. Verify application code handles timezone-aware values.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/datatype-datetime.html' as documentation_link,
+ 2 as severity_order
 from pg_attribute a
 join pg_class c on a.attrelid = c.oid
 join pg_namespace n on c.relnamespace = n.oid
 where a.atttypid = 'pg_catalog.timestamp'::regtype
-  and a.attnum > 0
-  and not a.attisdropped
-  and c.relkind in ('r', 'p')
-  and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
-  and n.nspname not like 'pg_temp_%'
+ and a.attnum > 0
+ and not a.attisdropped
+ and c.relkind in ('r', 'p')
+ and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+ and n.nspname not like 'pg_temp_%'
 order by n.nspname, c.relname, a.attnum
 limit 100;
 
 -- LOW: Varchar with length limit
 insert into health_results
 select
-    'LOW' as severity,
-    'Table Health' as category,
-    'Varchar With Length Limit' as check_name,
-    quote_ident(table_schema) || '.' || quote_ident(table_name) || '.' || quote_ident(column_name) as object_name,
-    'Column declared as varchar(n). The book recommends text when in doubt; length limits can cause silent truncation and require length migrations later.' as issue_description,
-    data_type || '(' || character_maximum_length || ')' as current_value,
-    'If the length limit is intentional (validation), keep it. Otherwise migrate to text: ALTER TABLE ' || quote_ident(table_schema) || '.' || quote_ident(table_name) || ' ALTER COLUMN ' || quote_ident(column_name) || ' TYPE text USING ' || quote_ident(column_name) || '::text.' as recommended_action,
-    'https://www.postgresql.org/docs/current/datatype-character.html' as documentation_link,
-    4 as severity_order
+ 'LOW' as severity,
+ 'Table Health' as category,
+ 'Varchar With Length Limit' as check_name,
+ quote_ident(table_schema) || '.' || quote_ident(table_name) || '.' || quote_ident(column_name) as object_name,
+ 'Column declared as varchar(n). The book recommends text when in doubt; length limits can cause silent truncation and require length migrations later.' as issue_description,
+ data_type || '(' || character_maximum_length || ')' as current_value,
+ 'If the length limit is intentional (validation), keep it. Otherwise migrate to text: ALTER TABLE ' || quote_ident(table_schema) || '.' || quote_ident(table_name) || ' ALTER COLUMN ' || quote_ident(column_name) || ' TYPE text USING ' || quote_ident(column_name) || '::text.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/datatype-character.html' as documentation_link,
+ 4 as severity_order
 from information_schema.columns
 where table_schema not in ('pg_catalog', 'information_schema', 'pg_toast')
-  and table_schema not like 'pg_temp_%'
-  and data_type = 'character varying'
-  and character_maximum_length is not null
+ and table_schema not like 'pg_temp_%'
+ and data_type = 'character varying'
+ and character_maximum_length is not null
 order by table_schema, table_name, ordinal_position
 limit 100;
 
 -- LOW: Serial column legacy
 insert into health_results
 select
-    'LOW' as severity,
-    'Table Health' as category,
-    'Serial Column Legacy' as check_name,
-    quote_ident(n.nspname) || '.' || quote_ident(c.relname) || '.' || quote_ident(a.attname) as object_name,
-    'Column uses a serial-style nextval() default. The modern equivalent is GENERATED AS IDENTITY, which integrates better with replication, ownership, and pg_dump.' as issue_description,
-    pg_get_expr(d.adbin, d.adrelid) as current_value,
-    'Migrate to identity: ALTER TABLE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' ALTER COLUMN ' || quote_ident(a.attname) || ' ADD GENERATED BY DEFAULT AS IDENTITY. Sequence ownership transfers automatically.' as recommended_action,
-    'https://www.postgresql.org/docs/current/sql-createtable.html#SQL-CREATETABLE-GENERATED-IDENTITY' as documentation_link,
-    4 as severity_order
+ 'LOW' as severity,
+ 'Table Health' as category,
+ 'Serial Column Legacy' as check_name,
+ quote_ident(n.nspname) || '.' || quote_ident(c.relname) || '.' || quote_ident(a.attname) as object_name,
+ 'Column uses a serial-style nextval() default. The modern equivalent is GENERATED AS IDENTITY, which integrates better with replication, ownership, and pg_dump.' as issue_description,
+ pg_get_expr(d.adbin, d.adrelid) as current_value,
+ 'Migrate to identity: ALTER TABLE ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' ALTER COLUMN ' || quote_ident(a.attname) || ' ADD GENERATED BY DEFAULT AS IDENTITY. Sequence ownership transfers automatically.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/sql-createtable.html#SQL-CREATETABLE-GENERATED-IDENTITY' as documentation_link,
+ 4 as severity_order
 from pg_attrdef d
 join pg_attribute a on d.adrelid = a.attrelid and d.adnum = a.attnum
 join pg_class c on a.attrelid = c.oid
 join pg_namespace n on c.relnamespace = n.oid
 where pg_get_expr(d.adbin, d.adrelid) ~ '^nextval'
-  and a.attnum > 0 and not a.attisdropped
-  and c.relkind in ('r', 'p')
-  and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
-  and n.nspname not like 'pg_temp_%'
-  and a.attidentity = ''
+ and a.attnum > 0 and not a.attisdropped
+ and c.relkind in ('r', 'p')
+ and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+ and n.nspname not like 'pg_temp_%'
+ and a.attidentity = ''
 order by n.nspname, c.relname, a.attnum
 limit 100;
 
 -- LOW: Rules on tables
 insert into health_results
 select
-    'LOW' as severity,
-    'Database Health' as category,
-    'Rules On Tables' as check_name,
-    quote_ident(n.nspname) || '.' || quote_ident(c.relname) as object_name,
-    'Table has a non-view rule attached. Rules on tables are an old mechanism; triggers are clearer and more flexible. Rules on views (which implement views themselves) are useful and expected.' as issue_description,
-    r.rulename as current_value,
-    'Review whether this rule can be replaced with a trigger. Run \d ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' to see the rule definition, then DROP RULE ' || quote_ident(r.rulename) || ' ON ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' if safe.' as recommended_action,
-    'https://www.postgresql.org/docs/current/rules.html' as documentation_link,
-    4 as severity_order
+ 'LOW' as severity,
+ 'Database Health' as category,
+ 'Rules On Tables' as check_name,
+ quote_ident(n.nspname) || '.' || quote_ident(c.relname) as object_name,
+ 'Table has a non-view rule attached. Rules on tables are an old mechanism; triggers are clearer and more flexible. Rules on views (which implement views themselves) are useful and expected.' as issue_description,
+ r.rulename as current_value,
+ 'Review whether this rule can be replaced with a trigger. Run \d ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' to see the rule definition, then DROP RULE ' || quote_ident(r.rulename) || ' ON ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || ' if safe.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/rules.html' as documentation_link,
+ 4 as severity_order
 from pg_rewrite r
 join pg_class c on r.ev_class = c.oid
 join pg_namespace n on c.relnamespace = n.oid
 where c.relkind = 'r'
-  and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
-  and n.nspname not like 'pg_temp_%'
+ and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+ and n.nspname not like 'pg_temp_%'
 order by n.nspname, c.relname, r.rulename
 limit 100;
 
 -- INFO: Database size and growth
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'INFO' as severity,
 	'Database Health' as category,
 	'Database Size' as check_name,
@@ -1608,10 +1608,10 @@ limit 100;
 	'https://www.postgresql.org/docs/current/diskusage.html' as documentation_link,
 	5 as severity_order;
 -- INFO: Version and configuration
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'INFO' as severity,
 	'System Info' as category,
 	'PostgreSQL Version' as check_name,
@@ -1624,172 +1624,172 @@ limit 100;
 -- INFO: shared_buffers current value
 insert into health_results
 select
-    'INFO' as severity,
-    'System Health' as category,
-    'shared_buffers Setting' as check_name,
-    'System' as object_name,
-    'Current value of shared_buffers. Recommended: ~25% of total system RAM for dedicated database servers.' as issue_description,
-    current_setting('shared_buffers') as current_value,
-    'No action needed if already tuned. For dedicated DB servers with 8GB+ RAM, target 25% of total RAM. Changes require a PostgreSQL restart.' as recommended_action,
-    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS' as documentation_link,
-    5 as severity_order;
+ 'INFO' as severity,
+ 'System Health' as category,
+ 'shared_buffers Setting' as check_name,
+ 'System' as object_name,
+ 'Current value of shared_buffers. Recommended: ~25% of total system RAM for dedicated database servers.' as issue_description,
+ current_setting('shared_buffers') as current_value,
+ 'No action needed if already tuned. For dedicated DB servers with 8GB+ RAM, target 25% of total RAM. Changes require a PostgreSQL restart.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS' as documentation_link,
+ 5 as severity_order;
 -- HIGH: shared_buffers still at 128MB PostgreSQL default
 insert into health_results
 select
-    'HIGH' as severity,
-    'System Health' as category,
-    'shared_buffers At Default' as check_name,
-    'System' as object_name,
-    'shared_buffers is set to the PostgreSQL default of 128MB. On any real workload this is almost certainly too low.' as issue_description,
-    current_setting('shared_buffers') as current_value,
-    'Set shared_buffers to approximately 25% of total system RAM (e.g., 2GB on an 8GB server). Requires a PostgreSQL restart.' as recommended_action,
-    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS' as documentation_link,
-    2 as severity_order
+ 'HIGH' as severity,
+ 'System Health' as category,
+ 'shared_buffers At Default' as check_name,
+ 'System' as object_name,
+ 'shared_buffers is set to the PostgreSQL default of 128MB. On any real workload this is almost certainly too low.' as issue_description,
+ current_setting('shared_buffers') as current_value,
+ 'Set shared_buffers to approximately 25% of total system RAM (e.g., 2GB on an 8GB server). Requires a PostgreSQL restart.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-SHARED-BUFFERS' as documentation_link,
+ 2 as severity_order
 where pg_size_bytes(current_setting('shared_buffers')) = pg_size_bytes('128MB');
 
 -- INFO: work_mem current value
 insert into health_results
 select
-    'INFO' as severity,
-    'System Health' as category,
-    'work_mem Setting' as check_name,
-    'System' as object_name,
-    'Current value of work_mem. Allocated per sort/hash operation per session — multiply by max_connections and parallel workers to estimate peak memory consumption.' as issue_description,
-    current_setting('work_mem') || ' (max_connections: ' || current_setting('max_connections') || ')' as current_value,
-    'For OLTP workloads, 16-32MB is a common starting point. Monitor pg_stat_statements for temp file spills to determine if higher is warranted. Use SET work_mem per-session for large one-off queries rather than setting globally.' as recommended_action,
-    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
-    5 as severity_order;
+ 'INFO' as severity,
+ 'System Health' as category,
+ 'work_mem Setting' as check_name,
+ 'System' as object_name,
+ 'Current value of work_mem. Allocated per sort/hash operation per session: multiply by max_connections and parallel workers to estimate peak memory consumption.' as issue_description,
+ current_setting('work_mem') || ' (max_connections: ' || current_setting('max_connections') || ')' as current_value,
+ 'For OLTP workloads, 16-32MB is a common starting point. Monitor pg_stat_statements for temp file spills to determine if higher is warranted. Use SET work_mem per-session for large one-off queries rather than setting globally.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
+ 5 as severity_order;
 
 -- MEDIUM: work_mem still at 4MB PostgreSQL default
 insert into health_results
 select
-    'MEDIUM' as severity,
-    'System Health' as category,
-    'work_mem At Default' as check_name,
-    'System' as object_name,
-    'work_mem is set to the PostgreSQL default of 4MB. On modern hardware this often causes unnecessary sort and hash spills to disk.' as issue_description,
-    current_setting('work_mem') as current_value,
-    'Consider raising work_mem to 16-32MB for OLTP workloads. Be aware that work_mem is allocated per operation per session — high concurrency multiplies total memory usage.' as recommended_action,
-    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
-    3 as severity_order
+ 'MEDIUM' as severity,
+ 'System Health' as category,
+ 'work_mem At Default' as check_name,
+ 'System' as object_name,
+ 'work_mem is set to the PostgreSQL default of 4MB. On modern hardware this often causes unnecessary sort and hash spills to disk.' as issue_description,
+ current_setting('work_mem') as current_value,
+ 'Consider raising work_mem to 16-32MB for OLTP workloads. Be aware that work_mem is allocated per operation per session: high concurrency multiplies total memory usage.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-WORK-MEM' as documentation_link,
+ 3 as severity_order
 where pg_size_bytes(current_setting('work_mem')) = pg_size_bytes('4MB');
 
 -- MEDIUM: Query duration logging disabled
 insert into health_results
 select
-    'MEDIUM' as severity,
-    'System Health' as category,
-    'Query Duration Logging Disabled' as check_name,
-    'System' as object_name,
-    'log_min_duration_statement is set to -1, so no slow-query log is produced. Without duration tracking, regressions and runaway queries go undetected.' as issue_description,
-    '-1 (disabled)' as current_value,
-    'Set log_min_duration_statement to a positive threshold (e.g., 1000ms) to log every query taking longer. Pair with log_line_prefix=%m [%p] %u@%d and consider auto_explain for plan capture.' as recommended_action,
-    'https://www.postgresql.org/docs/current/runtime-config-logging.html#GUC-LOG-MIN-DURATION-STATEMENT' as documentation_link,
-    3 as severity_order
+ 'MEDIUM' as severity,
+ 'System Health' as category,
+ 'Query Duration Logging Disabled' as check_name,
+ 'System' as object_name,
+ 'log_min_duration_statement is set to -1, so no slow-query log is produced. Without duration tracking, regressions and runaway queries go undetected.' as issue_description,
+ '-1 (disabled)' as current_value,
+ 'Set log_min_duration_statement to a positive threshold (e.g., 1000ms) to log every query taking longer. Pair with log_line_prefix=%m [%p] %u@%d and consider auto_explain for plan capture.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/runtime-config-logging.html#GUC-LOG-MIN-DURATION-STATEMENT' as documentation_link,
+ 3 as severity_order
 where current_setting('log_min_duration_statement') = '-1';
 
 -- INFO: effective_cache_size current value
 insert into health_results
 select
-    'INFO' as severity,
-    'System Health' as category,
-    'effective_cache_size Setting' as check_name,
-    'System' as object_name,
-    'Current value of effective_cache_size. Tells the query planner how much memory is available for disk caching. Does not allocate memory — purely advisory.' as issue_description,
-    current_setting('effective_cache_size') as current_value,
-    'Set to ~50-75% of total system RAM (shared_buffers + expected OS page cache). Underestimates cause the planner to prefer nested loops over index scans.' as recommended_action,
-    'https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE' as documentation_link,
-    5 as severity_order;
+ 'INFO' as severity,
+ 'System Health' as category,
+ 'effective_cache_size Setting' as check_name,
+ 'System' as object_name,
+ 'Current value of effective_cache_size. Tells the query planner how much memory is available for disk caching. Does not allocate memory: purely advisory.' as issue_description,
+ current_setting('effective_cache_size') as current_value,
+ 'Set to ~50-75% of total system RAM (shared_buffers + expected OS page cache). Underestimates cause the planner to prefer nested loops over index scans.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-EFFECTIVE-CACHE-SIZE' as documentation_link,
+ 5 as severity_order;
 
 -- INFO: maintenance_work_mem current value
 insert into health_results
 select
-    'INFO' as severity,
-    'System Health' as category,
-    'maintenance_work_mem Setting' as check_name,
-    'System' as object_name,
-    'Current value of maintenance_work_mem. Used by VACUUM, CREATE INDEX, ALTER TABLE, and each autovacuum worker.' as issue_description,
-    current_setting('maintenance_work_mem') as current_value,
-    'Consider 256MB-1GB on modern hardware. Higher values speed up index builds and autovacuum on large tables. Changes take effect immediately for new sessions.' as recommended_action,
-    'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-MAINTENANCE-WORK-MEM' as documentation_link,
-    5 as severity_order;
+ 'INFO' as severity,
+ 'System Health' as category,
+ 'maintenance_work_mem Setting' as check_name,
+ 'System' as object_name,
+ 'Current value of maintenance_work_mem. Used by VACUUM, CREATE INDEX, ALTER TABLE, and each autovacuum worker.' as issue_description,
+ current_setting('maintenance_work_mem') as current_value,
+ 'Consider 256MB-1GB on modern hardware. Higher values speed up index builds and autovacuum on large tables. Changes take effect immediately for new sessions.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-MAINTENANCE-WORK-MEM' as documentation_link,
+ 5 as severity_order;
 
 -- INFO: Transaction ID wraparound risk per database
 insert into health_results
 select
-    'INFO' as severity,
-    'System Health' as category,
-    'Transaction ID Wraparound Risk' as check_name,
-    datname as object_name,
-    'Age of the oldest unfrozen transaction ID in this database. PostgreSQL must freeze XIDs before reaching ~2.1 billion to prevent data loss from wraparound.' as issue_description,
-    datname || ': XID age ' || trim(to_char(age(datfrozenxid), 'FM999,999,999,990')) ||
-    ' (' || round(age(datfrozenxid)::numeric * 100 / 2000000000, 1)::text ||
-    '% of wraparound window, ~' ||
-    trim(to_char(greatest(2000000000::bigint - age(datfrozenxid)::bigint, 0), 'FM999,999,999,990')) ||
-    ' remaining)' as current_value,
-    'Run VACUUM FREEZE on databases approaching high XID age. Ensure autovacuum is enabled and not blocked. Monitor databases with age > 500,000,000.' as recommended_action,
-    'https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND' as documentation_link,
-    5 as severity_order
+ 'INFO' as severity,
+ 'System Health' as category,
+ 'Transaction ID Wraparound Risk' as check_name,
+ datname as object_name,
+ 'Age of the oldest unfrozen transaction ID in this database. PostgreSQL must freeze XIDs before reaching ~2.1 billion to prevent data loss from wraparound.' as issue_description,
+ datname || ': XID age ' || trim(to_char(age(datfrozenxid), 'FM999,999,999,990')) ||
+ ' (' || round(age(datfrozenxid)::numeric * 100 / 2000000000, 1)::text ||
+ '% of wraparound window, ~' ||
+ trim(to_char(greatest(2000000000::bigint - age(datfrozenxid)::bigint, 0), 'FM999,999,999,990')) ||
+ ' remaining)' as current_value,
+ 'Run VACUUM FREEZE on databases approaching high XID age. Ensure autovacuum is enabled and not blocked. Monitor databases with age > 500,000,000.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND' as documentation_link,
+ 5 as severity_order
 from
-    pg_database
+ pg_database
 where
-    datallowconn = true;
+ datallowconn = true;
 
 -- INFO: Checkpoint statistics (PG15/16: pg_stat_bgwriter, PG17+: pg_stat_checkpointer)
 insert into health_results
 select
-    'INFO' as severity,
-    'System Health' as category,
-    'Checkpoint Stats' as check_name,
-    'System' as object_name,
-    'Checkpoint activity since stats last reset. Forced checkpoints occur when WAL fills up before the scheduled interval — high ratios suggest max_wal_size may be too small. PG15/16 reads from pg_stat_bgwriter; PG17+ reads from pg_stat_checkpointer.' as issue_description,
-    _pg_firstaid_checkpoint_stats() as current_value,
-    'If forced checkpoints are consistently above 50% of total, consider increasing max_wal_size. Reset stats with: SELECT pg_stat_reset_shared(''' ||
-    case
-        when current_setting('server_version_num')::int >= 170000 then 'checkpointer'
-        else 'bgwriter'
-    end ||
-    ''').' as recommended_action,
-    'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-BGWRITER-VIEW' as documentation_link,
-    5 as severity_order;
+ 'INFO' as severity,
+ 'System Health' as category,
+ 'Checkpoint Stats' as check_name,
+ 'System' as object_name,
+ 'Checkpoint activity since stats last reset. Forced checkpoints occur when WAL fills up before the scheduled interval: high ratios suggest max_wal_size may be too small. PG15/16 reads from pg_stat_bgwriter; PG17+ reads from pg_stat_checkpointer.' as issue_description,
+ _pg_firstaid_checkpoint_stats() as current_value,
+ 'If forced checkpoints are consistently above 50% of total, consider increasing max_wal_size. Reset stats with: SELECT pg_stat_reset_shared(''' ||
+ case
+ when current_setting('server_version_num')::int >= 170000 then 'checkpointer'
+ else 'bgwriter'
+ end ||
+ ''').' as recommended_action,
+ 'https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-BGWRITER-VIEW' as documentation_link,
+ 5 as severity_order;
 
 -- INFO: Server role (primary vs standby)
 insert into health_results
 select
-    'INFO' as severity,
-    'System Info' as category,
-    'Server Role' as check_name,
-    'System' as object_name,
-    'Whether this server is operating as a primary or standby replica. Context for interpreting other checks — some checks are only relevant on standbys.' as issue_description,
-    case
-        when pg_is_in_recovery() then 'Standby (replica)'
-        else 'Primary'
-    end as current_value,
-    'No action needed — informational.' as recommended_action,
-    'https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-RECOVERY-INFO-TABLE' as documentation_link,
-    5 as severity_order;
+ 'INFO' as severity,
+ 'System Info' as category,
+ 'Server Role' as check_name,
+ 'System' as object_name,
+ 'Whether this server is operating as a primary or standby replica. Context for interpreting other checks: some checks are only relevant on standbys.' as issue_description,
+ case
+ when pg_is_in_recovery() then 'Standby (replica)'
+ else 'Primary'
+ end as current_value,
+ 'No action needed: informational.' as recommended_action,
+ 'https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-RECOVERY-INFO-TABLE' as documentation_link,
+ 5 as severity_order;
 
 -- INFO: Connection utilization
 insert into health_results
 select
-    'INFO' as severity,
-    'System Health' as category,
-    'Connection Utilization' as check_name,
-    'System' as object_name,
-    'Current connection usage as a percentage of max_connections. Includes all connection states, not just active queries.' as issue_description,
-    count(*)::text || ' total / ' || current_setting('max_connections') || ' max (' ||
-    round(100.0 * count(*) / current_setting('max_connections')::int, 1)::text || '% used)' as current_value,
-    'If consistently above 80%, consider a connection pooler such as PgBouncer. Reserve headroom for superuser connections (superuser_reserved_connections).' as recommended_action,
-    'https://www.postgresql.org/docs/current/runtime-config-connection.html' as documentation_link,
-    5 as severity_order
+ 'INFO' as severity,
+ 'System Health' as category,
+ 'Connection Utilization' as check_name,
+ 'System' as object_name,
+ 'Current connection usage as a percentage of max_connections. Includes all connection states, not just active queries.' as issue_description,
+ count(*)::text || ' total / ' || current_setting('max_connections') || ' max (' ||
+ round(100.0 * count(*) / current_setting('max_connections')::int, 1)::text || '% used)' as current_value,
+ 'If consistently above 80%, consider a connection pooler such as PgBouncer. Reserve headroom for superuser connections (superuser_reserved_connections).' as recommended_action,
+ 'https://www.postgresql.org/docs/current/runtime-config-connection.html' as documentation_link,
+ 5 as severity_order
 from
-    pg_stat_activity;
+ pg_stat_activity;
 
 -- INFO: Installed Extensions
-   insert
+ insert
 	into
 	health_results
-   select
+ select
 	'INFO' as severity,
 	'System Info' as category,
 	'Installed Extension' as check_name,
@@ -1803,10 +1803,10 @@ from
 from
 	pg_extension pe;
 -- INFO: Server Uptime
-    insert
+ insert
 	into
 	health_results
-    select
+ select
 	'INFO' as severity,
 	'System Info' as category,
 	'Server Uptime' as check_name,
@@ -1817,14 +1817,14 @@ from
 	'N/A' as documentation_link,
 	5 as severity_order;
 -- INFO: Log Directory
-    with ld as (
+ with ld as (
 select
 	current_setting('log_directory') as log_directory
-    )
-    insert
+ )
+ insert
 	into
 	health_results
-    select
+ select
 	'INFO' as severity,
 	'System Info' as category,
 	'Is Logging Enabled' as check_name,
@@ -1833,10 +1833,10 @@ select
 	ld.log_directory as current_value,
 	'Logging enabled will assist with troubleshooting future issues. Dont you like logs?' as recommended_action,
 	'For self-hosting: https://www.postgresql.org/docs/current/runtime-config-logging.html /
-         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
-         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
-         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
-        ' as documentation_link,
+ For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html /
+ For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
+ For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
+ ' as documentation_link,
 	5 as severity_order
 from
 	ld;
@@ -1848,7 +1848,7 @@ select
 from
 		pg_ls_dir(current_setting('log_directory')) as logs
 cross join lateral
-		      pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
+		 pg_stat_file(current_setting('log_directory') || '/' || logs) as stat)
 	insert
 		into
 		health_results
@@ -1861,10 +1861,10 @@ cross join lateral
 		ls.size_mb as current_value,
 		'Set log_rotation_age and size for proper rotation of log files. This will prevent runaway log sizes.' as recommended_action,
 		'For self-hosting:https://www.postgresql.org/docs/current/runtime-config-logging.html /
-	         For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html  /
-	         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
-	         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
-	        ' as documentation_link,
+	 For AWS Aurora/RDS: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.overview.parameter-groups.html /
+	 For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/flags /
+	 For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-server-parameters
+	 ' as documentation_link,
 		5 as severity_order
 from
 		ls;
@@ -1881,15 +1881,105 @@ when insufficient_privilege then
 			'Unable to check log file sizes - insufficient privileges' as issue_description,
 			'Permission denied for pg_ls_dir' as current_value,
 			'If this is a managed instance (ex:AWS RDS), you will not be able to view this information from SQL. For RDS, use AWS CLI: aws rds describe-db-log-files --db-instance-identifier <instance-name>. Otherwise, grant pg_read_server_files role or run as superuser to enable this check.' as recommended_action,
-			'For AWS Aurora/RDS: https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-log-files.html  /
-         For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/logging /
-         For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/cli/azure/postgres/flexible-server/server-logs?view=azure-cli-latest
-        ' as documentation_link,
+			'For AWS Aurora/RDS: https://docs.aws.amazon.com/cli/latest/reference/rds/describe-db-log-files.html /
+ For GCP Cloud SQL: https://docs.cloud.google.com/sql/docs/postgres/logging /
+ For Azure Database for PostgreSQL: https://learn.microsoft.com/en-us/cli/azure/postgres/flexible-server/server-logs?view=azure-cli-latest
+ ' as documentation_link,
 			5 as severity_order;
 end;
+-- HIGH: Known CVEs affecting the running PostgreSQL version. Curated from
+-- https://www.postgresql.org/support/security/: affected_min and fixed_in
+-- are server_version_num integers (e.g. 150004 for 15.4). Covers PG 15-18.
+insert into health_results
+with cve_data(cve_id, cvss, summary, affected_min, fixed_in, doc_link) as (
+ values
+ -- GENERATED cves BEGIN (do not edit; regenerate via tools/generate_cve_sql.py)
+        ('CVE-2023-39417', 7.5, 'Extension script @substitutions@ within quoting allows SQL injection', 150000, 150004, 'https://www.postgresql.org/support/security/CVE-2023-39417/'),
+        ('CVE-2023-39417', 7.5, 'Extension script @substitutions@ within quoting allows SQL injection', 160000, 160001, 'https://www.postgresql.org/support/security/CVE-2023-39417/'),
+        ('CVE-2023-5869', 8.8, 'pg_dump integer overflow (32-bit builds) can execute arbitrary code at restore', 150000, 150005, 'https://www.postgresql.org/support/security/CVE-2023-5869/'),
+        ('CVE-2023-5869', 8.8, 'pg_dump integer overflow (32-bit builds) can execute arbitrary code at restore', 160000, 160001, 'https://www.postgresql.org/support/security/CVE-2023-5869/'),
+        ('CVE-2024-0985', 8.0, 'Non-owner REFRESH MATERIALIZED VIEW CONCURRENTLY executes arbitrary SQL', 150000, 150006, 'https://www.postgresql.org/support/security/CVE-2024-0985/'),
+        ('CVE-2024-0985', 8.0, 'Non-owner REFRESH MATERIALIZED VIEW CONCURRENTLY executes arbitrary SQL', 160000, 160002, 'https://www.postgresql.org/support/security/CVE-2024-0985/'),
+        ('CVE-2024-7348', 8.8, 'pg_dump --restore uses an invalid type OID, allowing arbitrary SQL execution from a crafted dump', 150000, 150008, 'https://www.postgresql.org/support/security/CVE-2024-7348/'),
+        ('CVE-2024-7348', 8.8, 'pg_dump --restore uses an invalid type OID, allowing arbitrary SQL execution from a crafted dump', 160000, 160004, 'https://www.postgresql.org/support/security/CVE-2024-7348/'),
+        ('CVE-2024-10979', 8.8, 'PL/Perl environment variable changes execute arbitrary code', 150000, 150009, 'https://www.postgresql.org/support/security/CVE-2024-10979/'),
+        ('CVE-2024-10979', 8.8, 'PL/Perl environment variable changes execute arbitrary code', 160000, 160005, 'https://www.postgresql.org/support/security/CVE-2024-10979/'),
+        ('CVE-2024-10979', 8.8, 'PL/Perl environment variable changes execute arbitrary code', 170000, 170001, 'https://www.postgresql.org/support/security/CVE-2024-10979/'),
+        ('CVE-2026-6471', 7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)', 150000, 150019, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
+        ('CVE-2026-6471', 7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)', 160000, 160015, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
+        ('CVE-2026-6471', 7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)', 170000, 170011, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
+        ('CVE-2026-6471', 7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)', 180000, 180005, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
+        ('CVE-2026-16239', 8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types', 150000, 150019, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
+        ('CVE-2026-16239', 8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types', 160000, 160015, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
+        ('CVE-2026-16239', 8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types', 170000, 170011, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
+        ('CVE-2026-16239', 8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types', 180000, 180005, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
+        ('CVE-2026-19385', 8.8, 'pg_dump heap buffer overflow executes arbitrary code', 150000, 150019, 'https://www.postgresql.org/support/security/CVE-2026-19385/'),
+        ('CVE-2026-19385', 8.8, 'pg_dump heap buffer overflow executes arbitrary code', 160000, 160015, 'https://www.postgresql.org/support/security/CVE-2026-19385/'),
+        ('CVE-2026-19385', 8.8, 'pg_dump heap buffer overflow executes arbitrary code', 170000, 170011, 'https://www.postgresql.org/support/security/CVE-2026-19385/'),
+        ('CVE-2026-19385', 8.8, 'pg_dump heap buffer overflow executes arbitrary code', 180000, 180005, 'https://www.postgresql.org/support/security/CVE-2026-19385/')
+-- GENERATED cves END
+),
+running_version as (
+ select current_setting('server_version_num')::int as version_num
+)
+select
+ 'HIGH' as severity,
+ 'Security Health' as category,
+ 'Known CVE Affecting Your Version' as check_name,
+ c.cve_id as object_name,
+ 'CVSS ' || c.cvss::text || ': ' || c.summary as issue_description,
+ 'server_version_num=' || r.version_num::text ||
+ ' (' || current_setting('server_version') || ')' ||
+ ', first fixed in version_num=' || c.fixed_in::text as current_value,
+ 'Upgrade to first PostgreSQL minor >= ' || c.fixed_in::text ||
+ ' (or apply distro backport). See ' || c.doc_link as recommended_action,
+ c.doc_link as documentation_link,
+ 2 as severity_order
+from cve_data c
+cross join running_version r
+where r.version_num >= c.affected_min
+ and r.version_num < c.fixed_in;
+-- MEDIUM: Notable known bugs affecting the running PostgreSQL version. Curated
+-- from https://www.postgresql.org/docs/release/: non-CVE fixes users hit in
+-- production. affected_min/fixed_in are server_version_num integers.
+insert into health_results
+with issue_data(issue_id, summary, affected_min, fixed_in, doc_link) as (
+ values
+ -- GENERATED bugs BEGIN (do not edit; regenerate via tools/generate_cve_sql.py)
+        ('PG15-INSERT-CONFLICT-VISIBLE-01', 'INSERT ... ON CONFLICT can fail to enforce unique-constraint visibility checks in some MVCC edge cases', 150000, 150001, 'https://www.postgresql.org/docs/release/15.1/'),
+        ('PG15-BTREE-PAGE-LEAK-02', 'B-tree page deletion can leak pages on workloads with heavy concurrent UPDATEs', 150000, 150002, 'https://www.postgresql.org/docs/release/15.2/'),
+        ('PG15-LOGREP-SUBSCRIBER-CRASH-03', 'Logical replication subscriber can crash mid-transaction on large in-progress changes', 150000, 150005, 'https://www.postgresql.org/docs/release/15.5/'),
+        ('PG16-BTREE-CORRUPT-04', 'B-tree index page splits could corrupt the tree on high-concurrency inserts', 160000, 160002, 'https://www.postgresql.org/docs/release/16.2/'),
+        ('PG16-LOGICAL-DECODING-SUBXACT-05', 'Logical decoding can miss subtransaction changes for aborted DDL', 160000, 160003, 'https://www.postgresql.org/docs/release/16.3/'),
+        ('PG16-VACUUM-MEMORY-LEAK-06', 'Vacuum memory accounting leaks over many iterations of aggressive autovacuum', 160000, 160005, 'https://www.postgresql.org/docs/release/16.5/'),
+        ('PG17-COPY-PARTITION-ROUTING-07', 'COPY FROM routing into partitioned tables can drop rows under concurrent partition attach', 170000, 170001, 'https://www.postgresql.org/docs/release/17.1/'),
+        ('PG17-PG-CREATESUBSCRIBER-08', 'pg_createsubscriber can leave slots uninitialized, breaking logical failover on first switchover', 170000, 170004, 'https://www.postgresql.org/docs/release/17.4/'),
+        ('PG18-MERGE-UPSERT-VIEW-09', 'MERGE ... WHEN NOT MATCHED against an inheritance child can produce duplicate rows under concurrent INSERT', 180000, 180001, 'https://www.postgresql.org/docs/release/18.1/')
+-- GENERATED bugs END
+),
+running_version as (
+ select current_setting('server_version_num')::int as version_num
+)
+select
+ 'MEDIUM' as severity,
+ 'System Health' as category,
+ 'Known Bug Affecting Your Version' as check_name,
+ i.issue_id as object_name,
+ i.summary as issue_description,
+ 'server_version_num=' || r.version_num::text ||
+ ' (' || current_setting('server_version') || ')' ||
+ ', first fixed in version_num=' || i.fixed_in::text as current_value,
+ 'Upgrade to first PostgreSQL minor >= ' || i.fixed_in::text ||
+ ' to pick up the fix. See the linked release notes for commit and reproduction steps.' as recommended_action,
+ i.doc_link as documentation_link,
+ 3 as severity_order
+from issue_data i
+cross join running_version r
+where r.version_num >= i.affected_min
+ and r.version_num < i.fixed_in;
 -- Return results ordered by severity
-    return QUERY
-    select
+ return QUERY
+ select
 	hr.severity,
 	hr.category,
 	hr.check_name,
@@ -1905,7 +1995,7 @@ order by
 	hr.category,
 	hr.check_name;
 -- Clean up
-    drop table health_results;
+ drop table health_results;
 end;
 
 $$ language plpgsql;

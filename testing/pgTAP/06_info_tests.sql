@@ -90,22 +90,40 @@ SELECT ok(
 );
 
 -- Version-conditional checks: SQL must parse and run regardless of whether
--- any rows match the current server_version_num.
+-- any rows match the current server_version_num. We assert that EVERY row
+-- the check produces has the expected shape (severity, object_name prefix).
+-- A fully-patched version returns 0 rows; the assertion is vacuously true.
 SELECT ok(
-    (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'Known CVE Affecting Your Version'),
-    'Function executes Known CVE Affecting Your Version check (version-conditional)'
+    (SELECT NOT EXISTS (
+        SELECT 1 FROM _pgfa_func_results
+         WHERE check_name = 'Known CVE Affecting Your Version'
+           AND (severity <> 'HIGH' OR object_name !~ '^CVE-')
+    )),
+    'Function CVE rows have the expected shape (severity=HIGH, object_name=CVE-*)'
 );
 SELECT ok(
-    (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'Known CVE Affecting Your Version'),
-    'View executes Known CVE Affecting Your Version check (version-conditional)'
+    (SELECT NOT EXISTS (
+        SELECT 1 FROM _pgfa_view_results
+         WHERE check_name = 'Known CVE Affecting Your Version'
+           AND (severity <> 'HIGH' OR object_name !~ '^CVE-')
+    )),
+    'View CVE rows have the expected shape (severity=HIGH, object_name=CVE-*)'
 );
 SELECT ok(
-    (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'Known Bug Affecting Your Version'),
-    'Function executes Known Bug Affecting Your Version check (version-conditional)'
+    (SELECT NOT EXISTS (
+        SELECT 1 FROM _pgfa_func_results
+         WHERE check_name = 'Known Bug Affecting Your Version'
+           AND (severity <> 'MEDIUM' OR object_name !~ '^PG')
+    )),
+    'Function Bug rows have the expected shape (severity=MEDIUM, object_name=PG*)'
 );
 SELECT ok(
-    (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'Known Bug Affecting Your Version'),
-    'View executes Known Bug Affecting Your Version check (version-conditional)'
+    (SELECT NOT EXISTS (
+        SELECT 1 FROM _pgfa_view_results
+         WHERE check_name = 'Known Bug Affecting Your Version'
+           AND (severity <> 'MEDIUM' OR object_name !~ '^PG')
+    )),
+    'View Bug rows have the expected shape (severity=MEDIUM, object_name=PG*)'
 );
 
 SELECT * FROM finish();

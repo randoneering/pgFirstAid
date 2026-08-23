@@ -1890,38 +1890,33 @@ end;
 -- HIGH: Known CVEs affecting the running PostgreSQL version. Curated from
 -- https://www.postgresql.org/support/security/: affected_min and fixed_in
 -- are server_version_num integers (e.g. 150004 for 15.4). Covers PG 15-18.
--- CVEs into the supported-versions index.
 insert into health_results
 with cve_data(cve_id, cvss, summary, affected_min, fixed_in, doc_link) as (
  values
  -- GENERATED cves BEGIN (do not edit; regenerate via tools/generate_cve_sql.py)
-        ('CVE-2023-39417',  7.5, 'Extension script @substitutions@ within quoting allows SQL injection',150000, 150004, 'https://www.postgresql.org/support/security/CVE-2023-39417/'),
-        ('CVE-2023-39417',  7.5, 'Extension script @substitutions@ within quoting allows SQL injection',160000, 160001, 'https://www.postgresql.org/support/security/CVE-2023-39417/'),
-        ('CVE-2023-5869',  8.8, 'pg_dump integer overflow (32-bit builds) can execute arbitrary code at restore',150000, 150005, 'https://www.postgresql.org/support/security/CVE-2023-5869/'),
-        ('CVE-2023-5869',  8.8, 'pg_dump integer overflow (32-bit builds) can execute arbitrary code at restore',160000, 160001, 'https://www.postgresql.org/support/security/CVE-2023-5869/'),
-        ('CVE-2024-0985',  8.0, 'Non-owner REFRESH MATERIALIZED VIEW CONCURRENTLY executes arbitrary SQL',150000, 150006, 'https://www.postgresql.org/support/security/CVE-2024-0985/'),
-        ('CVE-2024-0985',  8.0, 'Non-owner REFRESH MATERIALIZED VIEW CONCURRENTLY executes arbitrary SQL',160000, 160002, 'https://www.postgresql.org/support/security/CVE-2024-0985/'),
-        ('CVE-2024-7348',  8.8, 'pg_dump --restore uses an invalid type OID, allowing arbitrary SQL execution from a crafted dump',150000, 150008, 'https://www.postgresql.org/support/security/CVE-2024-7348/'),
-        ('CVE-2024-7348',  8.8, 'pg_dump --restore uses an invalid type OID, allowing arbitrary SQL execution from a crafted dump',160000, 160004, 'https://www.postgresql.org/support/security/CVE-2024-7348/'),
-        ('CVE-2024-10979',  8.8, 'PL/Perl environment variable changes execute arbitrary code',150000, 150009, 'https://www.postgresql.org/support/security/CVE-2024-10979/'),
-        ('CVE-2024-10979',  8.8, 'PL/Perl environment variable changes execute arbitrary code',160000, 160005, 'https://www.postgresql.org/support/security/CVE-2024-10979/'),
-        ('CVE-2024-10979',  8.8, 'PL/Perl environment variable changes execute arbitrary code',170000, 170001, 'https://www.postgresql.org/support/security/CVE-2024-10979/'),
-        ('CVE-2025-12818',  5.9, 'libpq undersizes allocations via integer wraparound (DoS, potential code execution)',150000, 150015, 'https://www.postgresql.org/support/security/CVE-2025-12818/'),
-        ('CVE-2025-12818',  5.9, 'libpq undersizes allocations via integer wraparound (DoS, potential code execution)',160000, 160011, 'https://www.postgresql.org/support/security/CVE-2025-12818/'),
-        ('CVE-2025-12818',  5.9, 'libpq undersizes allocations via integer wraparound (DoS, potential code execution)',170000, 170007, 'https://www.postgresql.org/support/security/CVE-2025-12818/'),
-        ('CVE-2025-12818',  5.9, 'libpq undersizes allocations via integer wraparound (DoS, potential code execution)',180000, 180001, 'https://www.postgresql.org/support/security/CVE-2025-12818/'),
-        ('CVE-2026-6471',  7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)',150000, 150019, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
-        ('CVE-2026-6471',  7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)',160000, 160015, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
-        ('CVE-2026-6471',  7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)',170000, 170011, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
-        ('CVE-2026-6471',  7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)',180000, 180005, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
-        ('CVE-2026-16239',  8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types',150000, 150019, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
-        ('CVE-2026-16239',  8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types',160000, 160015, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
-        ('CVE-2026-16239',  8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types',170000, 170011, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
-        ('CVE-2026-16239',  8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types',180000, 180005, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
-        ('CVE-2026-19385',  8.8, 'pg_dump heap buffer overflow executes arbitrary code',150000, 150019, 'https://www.postgresql.org/support/security/CVE-2026-19385/'),
-        ('CVE-2026-19385',  8.8, 'pg_dump heap buffer overflow executes arbitrary code',160000, 160015, 'https://www.postgresql.org/support/security/CVE-2026-19385/'),
-        ('CVE-2026-19385',  8.8, 'pg_dump heap buffer overflow executes arbitrary code',170000, 170011, 'https://www.postgresql.org/support/security/CVE-2026-19385/'),
-        ('CVE-2026-19385',  8.8, 'pg_dump heap buffer overflow executes arbitrary code',180000, 180005, 'https://www.postgresql.org/support/security/CVE-2026-19385/')
+        ('CVE-2023-39417', 7.5, 'Extension script @substitutions@ within quoting allows SQL injection', 150000, 150004, 'https://www.postgresql.org/support/security/CVE-2023-39417/'),
+        ('CVE-2023-39417', 7.5, 'Extension script @substitutions@ within quoting allows SQL injection', 160000, 160001, 'https://www.postgresql.org/support/security/CVE-2023-39417/'),
+        ('CVE-2023-5869', 8.8, 'pg_dump integer overflow (32-bit builds) can execute arbitrary code at restore', 150000, 150005, 'https://www.postgresql.org/support/security/CVE-2023-5869/'),
+        ('CVE-2023-5869', 8.8, 'pg_dump integer overflow (32-bit builds) can execute arbitrary code at restore', 160000, 160001, 'https://www.postgresql.org/support/security/CVE-2023-5869/'),
+        ('CVE-2024-0985', 8.0, 'Non-owner REFRESH MATERIALIZED VIEW CONCURRENTLY executes arbitrary SQL', 150000, 150006, 'https://www.postgresql.org/support/security/CVE-2024-0985/'),
+        ('CVE-2024-0985', 8.0, 'Non-owner REFRESH MATERIALIZED VIEW CONCURRENTLY executes arbitrary SQL', 160000, 160002, 'https://www.postgresql.org/support/security/CVE-2024-0985/'),
+        ('CVE-2024-7348', 8.8, 'pg_dump --restore uses an invalid type OID, allowing arbitrary SQL execution from a crafted dump', 150000, 150008, 'https://www.postgresql.org/support/security/CVE-2024-7348/'),
+        ('CVE-2024-7348', 8.8, 'pg_dump --restore uses an invalid type OID, allowing arbitrary SQL execution from a crafted dump', 160000, 160004, 'https://www.postgresql.org/support/security/CVE-2024-7348/'),
+        ('CVE-2024-10979', 8.8, 'PL/Perl environment variable changes execute arbitrary code', 150000, 150009, 'https://www.postgresql.org/support/security/CVE-2024-10979/'),
+        ('CVE-2024-10979', 8.8, 'PL/Perl environment variable changes execute arbitrary code', 160000, 160005, 'https://www.postgresql.org/support/security/CVE-2024-10979/'),
+        ('CVE-2024-10979', 8.8, 'PL/Perl environment variable changes execute arbitrary code', 170000, 170001, 'https://www.postgresql.org/support/security/CVE-2024-10979/'),
+        ('CVE-2026-6471', 7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)', 150000, 150019, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
+        ('CVE-2026-6471', 7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)', 160000, 160015, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
+        ('CVE-2026-6471', 7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)', 170000, 170011, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
+        ('CVE-2026-6471', 7.2, 'Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)', 180000, 180005, 'https://www.postgresql.org/support/security/CVE-2026-6471/'),
+        ('CVE-2026-16239', 8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types', 150000, 150019, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
+        ('CVE-2026-16239', 8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types', 160000, 160015, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
+        ('CVE-2026-16239', 8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types', 170000, 170011, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
+        ('CVE-2026-16239', 8.8, 'Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types', 180000, 180005, 'https://www.postgresql.org/support/security/CVE-2026-16239/'),
+        ('CVE-2026-19385', 8.8, 'pg_dump heap buffer overflow executes arbitrary code', 150000, 150019, 'https://www.postgresql.org/support/security/CVE-2026-19385/'),
+        ('CVE-2026-19385', 8.8, 'pg_dump heap buffer overflow executes arbitrary code', 160000, 160015, 'https://www.postgresql.org/support/security/CVE-2026-19385/'),
+        ('CVE-2026-19385', 8.8, 'pg_dump heap buffer overflow executes arbitrary code', 170000, 170011, 'https://www.postgresql.org/support/security/CVE-2026-19385/'),
+        ('CVE-2026-19385', 8.8, 'pg_dump heap buffer overflow executes arbitrary code', 180000, 180005, 'https://www.postgresql.org/support/security/CVE-2026-19385/')
 -- GENERATED cves END
 ),
 running_version as (
@@ -1947,20 +1942,19 @@ where r.version_num >= c.affected_min
 -- MEDIUM: Notable known bugs affecting the running PostgreSQL version. Curated
 -- from https://www.postgresql.org/docs/release/: non-CVE fixes users hit in
 -- production. affected_min/fixed_in are server_version_num integers.
--- operator-reported bug proves it deserves a permanent seat.
 insert into health_results
 with issue_data(issue_id, summary, affected_min, fixed_in, doc_link) as (
  values
  -- GENERATED bugs BEGIN (do not edit; regenerate via tools/generate_cve_sql.py)
-        ('PG15-INSERT-CONFLICT-VISIBLE-01', 'INSERT ... ON CONFLICT can fail to enforce unique-constraint visibility checks in some MVCC edge cases',150000, 150001, 'https://www.postgresql.org/docs/release/15.1/'),
-        ('PG15-BTREE-PAGE-LEAK-02', 'B-tree page deletion can leak pages on workloads with heavy concurrent UPDATEs',150000, 150002, 'https://www.postgresql.org/docs/release/15.2/'),
-        ('PG15-LOGREP-SUBSCRIBER-CRASH-03', 'Logical replication subscriber can crash mid-transaction on large in-progress changes',150000, 150005, 'https://www.postgresql.org/docs/release/15.5/'),
-        ('PG16-BTREE-CORRUPT-04', 'B-tree index page splits could corrupt the tree on high-concurrency inserts',160000, 160002, 'https://www.postgresql.org/docs/release/16.2/'),
-        ('PG16-LOGICAL-DECODING-SUBXACT-05', 'Logical decoding can miss subtransaction changes for aborted DDL',160000, 160003, 'https://www.postgresql.org/docs/release/16.3/'),
-        ('PG16-VACUUM-MEMORY-LEAK-06', 'Vacuum memory accounting leaks over many iterations of aggressive autovacuum',160000, 160005, 'https://www.postgresql.org/docs/release/16.5/'),
-        ('PG17-COPY-PARTITION-ROUTING-07', 'COPY FROM routing into partitioned tables can drop rows under concurrent partition attach',170000, 170001, 'https://www.postgresql.org/docs/release/17.1/'),
-        ('PG17-PG-CREATESUBSCRIBER-08', 'pg_createsubscriber can leave slots uninitialized, breaking logical failover on first switchover',170000, 170004, 'https://www.postgresql.org/docs/release/17.4/'),
-        ('PG18-MERGE-UPSERT-VIEW-09', 'MERGE ... WHEN NOT MATCHED against an inheritance child can produce duplicate rows under concurrent INSERT',180000, 180001, 'https://www.postgresql.org/docs/release/18.1/')
+        ('PG15-INSERT-CONFLICT-VISIBLE-01', 'INSERT ... ON CONFLICT can fail to enforce unique-constraint visibility checks in some MVCC edge cases', 150000, 150001, 'https://www.postgresql.org/docs/release/15.1/'),
+        ('PG15-BTREE-PAGE-LEAK-02', 'B-tree page deletion can leak pages on workloads with heavy concurrent UPDATEs', 150000, 150002, 'https://www.postgresql.org/docs/release/15.2/'),
+        ('PG15-LOGREP-SUBSCRIBER-CRASH-03', 'Logical replication subscriber can crash mid-transaction on large in-progress changes', 150000, 150005, 'https://www.postgresql.org/docs/release/15.5/'),
+        ('PG16-BTREE-CORRUPT-04', 'B-tree index page splits could corrupt the tree on high-concurrency inserts', 160000, 160002, 'https://www.postgresql.org/docs/release/16.2/'),
+        ('PG16-LOGICAL-DECODING-SUBXACT-05', 'Logical decoding can miss subtransaction changes for aborted DDL', 160000, 160003, 'https://www.postgresql.org/docs/release/16.3/'),
+        ('PG16-VACUUM-MEMORY-LEAK-06', 'Vacuum memory accounting leaks over many iterations of aggressive autovacuum', 160000, 160005, 'https://www.postgresql.org/docs/release/16.5/'),
+        ('PG17-COPY-PARTITION-ROUTING-07', 'COPY FROM routing into partitioned tables can drop rows under concurrent partition attach', 170000, 170001, 'https://www.postgresql.org/docs/release/17.1/'),
+        ('PG17-PG-CREATESUBSCRIBER-08', 'pg_createsubscriber can leave slots uninitialized, breaking logical failover on first switchover', 170000, 170004, 'https://www.postgresql.org/docs/release/17.4/'),
+        ('PG18-MERGE-UPSERT-VIEW-09', 'MERGE ... WHEN NOT MATCHED against an inheritance child can produce duplicate rows under concurrent INSERT', 180000, 180001, 'https://www.postgresql.org/docs/release/18.1/')
 -- GENERATED bugs END
 ),
 running_version as (

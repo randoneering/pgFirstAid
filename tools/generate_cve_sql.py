@@ -63,18 +63,35 @@ def _version_num(major: str, minor: int) -> int:
     return int(major) * 10000 + minor
 
 
+def _sql_quote(s: str) -> str:
+    """PostgreSQL-safe string literal: wrap in single quotes, double internal apostrophes.
+
+    Python's repr() emits backslash escapes (e.g. 'foo\\'s'), which PostgreSQL's
+    standard_conforming_strings interprets as a multi-line string-start, not an
+    embedded quote. Doubling the apostrophe ('foo''s') is the only form that
+    works in plain single-quoted string literals under any PG setting.
+    """
+    return "'" + s.replace("'", "''") + "'"
+
+
 def _render_cve_row(cve_id: str, cvss: float, summary: str, major: str, minor: int, doc_link: str) -> str:
     """Render one VALUES row for a CVE entry expanded to a single major version."""
     affected_min = _version_num(major, 0)
     fixed_in = _version_num(major, minor)
-    return f"{ROW_INDENT}({cve_id!r}, {cvss:>4}, {summary!r:>3},{affected_min}, {fixed_in}, {doc_link!r}),"
+    return (
+        f"{ROW_INDENT}({_sql_quote(cve_id)}, {cvss}, "
+        f"{_sql_quote(summary)}, {affected_min}, {fixed_in}, {_sql_quote(doc_link)}),"
+    )
 
 
 def _render_bug_row(issue_id: str, summary: str, major: str, minor: int, doc_link: str) -> str:
     """Render one VALUES row for a known-bug entry expanded to a single major version."""
     affected_min = _version_num(major, 0)
     fixed_in = _version_num(major, minor)
-    return f"{ROW_INDENT}({issue_id!r}, {summary!r},{affected_min}, {fixed_in}, {doc_link!r}),"
+    return (
+        f"{ROW_INDENT}({_sql_quote(issue_id)}, {_sql_quote(summary)}, "
+        f"{affected_min}, {fixed_in}, {_sql_quote(doc_link)}),"
+    )
 
 
 def render_cve_rows(cves_doc: dict) -> list[str]:
@@ -111,9 +128,23 @@ def render_bug_rows(bugs_doc: dict) -> list[str]:
     out = []
     for bug in bugs_doc["bugs"]:
         # Parse the leading major from the issue_id, e.g. "PG15-..." -> "15".
-        prefix, _, _ = bug["issue_id"].partition("-")
-        major = prefix[len("PG"):]  # strip "PG"
-        out.append(_render_bug_row(bug["issue_id"], bug["summary"], major, bug["fixed_in_minor"], bug["doc_link"]))
+        # The major must be a non-empty decimal, otherwise the row can't map
+        # to a server_version_num range and _version_num would either explode
+        # or silently emit a non-matching row.
+        prefix, sep, rest = bug["issue_id"].partition("-")
+        if not prefix.startswith("PG") or not sep or not rest:
+            raise ValueError(
+                f"issue_id {bug['issue_id']!r} is malformed; expected 'PG<MAJOR>-<rest>'"
+            )
+        major_str = prefix[2:]
+        if not major_str.isdigit() or int(major_str) <= 0:
+            raise ValueError(
+                f"issue_id {bug['issue_id']!r} has non-positive or non-decimal major"
+            )
+        out.append(_render_bug_row(
+            bug["issue_id"], bug["summary"],
+            major_str, bug["fixed_in_minor"], bug["doc_link"],
+        ))
     if out:
         out[-1] = out[-1].rstrip(",")
     return out

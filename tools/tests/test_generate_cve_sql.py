@@ -86,9 +86,14 @@ class RenderCveTests(unittest.TestCase):
         majors_in_rows = [row for row in rows if "CVE-2025-9999" in row]
         self.assertEqual(len(majors_in_rows), 4)
         # Extract the affected_min/fixed_in pair per row to confirm ordering.
+        # The regex tolerates optional whitespace between fields so it stays
+        # independent of _render_cve_row's exact formatting.
+        row_pat = re.compile(
+            r",\s*(\d{6}),\s*(\d{6}),\s*'https",
+        )
         seen_pairs = []
         for row in majors_in_rows:
-            m = re.search(r",(\d{6}), (\d{6}), 'https", row)
+            m = row_pat.search(row)
             self.assertIsNotNone(m, f"row did not match pattern: {row}")
             am, fi = int(m.group(1)), int(m.group(2))
             major_part = am // 10000
@@ -172,39 +177,103 @@ class ReplaceBlockTests(unittest.TestCase):
             gen.replace_block(bad, "cves", self.NEW_ROWS)
 
 
-class FileRegenerationTests(unittest.TestCase):
-    """End-to-end: write the JSON + a template file, run the regenerator, assert idempotence."""
+class RegenerateOneTests(unittest.TestCase):
+    """Verify regenerate_one end-to-end against a real tmpdir SQL file.
+
+    The class replaces the previous FileRegenerationTests stub (whose
+    setUp/tmpdir machinery was unused). Each test writes a real SQL file
+    on disk, calls regenerate_one, and asserts the file content matches
+    what the render functions would produce.
+    """
+
+    CVE_DOC = {
+        "cves": [
+            {
+                "cve_id": "CVE-9999-DEMO",
+                "cvss": 8.8,
+                "summary": "demo row for regenerate_one",
+                "doc_link": "https://example.com/cve-9999",
+                "fixed_in": {"15": 5, "16": 2},
+            }
+        ]
+    }
+    BUG_DOC = {
+        "bugs": [
+            {
+                "issue_id": "PG15-DEMO-BUG",
+                "summary": "demo bug row for regenerate_one",
+                "doc_link": "https://example.com/release/15.3",
+                "fixed_in_minor": 3,
+            }
+        ]
+    }
+    TEMPLATE = (
+        "-- header\n"
+        "with cve_data(...) as (values\n"
+        f"        {gen.SENTINEL_BEGIN_TEMPLATE.format(kind='cves')}\n"
+        "        ('placeholder-cve')\n"
+        f"        {gen.SENTINEL_END_TEMPLATE.format(kind='cves')}\n"
+        ")\n"
+        "select 1 from cve_data;\n"
+        "with issue_data(...) as (values\n"
+        f"        {gen.SENTINEL_BEGIN_TEMPLATE.format(kind='bugs')}\n"
+        "        ('placeholder-bug')\n"
+        f"        {gen.SENTINEL_END_TEMPLATE.format(kind='bugs')}\n"
+        ")\n"
+        "select 1 from issue_data;\n"
+    )
 
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.tmpdir = Path(self.tmp.name)
+        self._tmp = tempfile.TemporaryDirectory()
+        self.sql_path = Path(self._tmp.name) / "v_pgFirstAid.sql"
+        self.sql_path.write_text(self.TEMPLATE)
 
     def tearDown(self) -> None:
-        self.tmp.cleanup()
+        self._tmp.cleanup()
 
-    def _write_files(self) -> None:
-        # Make a JSON file under data/ relative to the test's cwd-override is
-        # awkward; we instead exercise the render functions directly here. The
-        # full script integration is covered by the live pgTAP suite.
-        pass
+    def _run(self) -> str:
+        cve_rows = gen.render_cve_rows(self.CVE_DOC)
+        bug_rows = gen.render_bug_rows(self.BUG_DOC)
+        new_text = gen.regenerate_one(self.sql_path, cve_rows, bug_rows)
+        # Apply as a real write so the assertion matches what an end user
+        # would see on disk.
+        self.sql_path.write_text(new_text)
+        return self.sql_path.read_text()
 
-    def test_idempotence_of_replace_block(self) -> None:
-        # Run replace_block twice with the same input; second call should be a no-op.
-        template = (
-            "-- header comment\n"
-            "with cte(c1) as (\n"
-            "    values\n"
-            f"        {gen.SENTINEL_BEGIN_TEMPLATE.format(kind='cves')}\n"
-            "        ('old1'),\n"
-            "        ('old2')\n"
-            f"        {gen.SENTINEL_END_TEMPLATE.format(kind='cves')}\n"
-            ")\n"
-            "select * from cte;\n"
-        )
-        new_rows = ["        ('newA'),", "        ('newB')"]
-        result1 = gen.replace_block(template, "cves", new_rows)
-        result2 = gen.replace_block(result1, "cves", new_rows)
-        self.assertEqual(result1, result2)
+    def test_writes_cve_rows_into_cve_block(self) -> None:
+        text = self._run()
+        # The cve_block now contains the demo CVE for both PG 15 and 16;
+        # placeholders are gone. bug_rows were passed in _run, so the bug
+        # block also reflects real data.
+        cve_block, _, bug_block = self._split_blocks(text)
+        self.assertIn("CVE-9999-DEMO", cve_block)
+        self.assertNotIn("placeholder-cve", cve_block)
+        # Two rows: one per affected major in fixed_in.
+        self.assertEqual(cve_block.count("'CVE-9999-DEMO'"), 2)
+        self.assertIn("PG15-DEMO-BUG", bug_block)
+        self.assertNotIn("placeholder-bug", bug_block)
+
+    def test_idempotent_on_unchanged_inputs(self) -> None:
+        # Run the regenerator twice in a row; the second pass should be
+        # a no-op (file content unchanged) — this is the contract the
+        # `cve-data-sync` CI relies on.
+        self._run()
+        first = self.sql_path.read_text()
+        self._run()
+        second = self.sql_path.read_text()
+        self.assertEqual(first, second)
+
+    def _split_blocks(self, text: str) -> tuple[str, str, str]:
+        """Return (cve_block, issue_block, bug_block) sliced between markers."""
+        cve_b = gen.SENTINEL_BEGIN_TEMPLATE.format(kind="cves")
+        cve_e = gen.SENTINEL_END_TEMPLATE.format(kind="cves")
+        bug_b = gen.SENTINEL_BEGIN_TEMPLATE.format(kind="bugs")
+        bug_e = gen.SENTINEL_END_TEMPLATE.format(kind="bugs")
+        cve_block = text[text.index(cve_b):text.index(cve_e) + len(cve_e)]
+        bug_block = text[text.index(bug_b):text.index(bug_e) + len(bug_e)]
+        # Whatever sits between cve_block's end and bug_block's start.
+        between = text[text.index(cve_e) + len(cve_e):text.index(bug_b)]
+        return cve_block, between, bug_block
 
 
 # Pull the SQL_TEMPLATE attribute back up so the per-major test can use it.

@@ -2,7 +2,7 @@ BEGIN;
 -- Cache results once; querying inline per-assertion multiplies execution cost by N.
 CREATE TEMP TABLE _pgfa_func_results AS SELECT * FROM pg_firstAid();
 CREATE TEMP TABLE _pgfa_view_results AS SELECT * FROM v_pgfirstaid;
-SELECT plan(20);
+SELECT plan(24);
 
 SELECT ok((SELECT count(*) >= 0 FROM _pgfa_func_results), 'pg_firstAid() executes');
 SELECT ok((SELECT count(*) >= 0 FROM _pgfa_view_results), 'v_pgfirstaid executes');
@@ -87,6 +87,25 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 1 FROM _pgfa_view_results WHERE check_name = 'Connection Utilization'),
     'View executes Connection Utilization check'
+);
+
+-- Version-conditional checks: SQL must parse and run regardless of whether
+-- any rows match the current server_version_num.
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'Known CVE Affecting Your Version'),
+    'Function executes Known CVE Affecting Your Version check (version-conditional)'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'Known CVE Affecting Your Version'),
+    'View executes Known CVE Affecting Your Version check (version-conditional)'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'Known Bug Affecting Your Version'),
+    'Function executes Known Bug Affecting Your Version check (version-conditional)'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'Known Bug Affecting Your Version'),
+    'View executes Known Bug Affecting Your Version check (version-conditional)'
 );
 
 SELECT * FROM finish();

@@ -1,0 +1,88 @@
+{
+  "_comment": [
+    "Curated CVE data for pgFirstAid.",
+    "Source of truth: this JSON file. Regenerate the inline VALUES rows in",
+    "pgFirstAid.sql / view_pgFirstAid.sql / view_pgFirstAid_managed.sql via",
+    "`python tools/generate_cve_sql.py`. The on-disk inline VALUES rows are",
+    "regenerated on every commit; edit only this file.",
+    "",
+    "Schema:",
+    "  cve_id:          CVE identifier (CVE-YYYY-NNNN)",
+    "  cvss:            Numeric CVSS v3 base score (Ponytail starter: only >= 7.0)",
+    "  summary:         One-sentence description (matches the PGDG advisory text)",
+    "  doc_link:        Canonical PGDG advisory URL",
+    "  fixed_in:        Map: major version string -> first patched minor number.",
+    "                   Each entry produces one row per major in the SQL output.",
+    "",
+    "Inclusions rule for any future scraper (layer 3): PG 15-18 only, CVSS >= 7.0.",
+    "Always hand-review before merge."
+  ],
+  "version": 1,
+  "last_reviewed": "2026-08-23",
+  "source": "https://www.postgresql.org/support/security/",
+  "cves": [
+    {
+      "cve_id": "CVE-2023-39417",
+      "cvss": 7.5,
+      "summary": "Extension script @substitutions@ within quoting allows SQL injection",
+      "doc_link": "https://www.postgresql.org/support/security/CVE-2023-39417/",
+      "fixed_in": {"15": 4, "16": 1}
+    },
+    {
+      "cve_id": "CVE-2023-5869",
+      "cvss": 8.8,
+      "summary": "pg_dump integer overflow (32-bit builds) can execute arbitrary code at restore",
+      "doc_link": "https://www.postgresql.org/support/security/CVE-2023-5869/",
+      "fixed_in": {"15": 5, "16": 1}
+    },
+    {
+      "cve_id": "CVE-2024-0985",
+      "cvss": 8.0,
+      "summary": "Non-owner REFRESH MATERIALIZED VIEW CONCURRENTLY executes arbitrary SQL",
+      "doc_link": "https://www.postgresql.org/support/security/CVE-2024-0985/",
+      "fixed_in": {"15": 6, "16": 2}
+    },
+    {
+      "cve_id": "CVE-2024-7348",
+      "cvss": 8.8,
+      "summary": "pg_dump --restore uses an invalid type OID, allowing arbitrary SQL execution from a crafted dump",
+      "doc_link": "https://www.postgresql.org/support/security/CVE-2024-7348/",
+      "fixed_in": {"15": 8, "16": 4}
+    },
+    {
+      "cve_id": "CVE-2024-10979",
+      "cvss": 8.8,
+      "summary": "PL/Perl environment variable changes execute arbitrary code",
+      "doc_link": "https://www.postgresql.org/support/security/CVE-2024-10979/",
+      "fixed_in": {"15": 9, "16": 5, "17": 1}
+    },
+    {
+      "cve_id": "CVE-2025-12818",
+      "cvss": 5.9,
+      "summary": "libpq undersizes allocations via integer wraparound (DoS, potential code execution)",
+      "doc_link": "https://www.postgresql.org/support/security/CVE-2025-12818/",
+      "fixed_in": {"15": 15, "16": 11, "17": 7, "18": 1}
+    },
+    {
+      "cve_id": "CVE-2026-6471",
+      "cvss": 7.2,
+      "summary": "Logical decoding can dlopen arbitrary file via choice of decoder plugin (REPLICATION privilege required)",
+      "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6471/",
+      "fixed_in": {"15": 19, "16": 15, "17": 11, "18": 5}
+    },
+    {
+      "cve_id": "CVE-2026-16239",
+      "cvss": 8.8,
+      "summary": "Type confusion in cursor CLOSE + DECLARE executes arbitrary code via portal/cursor re-creation with different types",
+      "doc_link": "https://www.postgresql.org/support/security/CVE-2026-16239/",
+      "fixed_in": {"15": 19, "16": 15, "17": 11, "18": 5}
+    },
+    {
+      "cve_id": "CVE-2026-19385",
+      "cvss": 8.8,
+      "summary": "pg_dump heap buffer overflow executes arbitrary code",
+      "doc_link": "https://www.postgresql.org/support/security/CVE-2026-19385/",
+      "fixed_in": {"15": 19, "16": 15, "17": 11, "18": 5}
+    }
+  ]
+}

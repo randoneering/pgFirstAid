@@ -19,7 +19,7 @@ Inclusion rule (project policy, matches the prior conversation):
   - Dedupe against data/known_bugs.json by the proposed issue_id.
   - Output is sorted by severity (highest first), then by major, then by id.
 
-Caveats — the release-notes catalog is fundamentally noisier than the CVE
+Caveats: the release-notes catalog is fundamentally noisier than the CVE
 catalog: each minor has ~50-200 listitems. We rely on keyword severity
 filtering plus a per-major top-N cap to keep the proposal list reviewable.
 
@@ -271,7 +271,7 @@ def parse_release_page(html: str, *, major: str, minor: str, doc_link: str) -> l
             "summary": summary,
             "doc_link": doc_link,
             "fixed_in_minor": int(minor),
-            # Internal fields — stripped by to_json_format.
+            # Internal fields: stripped by to_json_format.
             "_severity": severity,
             "_commit": commit_match.group(1) if commit_match else None,
         })
@@ -421,7 +421,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"scout: page fetch failed {major}.{minor}: {exc}", file=sys.stderr)
                 continue
             if html is None:
-                # 404 / 410 — PGDG indexing gap. Skip and continue.
+                # 404 / 410: PGDG indexing gap. Skip and continue.
                 skipped.append(f"{major}.{minor}")
                 continue
             all_entries.extend(parse_release_page(

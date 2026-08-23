@@ -54,7 +54,7 @@ class ParseSyntheticTests(unittest.TestCase):
         entries = scraper.parse_pgdg_table(self.html)
         second = entries[1]
         self.assertEqual(second["cve_id"], "CVE-2024-0985")
-        # Source listed only 16, 15, 14 — only 15 and 16 should appear.
+        # Source listed only 16, 15, 14: only 15 and 16 should appear.
         self.assertEqual(second["fixed_in"], {"15": 6, "16": 2})
 
     def test_summary_strips_more_details_link(self) -> None:
@@ -79,7 +79,7 @@ class ParseRealisticFixtureTests(unittest.TestCase):
 
     def test_parses_at_least_60_cves(self) -> None:
         # PGDG publishes ~30 CVEs per major x 5 majors = ~150 historically;
-        # 60 is a loose floor — if we drop below this, suspect a parse regression.
+        # 60 is a loose floor: if we drop below this, suspect a parse regression.
         entries = scraper.parse_pgdg_table(self.html)
         self.assertGreater(len(entries), 60, f"only {len(entries)} entries parsed")
 

@@ -73,9 +73,9 @@ class ParseReleasePageTests(unittest.TestCase):
     def test_strips_trailing_section_marker(self) -> None:
         entries = scout.parse_release_page(self.html, major="17", minor="11", doc_link="x/")
         for entry in entries:
-            # The "§" anchor at the end (from postgr.es/c/<hash>) is HTML,
+            # The section anchor at the end (from postgr.es/c/<hash>) is HTML,
             # but if our _strip_tags missed it the text would contain it.
-            self.assertNotIn("§", entry["summary"])
+            self.assertNotIn("sec.", entry["summary"])
 
     def test_stable_id_uses_commit_hash(self) -> None:
         entries = scout.parse_release_page(self.html, major="17", minor="11", doc_link="x/")

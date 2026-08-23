@@ -21,7 +21,7 @@ Inclusion rule (matches project policy from prior conversation):
 
 No external deps: uses urllib.request + stdlib re. The HTML is small and
 table-uniform, so we regex over the rendered page rather than depend on
-BeautifulSoup. The HTML structure can shift if PGDG redesigns — when that
+BeautifulSoup. The HTML structure can shift if PGDG redesigns: when that
 happens, the unit-test fixtures will catch it and we'll tighten the regex.
 """
 

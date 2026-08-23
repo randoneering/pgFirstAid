@@ -73,14 +73,12 @@ Each bug entry covers exactly one major (`issue_id` starts with `PG<MAJOR>`). Ru
 ## Manual flags
 
 ```
-python tools/generate_cve_sql.py # write fresh rows into all SQL files
-python tools/generate_cve_sql.py --check # exit non-zero if any file is stale (CI mode)
+python tools/generate_cve_sql.py            # write fresh rows into all SQL files
+python tools/generate_cve_sql.py --check    # exit non-zero if any file is stale (CI mode)
 ```
 
 The generator is idempotent: running it twice with no JSON changes writes identical bytes and reports `ok <file>` for each file.
 
 ## Why inline VALUES, not a runtime lookup
 
-The project's install promise is "paste one SQL file." A runtime `pg_read_file()` lookup would require `pg_read_server_files` privilege, a known file path, and a network-or-disk dependency at query time. Inline VALUES give us a fully offline, no-extra-privilege install.
-
-The trade-off is curation: every row is reviewed-by-hand and added to JSON. The weekly scraper (next section) keeps it current.
+The install promise is "paste one SQL file": no DB-side privileges, no disk dependency. The trade-off is curation.

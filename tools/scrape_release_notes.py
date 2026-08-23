@@ -161,11 +161,12 @@ def _resolve_cafile() -> str | None:
 
 
 def _fetch(url: str, timeout: float = 30.0, user_agent: str = DEFAULT_USER_AGENT) -> str | None:
-    """Fetch a URL. Returns None on 404/410/5xx to allow caller to skip gracefully.
+    """Fetch a URL. Returns None on 404/410; any other HTTPError re-raises.
 
     PGDG occasionally has indexing gaps (a release is announced and indexed
     but the per-minor page hasn't been uploaded yet). We treat that as
-    "skip this revision and continue" rather than a hard error.
+    "skip this revision and continue" rather than a hard error. Anything
+    else (5xx, network error, etc.) propagates so the caller can decide.
     """
     import ssl
     ctx = ssl.create_default_context()
@@ -400,6 +401,10 @@ def main(argv: list[str] | None = None) -> int:
         index_html = _fetch(args.index_url, user_agent=args.user_agent)
     except Exception as exc:
         print(f"scout: index fetch failed: {exc}", file=sys.stderr)
+        return 2
+
+    if index_html is None:
+        print("scout: index returned 404/410", file=sys.stderr)
         return 2
 
     recent = list_recent_releases(index_html, majors=majors, revisions_back=args.revisions_back)

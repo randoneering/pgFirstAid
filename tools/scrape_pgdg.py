@@ -14,7 +14,7 @@ Workflow:
   --write --yes        Patch data/cves.json with the proposed additions.
                        Use --yes to skip the confirmation prompt.
 
-Inclusion rule (matches project policy from prior conversation):
+Inclusion rule (project policy):
   - CVE must affect at least one of PG 15, 16, 17, 18 (--majors 15,16,17,18).
   - CVSS v3 base score must be >= 7.0 (--min-cvss 7.0).
   - Skip CVEs already in data/cves.json.

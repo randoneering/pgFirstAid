@@ -226,5 +226,48 @@ class StrigHtmlTests(unittest.TestCase):
         self.assertEqual(out, 'PostgreSQL "pg_dump" leaks files & arbitrary code')
 
 
+class FetchIndexUrlTests(unittest.TestCase):
+    """fetch_pgdg_index passes its `url` argument to urllib.request.Request.
+
+    Without this, the CLI's --url flag is decorative — the request always
+    hits the hard-coded PGDG_URL. These tests verify the wiring.
+    """
+
+    def test_request_uses_supplied_url(self) -> None:
+        import unittest.mock as mock
+
+        captured: dict = {}
+        def fake_urlopen(req, timeout, context):
+            captured["url"] = req.full_url
+            captured["headers"] = dict(req.header_items())
+            return mock.MagicMock(
+                __enter__=lambda s: s,
+                __exit__=lambda s, *a: False,
+                read=lambda: b"<html>placeholder</html>",
+            )
+
+        with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            scraper.fetch_pgdg_index(url="https://example.com/security")
+
+        self.assertEqual(captured["url"], "https://example.com/security")
+
+    def test_default_url_unchanged(self) -> None:
+        import unittest.mock as mock
+
+        captured: dict = {}
+        def fake_urlopen(req, timeout, context):
+            captured["url"] = req.full_url
+            return mock.MagicMock(
+                __enter__=lambda s: s,
+                __exit__=lambda s, *a: False,
+                read=lambda: b"<html>x</html>",
+            )
+
+        with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            scraper.fetch_pgdg_index()
+
+        self.assertEqual(captured["url"], scraper.PGDG_URL)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -308,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        entries = parse_pgdg_table(html)
+        entries = parse_pgdg_table(html, majors=set(majors))
     except RuntimeError as exc:
         print(f"scraper: parse failed: {exc}", file=sys.stderr)
         return 2

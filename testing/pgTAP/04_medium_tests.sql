@@ -2,7 +2,7 @@ BEGIN;
 -- Cache results once; querying inline per-assertion multiplies execution cost by N.
 CREATE TEMP TABLE _pgfa_func_results AS SELECT * FROM pg_firstAid();
 CREATE TEMP TABLE _pgfa_view_results AS SELECT * FROM v_pgfirstaid;
-SELECT plan(16);
+SELECT plan(18);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'Missing FK Index'),
@@ -74,6 +74,15 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'work_mem At Default'),
     'View executes work_mem At Default check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'Query Duration Logging Disabled'),
+    'Function executes Query Duration Logging Disabled check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'Query Duration Logging Disabled'),
+    'View executes Query Duration Logging Disabled check'
 );
 
 SELECT * FROM finish();

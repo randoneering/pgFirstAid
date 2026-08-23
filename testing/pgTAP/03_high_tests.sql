@@ -4,7 +4,7 @@ BEGIN;
 -- (function emits no rows for those checks) without needing CASE guards.
 CREATE TEMP TABLE _pgfa_func_results AS SELECT * FROM pg_firstAid();
 CREATE TEMP TABLE _pgfa_view_results AS SELECT * FROM v_pgfirstaid;
-SELECT plan(46);
+SELECT plan(52);
 
 SELECT ok(
     (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'Current Blocked/Blocking Queries'),
@@ -211,6 +211,33 @@ SELECT ok(
 SELECT ok(
     (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'shared_buffers At Default'),
     'View executes shared_buffers At Default check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'Autovacuum Disabled On Table'),
+    'Function executes Autovacuum Disabled On Table check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'Autovacuum Disabled On Table'),
+    'View executes Autovacuum Disabled On Table check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'listen_addresses Wildcard'),
+    'Function executes listen_addresses Wildcard check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'listen_addresses Wildcard'),
+    'View executes listen_addresses Wildcard check'
+);
+
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_func_results WHERE check_name = 'Timestamp Without Time Zone'),
+    'Function executes Timestamp Without Time Zone check'
+);
+SELECT ok(
+    (SELECT count(*) >= 0 FROM _pgfa_view_results WHERE check_name = 'Timestamp Without Time Zone'),
+    'View executes Timestamp Without Time Zone check'
 );
 
 SELECT * FROM finish();

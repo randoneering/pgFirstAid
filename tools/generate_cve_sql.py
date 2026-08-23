@@ -189,11 +189,6 @@ def main() -> int:
         action="store_true",
         help="exit non-zero if any SQL file would change (CI mode)",
     )
-    parser.add_argument(
-        "--write",
-        action="store_true",
-        help="default; write fresh rows into all SQL files (in-place)",
-    )
     args = parser.parse_args()
 
     cves_doc = json.loads(CVES_JSON.read_text())

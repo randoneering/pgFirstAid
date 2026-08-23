@@ -1,14 +1,7 @@
 {
   "_comment": [
-    "Curated non-CVE release-note bugs for pgFirstAid.",
-    "Source of truth: this JSON file. Regenerate the inline VALUES rows in",
-    "pgFirstAid.sql / view_pgFirstAid.sql / view_pgFirstAid_managed.sql via",
-    "`python tools/generate_cve_sql.py`. The on-disk inline VALUES rows are",
-    "regenerated on every commit; edit only this file.",
-    "",
-    "These are hand-picked from the PostgreSQL release notes — ponytail ceiling:",
-    "this is curated, not exhaustive. Add a row when an operator-reported bug",
-    "proves it deserves a permanent seat."
+    "Curated, hand-picked release-note bugs for pgFirstAid.",
+    "Edit this file; regenerate with `python tools/generate_cve_sql.py`."
   ],
   "version": 1,
   "last_reviewed": "2026-08-23",

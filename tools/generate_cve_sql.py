@@ -45,9 +45,9 @@ SQL_FILES = [
     REPO_ROOT / "view_pgFirstAid_managed.sql",
 ]
 
-# Sentinel comments. Keep these strings stable — they are how the generator
+# Sentinel comments. Keep these strings stable: they are how the generator
 # locates where to write. Format: "-- GENERATED <kind> BEGIN" / "... END".
-SENTINEL_BEGIN_TEMPLATE = "-- GENERATED {kind} BEGIN  (do not edit; regenerate via tools/generate_cve_sql.py)"
+SENTINEL_BEGIN_TEMPLATE = "-- GENERATED {kind} BEGIN (do not edit; regenerate via tools/generate_cve_sql.py)"
 SENTINEL_END_TEMPLATE = "-- GENERATED {kind} END"
 
 # Indentation for the VALUES rows. Each row lines up with the surrounding
@@ -96,7 +96,7 @@ def render_cve_rows(cves_doc: dict) -> list[str]:
             minor = cve["fixed_in"][major]
             out.append(_render_cve_row(cve_id, cvss, summary, major, minor, doc_link))
     if out:
-        # Strip the trailing comma from the last row — PostgreSQL rejects
+        # Strip the trailing comma from the last row: PostgreSQL rejects
         # the form `(...),` on the final VALUES entry.
         out[-1] = out[-1].rstrip(",")
     return out

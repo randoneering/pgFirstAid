@@ -60,7 +60,7 @@ A check only fires when its conditions are met, so an empty result for any check
 - **Roles That Have Never Logged In** - Excludes system role and managed services roles. This includes users with `LOGIN` rights.
 - **Varchar With Length Limit** - Columns declared `varchar(n)`. The book recommends `text` when in doubt; length limits can cause silent truncation
 - **Serial Column Legacy** - Columns with `nextval()` defaults instead of `GENERATED AS IDENTITY`. Migrate when convenient
-- **Rules On Tables** - Non-view rules on tables. Prefer triggers — rules on tables are an old mechanism
+- **Rules On Tables** - Non-view rules on tables. Prefer triggers: rules on tables are an old mechanism
 - **Not In With Subquery** *(pg_stat_statements)* - Queries using `NOT IN (SELECT ...)`. SQL NULL semantics trap returns zero rows if the subquery contains any NULL
 
 ## INFORMATIONAL

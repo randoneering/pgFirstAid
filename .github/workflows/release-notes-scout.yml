@@ -9,7 +9,11 @@ on:
   schedule:
     - cron: '0 22 * * 1'  # Mondays 22:00 UTC, after PGDG's Tuesday batch.
   workflow_dispatch:
-  pull_request:
+  # Note: deliberately no `pull_request:` trigger. The default GITHUB_TOKEN
+  # on PR events is read-only, so this workflow's "open a new PR" step
+  # would fail with "GitHub Actions is not permitted to create or approve
+  # pull requests." If you want a PR-validation pass, add a separate
+  # workflow that just runs the scout in --check mode.
 
 concurrency:
   group: release-notes-scout

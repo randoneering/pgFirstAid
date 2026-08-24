@@ -32,15 +32,26 @@ PGFIRSTAID_VERSION="${PGFIRSTAID_VERSION:-main}"
 PGFIRSTAID_FAIL_SEVERITY="${PGFIRSTAID_FAIL_SEVERITY:-HIGH}"
 
 # ---- 0. Pre-flight checks ----
+# If DATABASE_URL is not set explicitly, build it from the component
+# env vars (PGHOST / PGPORT / PGUSER / PGPASSWORD / PGDATABASE). This is
+# the shape the GitHub Actions matrix already injects; the older
+# error-and-bail was unnecessary friction for local runs of the
+# workflow.
 if [ -z "$DATABASE_URL" ]; then
-    echo "$PREFIX ERROR: DATABASE_URL is required."
-    echo ""
-    echo "  export DATABASE_URL=postgresql://user:pass@host:5432/dbname"
-    echo ""
-    echo "  You can also build it from component env vars:"
-    echo ""
-    echo '  DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"'
-    exit 1
+    if [ -n "${PGHOST:-}" ] && [ -n "${PGPORT:-}" ] && [ -n "${PGUSER:-}" ] && [ -n "${PGPASSWORD:-}" ] && [ -n "${PGDATABASE:-}" ]; then
+        DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
+        export DATABASE_URL
+        echo "$PREFIX DATABASE_URL built from component env vars."
+    else
+        echo "$PREFIX ERROR: DATABASE_URL is required."
+        echo ""
+        echo "  export DATABASE_URL=postgresql://user:pass@host:5432/dbname"
+        echo ""
+        echo "  You can also build it from component env vars:"
+        echo ""
+        echo '  DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"'
+        exit 1
+    fi
 fi
 
 if ! command -v uv >/dev/null 2>&1; then

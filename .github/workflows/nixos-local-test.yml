@@ -58,7 +58,13 @@ concurrency:
 jobs:
   local-test:
     runs-on: [self-hosted, nix, nixos, x86_64-linux]
-    if: ${{ github.event_name != 'workflow_dispatch' || matrix.postgres_version == inputs.postgres_version }}
+    # No job-level `if:`. The original conditional referenced
+    # `matrix.postgres_version` which is only valid in the strategy scope
+    # (after matrix evaluation), not at the job level. GitHub Actions
+    # rejects the workflow with "Unrecognized named-value: 'matrix'."
+    # The PR validation pass runs the full matrix unconditionally on
+    # pull_request; the workflow_dispatch path's per-version selection
+    # is handled by the strategy below.
     permissions:
       contents: read
     concurrency:

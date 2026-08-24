@@ -149,6 +149,11 @@ echo "$PREFIX === Step 3/5: Post-migration validation ==="
 "${PSQL[@]}" -f "${REPO_ROOT}/pgFirstAid.sql"
 
 "${PSQL[@]}" <<EOF
+-- Use DROP IF EXISTS to survive across runs on the same self-hosted
+-- runner. A previous interrupted session may have left the temp table
+-- in the connection's session state; the next run's CREATE otherwise
+-- fails with "relation already exists".
+DROP TABLE IF EXISTS _health_snapshot;
 CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();
 
 \echo '=== Post-Migration Health Report ==='

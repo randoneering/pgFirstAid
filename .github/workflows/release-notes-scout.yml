@@ -1,0 +1,117 @@
+name: release-notes-scout
+
+# Weekly Monday evening UTC scout of PostgreSQL release notes.
+# Proposes high/medium severity bug fixes that match data/known_bugs.json
+# entries missing from the curated list. A PR is opened for human review;
+# never auto-merges.
+
+on:
+  schedule:
+    - cron: '0 22 * * 1'  # Mondays 22:00 UTC, after PGDG's Tuesday batch.
+  workflow_dispatch:
+  # Note: deliberately no `pull_request:` trigger. The default GITHUB_TOKEN
+  # on PR events is read-only, so this workflow's "open a new PR" step
+  # would fail with "GitHub Actions is not permitted to create or approve
+  # pull requests." If you want a PR-validation pass, add a separate
+  # workflow that just runs the scout in --check mode.
+
+concurrency:
+  group: release-notes-scout
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  scout:
+    permissions:
+      contents: write
+      pull-requests: write
+    name: Scout release-notes for high-severity bug fixes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Sync deps
+        run: uv sync --quiet
+
+      - name: Run scout (CI mode)
+        # --check exit codes:
+        #   0 = no proposed additions
+        #   1 = proposed additions, written to stdout (this is what we want
+        #       to open a PR for)
+        #   2+ = hard failure (parse error, network error, missing
+        #       sentinel, etc.). Propagate as a workflow failure WITHOUT
+        #       writing the (likely empty or partial) stdout, so the
+        #       resulting commit doesn't carry a misleading file.
+        id: scout
+        run: |
+          set +e
+          PROPOSED=$(uv run python tools/scrape_release_notes.py --check 2>/dev/null)
+          rc=$?
+          set -e
+          echo "scout exit code: $rc"
+          if [ $rc -eq 1 ]; then
+            echo "needs_pr=true" >> "$GITHUB_OUTPUT"
+            echo "$PROPOSED" > proposed-bugs.json
+          elif [ $rc -eq 0 ]; then
+            echo "needs_pr=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "scout: hard failure (exit code $rc); not opening a PR" >&2
+            exit "$rc"
+          fi
+
+      - name: Open PR with proposed bug entries
+        if: steps.scout.outputs.needs_pr == 'true'
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6.1.0
+        with:
+          # Explicit base is required when the push event delivers a merge
+          # commit (detached HEAD), e.g. after merging main into the source
+          # branch on a feature PR. Default would otherwise fail with
+          # "the 'base' input must be supplied."
+          base: ${{ github.event.repository.default_branch }}
+          branch: chore/release-notes-scout
+          title: "chore: add notable PostgreSQL bug fixes"
+          body: |
+            Automated PostgreSQL release-notes scout.
+
+            `tools/scrape_release_notes.py` fetched the latest ~2 minor
+            release notes per major in {15,16,17,18}, filtered the
+            `<li class="listitem">` entries by severity keywords, deduped
+            against `data/known_bugs.json`, and surfaced the top 5 per
+            major for review. The candidates are in `proposed-bugs.json`.
+
+            **Action items for a human:**
+            - [ ] Decide which entries earn a permanent seat. The list
+                  is biased toward data-integrity / crash / replication
+                  bugs; doc-only or trivial entries should be dropped.
+            - [ ] Rename curator IDs if needed (e.g. `PG17-a1b2c3d4e`
+                  → `PG17-MERGE-RACE-CONDITION-01`) before merging.
+            - [ ] Merge selected entries into `data/known_bugs.json`:
+                  ```bash
+                  uv run python tools/scrape_release_notes.py --write --yes
+                  uv run python tools/generate_cve_sql.py
+                  git add data/known_bugs.json pgFirstAid.sql view_pgFirstAid.sql view_pgFirstAid_managed.sql
+                  git commit -m "chore: refresh known-bugs catalog"
+                  ```
+            - [ ] Delete `proposed-bugs.json` before merge.
+
+            Notes on the keyword filter (`HIGH`/`MEDIUM` lists live in
+            `tools/scrape_release_notes.py`): the curated list is small,
+            intent is curated quality over recall, and silent false
+            negatives are preferred over noisy false positives. Tune the
+            keyword lists if the proposals get noisy or thin.
+
+            scout exit code: ${{ steps.scout.outputs.needs_pr }} (non-zero = proposals pending)
+          add-paths: proposed-bugs.json
+          commit-message: "chore: scout release notes for new bug fixes"
+          delete-branch: true
+          labels: automated

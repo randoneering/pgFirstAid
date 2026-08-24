@@ -1,0 +1,32 @@
+
+<!doctype html>
+<html lang="en">
+<head><title>PostgreSQL: Release Notes</title></head>
+<body>
+<h1>Release Notes</h1>
+<h2 class="title">E.X. Release 17.11</h2>
+<h3 class="title">E.X.1. Migration to Version 17.11</h3>
+<h3 class="title">E.X.2. Changes</h3>
+<ul class="BLANK">
+<li class="listitem">
+<p>Fix memory-safety bugs in processing of incorrect ispell/hunspell dictionary files (Heikki Linnakangas) <a class="ulink" href="https://postgr.es/c/a1b2c3d4e" target="_top">&sect;</a></p>
+<p>Discovered while fuzzing.</p>
+</li>
+<li class="listitem">
+<p>Fix crash with namespace nodes in contrib/xml2's xpath_nodeset() function (Andrey Chernyy, Michael Paquier) <a class="ulink" href="https://postgr.es/c/1234567ab" target="_top">&sect;</a></p>
+</li>
+<li class="listitem">
+<p>In contrib/ltree, fix integer overflow in comparisons (Ayush Tiwari) <a class="ulink" href="https://postgr.es/c/8badf00d9" target="_top">&sect;</a></p>
+</li>
+<li class="listitem">
+<p>When a partition's detached partition is DETACH FINALIZE, fix a logical replication regression (Tomas Vondra) <a class="ulink" href="https://postgr.es/c/4f9e8d7c" target="_top">&sect;</a></p>
+</li>
+<li class="listitem">
+<p>Fix several typos in the documentation</p>
+</li>
+<li class="listitem">
+<p>Fix unexpected subxact cache search-path for HOT-pruned tuples (no commit URL, no name)</p>
+</li>
+</ul>
+</body>
+</html>

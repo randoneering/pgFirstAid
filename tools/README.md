@@ -4,23 +4,34 @@ Source-of-truth data + generator for the inline CVE and known-bug VALUES rows th
 
 ## What's here
 
-```
+```text
 data/
  cves.json curated CVE entries (one source of truth)
  known_bugs.json curated non-CVE release-note bugs
 tools/
  generate_cve_sql.py reads JSON → writes VALUES rows into the SQL files
+ scrape_pgdg.py fetches PGDG security index, proposes new CVEs
+ scrape_release_notes.py fetches PGDG release notes, proposes notable bugs
  tests/
  test_generate_cve_sql.py unit tests for the generator
+ test_scrape_pgdg.py PGDG scraper + filter tests with fixtures
+ test_scrape_release_notes.py release-notes scraper + filter tests with fixtures
+ fixtures/
+ pgdg_index_synthetic.html hand-written two-CVE fixture
+ pgdg_index_realistic.html snapshot of the live PGDG security index
+ release_notes_synthetic.html hand-written six-listitem fixture
+ release_index_realistic.html snapshot of the live release-notes index
 .github/workflows/
  cve-data-sync.yml CI drift check: fails if SQL files are out of sync with JSON
+ pgdg-cve-scraper.yml Weekly PGDG security scrape → opens a PR
+ release-notes-scout.yml Weekly PGDG release-notes scout → opens a PR
 ```
 
 ## How to add a CVE
 
 Edit `data/cves.json` and add an entry:
 
-```json
+```text
 {
  "cve_id": "CVE-2027-NNNNN",
  "cvss": 7.5,
@@ -61,7 +72,7 @@ Each bug entry covers exactly one major (`issue_id` starts with `PG<MAJOR>`). Ru
 
 ## Manual flags
 
-```
+```bash
 python tools/generate_cve_sql.py            # write fresh rows into all SQL files
 python tools/generate_cve_sql.py --check    # exit non-zero if any file is stale (CI mode)
 ```

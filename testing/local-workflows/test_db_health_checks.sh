@@ -66,6 +66,9 @@ echo "=============================================="
 echo ""
 
 "${PSQL[@]}" <<'EOF'
+-- Use DROP IF EXISTS so a leaked temp table from a prior session on the
+-- self-hosted runner doesn't fail this run with "already exists".
+DROP TABLE IF EXISTS _health_snapshot;
 CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();
 
 \echo '=== CRITICAL Issues (Must Fix) ==='
@@ -126,6 +129,7 @@ EOF
 # ---- 4. CSV export ----
 echo "$PREFIX Exporting CSV report..."
 "${PSQL[@]}" \
+    -c "DROP TABLE IF EXISTS _health_snapshot;" \
     -c "CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();" \
     -c "\copy (SELECT * FROM _health_snapshot ORDER BY severity, check_name) TO '${REPORTS_DIR}/full_health_check.csv' CSV HEADER"
 echo "$PREFIX CSV report -> ${REPORTS_DIR}/full_health_check.csv"
@@ -133,6 +137,7 @@ echo "$PREFIX CSV report -> ${REPORTS_DIR}/full_health_check.csv"
 # ---- 5. JSON export ----
 echo "$PREFIX Exporting JSON report..."
 "${PSQL[@]}" \
+    -c "DROP TABLE IF EXISTS _health_snapshot;" \
     -c "CREATE TEMP TABLE _health_snapshot AS SELECT * FROM pg_firstAid();" \
     -c "\copy (SELECT json_agg(to_json(d)) FROM _health_snapshot d) TO '${REPORTS_DIR}/full_health_check.json'"
 echo "$PREFIX JSON report -> ${REPORTS_DIR}/full_health_check.json"

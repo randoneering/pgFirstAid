@@ -1,0 +1,333 @@
+[
+  {
+    "cve_id": "CVE-2025-8714",
+    "cvss": 8.8,
+    "summary": "PostgreSQL pg_dump lets superuser of origin server execute arbitrary code in psql client",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2025-8714/",
+    "fixed_in": {
+      "17": 6,
+      "16": 10,
+      "15": 14
+    }
+  },
+  {
+    "cve_id": "CVE-2025-8715",
+    "cvss": 8.8,
+    "summary": "PostgreSQL pg_dump newline in object name executes arbitrary code in psql client and in restore target server",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2025-8715/",
+    "fixed_in": {
+      "17": 6,
+      "16": 10,
+      "15": 14
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14662",
+    "cvss": 8.8,
+    "summary": "PostgreSQL tsvector and tsquery undersize allocations, via integer wraparound",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14662/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14664",
+    "cvss": 8.8,
+    "summary": "PostgreSQL regexp heap buffer overflow executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14664/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14669",
+    "cvss": 8.8,
+    "summary": "PostgreSQL to_char heap buffer overflow executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14669/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14670",
+    "cvss": 8.8,
+    "summary": "PostgreSQL plperl tied object heap buffer overflow executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14670/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14671",
+    "cvss": 8.8,
+    "summary": "PostgreSQL refint plan cache type confusion executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14671/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14676",
+    "cvss": 8.8,
+    "summary": "PostgreSQL pg_stat_statements heap buffer overflow executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14676/",
+    "fixed_in": {
+      "18": 5
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14677",
+    "cvss": 8.8,
+    "summary": "PostgreSQL 32-bit pltcl and plperl undersize allocations, via integer wraparound",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14677/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14680",
+    "cvss": 8.8,
+    "summary": "PostgreSQL type confusion via \"internal\" arguments",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14680/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-15741",
+    "cvss": 8.8,
+    "summary": "PostgreSQL expression deparse allows SQL injection via EXTRACT argument",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-15741/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-15742",
+    "cvss": 8.8,
+    "summary": "PostgreSQL fuzzystrmatch writes effectively-arbitrary addresses, via integer wraparound",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-15742/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-16238",
+    "cvss": 8.8,
+    "summary": "PostgreSQL type confusion in pg_restore_attribute_stats() executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-16238/",
+    "fixed_in": {
+      "18": 5
+    }
+  },
+  {
+    "cve_id": "CVE-2026-18408",
+    "cvss": 8.8,
+    "summary": "PostgreSQL psql \\unrestrict lets superuser of pg_dump origin server execute arbitrary code in psql client",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-18408/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-2004",
+    "cvss": 8.8,
+    "summary": "PostgreSQL intarray missing validation of type of input to selectivity estimator executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-2004/",
+    "fixed_in": {
+      "18": 2,
+      "17": 8,
+      "16": 12,
+      "15": 16
+    }
+  },
+  {
+    "cve_id": "CVE-2026-2005",
+    "cvss": 8.8,
+    "summary": "PostgreSQL pgcrypto heap buffer overflow executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-2005/",
+    "fixed_in": {
+      "18": 2,
+      "17": 8,
+      "16": 12,
+      "15": 16
+    }
+  },
+  {
+    "cve_id": "CVE-2026-2006",
+    "cvss": 8.8,
+    "summary": "PostgreSQL missing validation of multibyte character length executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-2006/",
+    "fixed_in": {
+      "18": 2,
+      "17": 8,
+      "16": 12,
+      "15": 16
+    }
+  },
+  {
+    "cve_id": "CVE-2026-6473",
+    "cvss": 8.8,
+    "summary": "PostgreSQL server undersizes allocations, via integer wraparound",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6473/",
+    "fixed_in": {
+      "18": 4,
+      "17": 10,
+      "16": 14,
+      "15": 18
+    }
+  },
+  {
+    "cve_id": "CVE-2026-6475",
+    "cvss": 8.8,
+    "summary": "PostgreSQL pg_basebackup and pg_rewind can overwrite unrelated files of origin superuser choice",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6475/",
+    "fixed_in": {
+      "18": 4,
+      "17": 10,
+      "16": 14,
+      "15": 18
+    }
+  },
+  {
+    "cve_id": "CVE-2026-6477",
+    "cvss": 8.8,
+    "summary": "PostgreSQL libpq lo_* functions let server superuser overwrite client stack memory",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6477/",
+    "fixed_in": {
+      "18": 4,
+      "17": 10,
+      "16": 14,
+      "15": 18
+    }
+  },
+  {
+    "cve_id": "CVE-2026-6637",
+    "cvss": 8.8,
+    "summary": "PostgreSQL refint allows stack buffer overflow and SQL injection",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6637/",
+    "fixed_in": {
+      "18": 4,
+      "17": 10,
+      "16": 14,
+      "15": 18
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14679",
+    "cvss": 8.2,
+    "summary": "PostgreSQL stack buffer overflow in argument match writes 0x0 and 0x1 to server memory",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14679/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-2007",
+    "cvss": 8.2,
+    "summary": "PostgreSQL pg_trgm heap buffer overflow writes pattern onto server memory",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-2007/",
+    "fixed_in": {
+      "18": 2
+    }
+  },
+  {
+    "cve_id": "CVE-2025-1094",
+    "cvss": 8.1,
+    "summary": "PostgreSQL quoting APIs miss neutralizing quoting syntax in text that fails encoding validation",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2025-1094/",
+    "fixed_in": {
+      "17": 3,
+      "16": 7,
+      "15": 11
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14668",
+    "cvss": 8.1,
+    "summary": "PostgreSQL ctid type confusion in selectivity estimator discloses derivative of arbitrary read",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14668/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-6464",
+    "cvss": 8.1,
+    "summary": "PostgreSQL psql COPY FROM STDIN early failure processes data lines as psql commands",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6464/",
+    "fixed_in": {
+      "18": 5,
+      "17": 11,
+      "16": 15,
+      "15": 19
+    }
+  },
+  {
+    "cve_id": "CVE-2026-6479",
+    "cvss": 7.5,
+    "summary": "PostgreSQL SSL/GSS init causes denial of service, via uncontrolled recursion",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6479/",
+    "fixed_in": {
+      "18": 4,
+      "17": 10,
+      "16": 14,
+      "15": 18
+    }
+  },
+  {
+    "cve_id": "CVE-2023-2454",
+    "cvss": 7.2,
+    "summary": "CREATE SCHEMA ... schema_element defeats protective search_path changes",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2023-2454/",
+    "fixed_in": {
+      "15": 3
+    }
+  },
+  {
+    "cve_id": "CVE-2026-6476",
+    "cvss": 7.2,
+    "summary": "PostgreSQL pg_createsubscriber allows SQL injection via subscription name",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6476/",
+    "fixed_in": {
+      "18": 4,
+      "17": 10
+    }
+  }
+]

@@ -79,8 +79,13 @@ _CVSS_RE = re.compile(
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)$")
 
 
-def parse_pgdg_table(html_text: str) -> list[dict]:
+def parse_pgdg_table(html_text: str, *, majors: set[str] | None = None) -> list[dict]:
     """Parse the PGDG security index and return one dict per CVE entry.
+
+    If `majors` is provided, only entries whose `fixed_in` map contains at
+    least one of those majors are kept. Without it, the function preserves
+    every entry whose `fixed_in` has any major. The caller is expected to
+    apply any severity / major-scope filter separately.
 
     Returned dict shape:
       {
@@ -126,8 +131,8 @@ def parse_pgdg_table(html_text: str) -> list[dict]:
 
         fixed_in: dict[str, int] = {}
         for major, version in zip(affected_majors, fixed_versions):
-            if major not in DEFAULT_MAJORS:
-                continue  # skip majors outside our supported range
+            if majors is not None and major not in majors:
+                continue  # skip majors outside the caller's scope
             vm = _VERSION_RE.match(version)
             if not vm or int(vm.group(1)) != int(major):
                 continue  # malformed "X.Y" or major/version mismatch in upstream table
@@ -260,7 +265,7 @@ def _resolve_cafile() -> str | None:
     return default.cafile or (default.capath if os.path.isdir(default.capath or "") else None)
 
 
-def fetch_pgdg_index(user_agent: str = DEFAULT_USER_AGENT, timeout: float = 30.0) -> str:
+def fetch_pgdg_index(url: str = PGDG_URL, user_agent: str = DEFAULT_USER_AGENT, timeout: float = 30.0) -> str:
     import ssl
     ctx = ssl.create_default_context()
     cafile = _resolve_cafile()
@@ -269,7 +274,7 @@ def fetch_pgdg_index(user_agent: str = DEFAULT_USER_AGENT, timeout: float = 30.0
     elif cafile and os.path.isdir(cafile):
         ctx.load_verify_locations(capath=cafile)
     req = urllib.request.Request(
-        PGDG_URL,
+        url,
         headers={"User-Agent": user_agent, "Accept": "text/html,application/xhtml+xml"},
     )
     with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
@@ -302,7 +307,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # ---- Fetch + parse ----
     try:
-        html = fetch_pgdg_index(user_agent=args.user_agent)
+        html = fetch_pgdg_index(url=args.url, user_agent=args.user_agent)
     except Exception as exc:
         print(f"scraper: HTTP fetch failed: {exc}", file=sys.stderr)
         return 2

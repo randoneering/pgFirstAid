@@ -1,6 +1,6 @@
 name: release-notes-scout
 
-# Weekly Monday morning UTC scout of PostgreSQL release notes.
+# Weekly Monday evening UTC scout of PostgreSQL release notes.
 # Proposes high/medium severity bug fixes that match data/known_bugs.json
 # entries missing from the curated list. A PR is opened for human review;
 # never auto-merges.
@@ -44,6 +44,14 @@ jobs:
         run: uv sync --quiet
 
       - name: Run scout (CI mode)
+        # --check exit codes:
+        #   0 = no proposed additions
+        #   1 = proposed additions, written to stdout (this is what we want
+        #       to open a PR for)
+        #   2+ = hard failure (parse error, network error, missing
+        #       sentinel, etc.). Propagate as a workflow failure WITHOUT
+        #       writing the (likely empty or partial) stdout, so the
+        #       resulting commit doesn't carry a misleading file.
         id: scout
         run: |
           set +e
@@ -51,11 +59,14 @@ jobs:
           rc=$?
           set -e
           echo "scout exit code: $rc"
-          if [ $rc -ne 0 ]; then
+          if [ $rc -eq 1 ]; then
             echo "needs_pr=true" >> "$GITHUB_OUTPUT"
             echo "$PROPOSED" > proposed-bugs.json
-          else
+          elif [ $rc -eq 0 ]; then
             echo "needs_pr=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "scout: hard failure (exit code $rc); not opening a PR" >&2
+            exit "$rc"
           fi
 
       - name: Open PR with proposed bug entries

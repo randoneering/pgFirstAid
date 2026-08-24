@@ -4,7 +4,7 @@ Source-of-truth data + generator for the inline CVE and known-bug VALUES rows th
 
 ## What's here
 
-```
+```text
 data/
  cves.json curated CVE entries (one source of truth)
  known_bugs.json curated non-CVE release-note bugs
@@ -31,7 +31,7 @@ tools/
 
 Edit `data/cves.json` and add an entry:
 
-```json
+```text
 {
  "cve_id": "CVE-2027-NNNNN",
  "cvss": 7.5,
@@ -72,7 +72,7 @@ Each bug entry covers exactly one major (`issue_id` starts with `PG<MAJOR>`). Ru
 
 ## Manual flags
 
-```
+```bash
 python tools/generate_cve_sql.py            # write fresh rows into all SQL files
 python tools/generate_cve_sql.py --check    # exit non-zero if any file is stale (CI mode)
 ```

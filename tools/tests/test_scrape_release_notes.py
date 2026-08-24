@@ -98,11 +98,15 @@ class ParseReleasePageTests(unittest.TestCase):
 class ListRecentReleasesTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        # If the realistic fixture isn't there, generate it from the live page.
+        # The realistic fixture is committed to the repo. If it's
+        # missing (e.g. first-time contributor check-out), skip the
+        # network-bootstrap fallback: tests should be deterministic and
+        # not silently start hitting PGDG on every CI run.
         realistic = FIXTURES_DIR / "release_index_realistic.html"
         if not realistic.exists():
-            index = scout._fetch(scout.PGDG_RELEASE_INDEX)
-            realistic.write_text(index)
+            raise unittest.SkipTest(
+                f"missing fixture: {realistic}. Add the file before running this test."
+            )
         cls.index_html = _load("release_index_realistic.html")
 
     def test_finds_per_major_minors(self) -> None:

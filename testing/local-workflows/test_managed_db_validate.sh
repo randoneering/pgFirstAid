@@ -67,6 +67,7 @@ echo "=============================================="
 echo ""
 
 "${PSQL[@]}" <<'EOF'
+DROP TABLE IF EXISTS _snap;
 CREATE TEMP TABLE _snap AS SELECT * FROM pg_firstAid();
 
 \echo '=== Severity Summary ==='

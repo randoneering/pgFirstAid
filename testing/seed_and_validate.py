@@ -915,9 +915,16 @@ def main() -> int:
         except Error:
             test_conn.close()
             test_conn = connect_test(params)
-            pss_extension_installed, pss_seeded = classify_pss_state(
-                test_conn, psql_seed_succeeded
-            )
+            try:
+                pss_extension_installed, pss_seeded = classify_pss_state(
+                    test_conn, psql_seed_succeeded
+                )
+            except Error:
+                print(
+                    "  WARNING: classify_pss_state failed twice; "
+                    "treating pg_stat_statements as unavailable"
+                )
+                pss_extension_installed, pss_seeded = False, False
         if pss_extension_installed and not pss_seeded:
             print(
                 "  SKIP: pg_stat_statements not in shared_preload_libraries — PSS checks not seeded"

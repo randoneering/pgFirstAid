@@ -66,15 +66,16 @@ echo "    Host: $PGHOST:$PGPORT"
 echo "=============================================="
 echo ""
 
-"${PSQL[@]}" <<'EOF'
-CREATE TEMP TABLE _snap AS SELECT * FROM pg_firstAid();
+"${PSQL[@]}" <<EOF
+DROP TABLE IF EXISTS _snap_${BASHPID};
+CREATE TEMP TABLE _snap_${BASHPID} AS SELECT * FROM pg_firstAid();
 
 \echo '=== Severity Summary ==='
 SELECT
   severity,
   COUNT(*) as issue_count,
   COUNT(DISTINCT object_name) as affected_objects
-FROM _snap
+FROM _snap_${BASHPID}
 GROUP BY severity
 ORDER BY
   CASE severity
@@ -87,14 +88,14 @@ ORDER BY
 
 \echo '=== Critical Issues ==='
 SELECT severity, check_name, object_name, issue_description, recommended_action
-FROM _snap
+FROM _snap_${BASHPID}
 WHERE severity = 'CRITICAL'
 ORDER BY check_name;
 \echo ''
 
 \echo '=== High Priority Issues ==='
 SELECT severity, check_name, object_name, issue_description
-FROM _snap
+FROM _snap_${BASHPID}
 WHERE severity = 'HIGH'
 ORDER BY check_name;
 \echo ''

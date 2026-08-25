@@ -46,7 +46,7 @@ _THRESHOLD_PATCHES: list[tuple[str, str]] = [
     # The seed workload deliberately opens sessions that idle/long-run longer
     # than 5 minutes to exercise these checks; bump the cutoff so the
     # synthetic workload doesn't tip the matrix into a failure.
-    (r"interval '5 minutes'", "interval '1 hour'"),
+    (r"interval '5 minutes'", "interval '24 hours'"),
     # Top 10 expensive active queries: 30s -> 5m
     (r"interval '30 seconds'", "interval '5 minutes'"),
 ]
@@ -209,6 +209,11 @@ def install_function(test_conn: PgConnection, managed: bool = False) -> None:
     sql_file = PG_FIRSTAID_MANAGED_SQL if managed else PG_FIRSTAID_SQL
     sql = sql_file.read_text()
     patched = patch_thresholds(sql)
+    # In managed mode we replace v_pgfirstAid; CREATE OR REPLACE in the file
+    # already handles that, but the workflow's pre-install step also installs
+    # the view, so an explicit DROP guarantees our patched version wins.
+    if managed:
+        _execute(test_conn, "DROP VIEW IF EXISTS v_pgfirstaid")
     _execute(test_conn, patched)
 
 

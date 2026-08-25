@@ -51,6 +51,9 @@ mkdir -p "$REPORTS_DIR"
 echo "$PREFIX [$CLOUD_PROVIDER] Installing pgFirstAid function + managed view..."
 "${PSQL[@]}" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements"
 "${PSQL[@]}" -f "${REPO_ROOT}/pgFirstAid.sql"
+# Drop the view first so a fresh install doesn't trip 'relation already exists'
+# when the workflow runs this script back-to-back or after seed_and_validate.
+"${PSQL[@]}" -c "DROP VIEW IF EXISTS v_pgfirstaid"
 "${PSQL[@]}" -f "${REPO_ROOT}/view_pgFirstAid_managed.sql"
 echo "$PREFIX [$CLOUD_PROVIDER] pgFirstAid installed."
 

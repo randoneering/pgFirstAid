@@ -87,6 +87,13 @@ jobs:
       PGFA_TEST_ACTIVE_CONN_TARGET: "52"
       PGFA_TEST_ACTIVE_CONN_SLEEP_SECONDS: "20"
       PGFA_TEST_WAIT_TIMEOUT_SECONDS: "45"
+      # Keep libpq connections alive across Neon's idle timeouts so the
+      # pgTAP and seed-and-validate harnesses don't see 'connection to
+      # server was lost' mid-run.
+      PGKEEPALIVES: "1"
+      PGKEEPALIVES_IDLE: "30"
+      PGKEEPALIVES_INTERVAL: "10"
+      PGKEEPALIVES_COUNT: "5"
 
     steps:
       - name: Checkout

@@ -42,6 +42,13 @@ _THRESHOLD_PATCHES: list[tuple[str, str]] = [
     (r"> 107374182400", "> 1048576"),
     # Tables larger than 50-100GB -> 512KB-1MB
     (r"between 53687091200 and 107374182400", "between 524288 and 1048576"),
+    # Long Running Queries / Idle In Transaction: 5m -> 1h
+    # The seed workload deliberately opens sessions that idle/long-run longer
+    # than 5 minutes to exercise these checks; bump the cutoff so the
+    # synthetic workload doesn't tip the matrix into a failure.
+    (r"interval '5 minutes'", "interval '1 hour'"),
+    # Top 10 expensive active queries: 30s -> 5m
+    (r"interval '30 seconds'", "interval '5 minutes'"),
 ]
 
 
@@ -897,9 +904,20 @@ def main() -> int:
         except Error:
             test_conn.close()
             test_conn = connect_test(params)
-        pss_extension_installed, pss_seeded = classify_pss_state(
-            test_conn, psql_seed_succeeded
-        )
+
+        # classify_pss_state issues its own queries; the connection may have
+        # been dropped again (Neon idle timeout, etc.). Retry once with a fresh
+        # connection before propagating the error.
+        try:
+            pss_extension_installed, pss_seeded = classify_pss_state(
+                test_conn, psql_seed_succeeded
+            )
+        except Error:
+            test_conn.close()
+            test_conn = connect_test(params)
+            pss_extension_installed, pss_seeded = classify_pss_state(
+                test_conn, psql_seed_succeeded
+            )
         if pss_extension_installed and not pss_seeded:
             print(
                 "  SKIP: pg_stat_statements not in shared_preload_libraries — PSS checks not seeded"

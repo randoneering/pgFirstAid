@@ -46,7 +46,7 @@ _THRESHOLD_PATCHES: list[tuple[str, str]] = [
     # The seed workload deliberately opens sessions that idle/long-run longer
     # than 5 minutes to exercise these checks; bump the cutoff so the
     # synthetic workload doesn't tip the matrix into a failure.
-    (r"interval '5 minutes'", "interval '24 hours'"),
+    (r"interval '5 minutes'", "interval '1 hour'"),
     # Top 10 expensive active queries: 30s -> 5m
     (r"interval '30 seconds'", "interval '5 minutes'"),
 ]
@@ -80,11 +80,6 @@ def get_conn_params(args: argparse.Namespace) -> dict:
 
 
 def _connect(params: dict[str, Any], *, autocommit: bool) -> PgConnection:
-    # Keep the connection alive across Neon idle timeouts (default 600s).
-    params.setdefault("keepalives", 1)
-    params.setdefault("keepalives_idle", 30)
-    params.setdefault("keepalives_interval", 10)
-    params.setdefault("keepalives_count", 5)
     conn = psycopg2.connect(**params)
     conn.autocommit = autocommit
     return conn
@@ -241,7 +236,6 @@ def install_function(test_conn: PgConnection, managed: bool = False, params: dic
         new_conn = connect_test(params)
         _install(new_conn)
         return new_conn
-    _execute(test_conn, patched)
 
 
 def run_sql_file(test_conn: PgConnection, path: Path) -> None:

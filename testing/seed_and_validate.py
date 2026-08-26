@@ -203,20 +203,44 @@ def drop_seed_role(admin_conn: PgConnection) -> None:
         print(f"  WARNING: failed to drop pgfirstaid_seed_role: {exc}")
 
 
-def install_function(test_conn: PgConnection, managed: bool = False) -> None:
+def install_function(test_conn: PgConnection, managed: bool = False, params: dict | None = None) -> PgConnection:
     """Read and install pgFirstAid SQL into the test DB, patching thresholds.
 
     When managed=True, installs view_pgFirstAid_managed.sql (view-based, no
     superuser-only queries) instead of the default function-based pgFirstAid.sql.
+
+    The patched SQL is ~2000 lines and can take several seconds to execute.
+    On Neon the connection occasionally drops mid-execution (SSL SYSCALL
+    EOF). Retry once on OperationalError with a fresh connection before
+    propagating the error. Returns the (possibly reconnected) test_conn.
     """
     sql_file = PG_FIRSTAID_MANAGED_SQL if managed else PG_FIRSTAID_SQL
     sql = sql_file.read_text()
     patched = patch_thresholds(sql)
-    # In managed mode we replace v_pgfirstAid; CREATE OR REPLACE in the file
-    # already handles that, but the workflow's pre-install step also installs
-    # the view, so an explicit DROP guarantees our patched version wins.
-    if managed:
-        _execute(test_conn, "DROP VIEW IF EXISTS v_pgfirstaid")
+
+    def _install(conn: PgConnection) -> None:
+        if managed:
+            _execute(conn, "DROP VIEW IF EXISTS v_pgfirstaid")
+        _execute(conn, patched)
+
+    try:
+        _install(test_conn)
+        return test_conn
+    except OperationalError as exc:
+        if params is None:
+            # No params available to reconnect — propagate.
+            raise
+        print(
+            f"  WARNING: install_function hit OperationalError ({exc}); "
+            "retrying with a fresh connection"
+        )
+        try:
+            test_conn.close()
+        except Exception:
+            pass
+        new_conn = connect_test(params)
+        _install(new_conn)
+        return new_conn
     _execute(test_conn, patched)
 
 
@@ -906,7 +930,7 @@ def main() -> int:
         test_conn = connect_test(params)
 
         print("Installing pgFirstAid with patched thresholds...")
-        install_function(test_conn, managed=managed)
+        test_conn = install_function(test_conn, managed=managed, params=params)
 
         # --- Static seed ------------------------------------------------------
         print("Seeding structural checks (01_seed_static_checks.sql)...")

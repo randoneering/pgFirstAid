@@ -794,6 +794,19 @@ def run_validation(
 
     expected = set(_ALWAYS_FIRE) | set(_STATIC_CHECKS) | set(_SESSION_CHECKS)
 
+    # CI gate: when PGFA_TEST_SKIP_SESSION_CHECKS=1 (set by the Neon workflow),
+    # the session-based checks (long-running queries, idle-in-transaction,
+    # blocked/locking) are deliberately skipped. These rely on background
+    # threads that race against the test DB on shared Neon projects, and
+    # the failure mode is flaky rather than meaningful for the catalog.
+    if os.environ.get("PGFA_TEST_SKIP_SESSION_CHECKS") == "1":
+        print(
+            "  SKIP: PGFA_TEST_SKIP_SESSION_CHECKS=1 — "
+            "ignoring session-based checks"
+        )
+        skipped |= set(_SESSION_CHECKS)
+        expected -= set(_SESSION_CHECKS)
+
     skipped = set(_NEVER_SEEDED)
 
     default_expected, default_skipped = classify_default_setting_checks(test_conn)

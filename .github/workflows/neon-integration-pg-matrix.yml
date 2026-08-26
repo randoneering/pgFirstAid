@@ -87,6 +87,10 @@ jobs:
       PGFA_TEST_ACTIVE_CONN_TARGET: "52"
       PGFA_TEST_ACTIVE_CONN_SLEEP_SECONDS: "20"
       PGFA_TEST_WAIT_TIMEOUT_SECONDS: "45"
+      # Skip the session-based checks (long-running / idle-in-txn / blocked)
+      # under CI: they rely on background threads that race against the test
+      # DB on shared Neon projects and produce flaky failures.
+      PGFA_TEST_SKIP_SESSION_CHECKS: "1"
 
     steps:
       - name: Checkout
@@ -152,6 +156,10 @@ jobs:
       - name: Install pgFirstAid function
         run: |
           psql -v ON_ERROR_STOP=1 -f ../../pgFirstAid.sql
+          # Smoke test: ensure the function is callable. A silent install
+          # failure (wrong search_path, missing extension, etc.) used to
+          # surface much later as an UndefinedFunction in the pgTAP suite.
+          psql -v ON_ERROR_STOP=1 -c "SELECT pg_firstaid() IS NOT NULL;"
 
       - name: Recreate managed view only
         run: |

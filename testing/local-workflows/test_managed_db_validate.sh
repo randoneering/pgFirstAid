@@ -58,7 +58,7 @@ echo "$PREFIX [$CLOUD_PROVIDER] Installing pgFirstAid function + managed view...
 echo "$PREFIX [$CLOUD_PROVIDER] pgFirstAid installed."
 
 # ---- 2. Verify installation ----
-"${PSQL[@]}" -c "SELECT pg_firstAid();" > /dev/null
+"${PSQL[@]}" -c "SET search_path = public, pg_catalog; SELECT pg_firstAid();" > /dev/null
 echo "$PREFIX [$CLOUD_PROVIDER] Function responds OK."
 
 # ---- 3. Run health check ----

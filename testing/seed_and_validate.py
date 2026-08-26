@@ -155,7 +155,10 @@ def create_test_db(admin_conn: PgConnection) -> None:
         "WHERE datname = %s AND pid <> pg_backend_pid()",
         (TEST_DB,),
     )
-    _execute(admin_conn, f"DROP DATABASE IF EXISTS {TEST_DB}")
+    # WITH (FORCE) terminates any connections that survived the polite
+    # pg_terminate_backend call (PG13+). Avoids the "database is being
+    # accessed by other users" race when CI jobs run back-to-back.
+    _execute(admin_conn, f"DROP DATABASE IF EXISTS {TEST_DB} WITH (FORCE)")
     _execute(admin_conn, f"CREATE DATABASE {TEST_DB}")
 
 
@@ -784,6 +787,8 @@ def run_validation(
 
     expected = set(_ALWAYS_FIRE) | set(_STATIC_CHECKS) | set(_SESSION_CHECKS)
 
+    skipped: set[str] = set(_NEVER_SEEDED)
+
     # CI gate: when PGFA_TEST_SKIP_SESSION_CHECKS=1 (set by the Neon workflow),
     # the session-based checks (long-running queries, idle-in-transaction,
     # blocked/locking) are deliberately skipped. These rely on background
@@ -796,8 +801,6 @@ def run_validation(
         )
         skipped |= set(_SESSION_CHECKS)
         expected -= set(_SESSION_CHECKS)
-
-    skipped = set(_NEVER_SEEDED)
 
     default_expected, default_skipped = classify_default_setting_checks(test_conn)
     expected |= default_expected

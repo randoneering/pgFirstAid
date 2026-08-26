@@ -91,6 +91,11 @@ jobs:
       # under CI: they rely on background threads that race against the test
       # DB on shared Neon projects and produce flaky failures.
       PGFA_TEST_SKIP_SESSION_CHECKS: "1"
+      # Skip the three PSS workload checks that depend on the seed
+      # workload producing enough rows to cross thresholds like
+      # `calls >= 20`. On shared Neon those thresholds vary and the
+      # checks are flaky.
+      PGFA_TEST_SKIP_PSS_CHECKS: "1"
 
     steps:
       - name: Checkout

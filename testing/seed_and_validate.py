@@ -354,9 +354,7 @@ def try_create_replication_slot(test_conn: PgConnection) -> bool:
     """Create a logical replication slot to trigger the inactive-slot check.
 
     Returns True if the slot was created, False if skipped due to
-    wal_level != logical or insufficient privilege. Reconnects once on
-    InterfaceError because Neon occasionally closes the socket between
-    the install step and this call.
+    wal_level != logical or insufficient privilege.
     """
     try:
         _execute(
@@ -365,12 +363,6 @@ def try_create_replication_slot(test_conn: PgConnection) -> bool:
             "    'pgfirstaid_test_slot', 'test_decoding')",
         )
         return True
-    except InterfaceError:
-        print(
-            "  WARNING: connection lost before replication slot; "
-            "skipping Inactive Replication Slots check"
-        )
-        return False
     except errors.ObjectNotInPrerequisiteState:
         print(
             "  SKIP: wal_level != logical — Inactive Replication Slots check not seeded"
@@ -848,24 +840,6 @@ def run_validation(
     if pss_seeded:
         expected |= set(_PSS_WORKLOAD_CHECKS)
         skipped |= pss_buffer_dependent_skips(test_conn)
-        # Some PSS checks (High Calls Low Value, High Rows Per Call,
-        # Top Queries by WAL Bytes Per Call) require the seed workload to
-        # produce enough rows to cross thresholds like calls >= 20 and
-        # rows_per_call thresholds. On shared Neon projects the seed
-        # workload's footprint varies, so these three are flaky. Skip
-        # them under CI via PGFA_TEST_SKIP_PSS_CHECKS=1.
-        if os.environ.get("PGFA_TEST_SKIP_PSS_CHECKS") == "1":
-            pss_skip = {
-                "High Calls Low Value Queries",
-                "High Rows Per Call Queries",
-                "Top Queries by WAL Bytes Per Call",
-            }
-            print(
-                "  SKIP: PGFA_TEST_SKIP_PSS_CHECKS=1 — "
-                "ignoring flaky pg_stat_statements checks"
-            )
-            skipped |= pss_skip
-            expected -= pss_skip
     elif pss_extension_installed:
         # Extension installed but not queryable (not in shared_preload_libraries).
         # Neither workload checks nor "Extension Missing" check will fire.

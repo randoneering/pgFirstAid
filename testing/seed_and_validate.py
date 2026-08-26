@@ -212,8 +212,6 @@ def install_function(test_conn: PgConnection, managed: bool = False, params: dic
     sql_file = PG_FIRSTAID_MANAGED_SQL if managed else PG_FIRSTAID_SQL
     sql = sql_file.read_text()
     patched = patch_thresholds(sql)
-<<<<<<< HEAD
-=======
 
     def _install(conn: PgConnection) -> None:
         if managed:
@@ -238,8 +236,6 @@ def install_function(test_conn: PgConnection, managed: bool = False, params: dic
         new_conn = connect_test(params)
         _install(new_conn)
         return new_conn
->>>>>>> 5ffd8b9 (fix(ci): retry install_function on OperationalError + reconnect)
-    _execute(test_conn, patched)
 
 
 def run_sql_file(test_conn: PgConnection, path: Path) -> None:

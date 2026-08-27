@@ -26,7 +26,7 @@ from typing import Any
 from pathlib import Path
 
 import psycopg2
-from psycopg2 import Error, errors
+from psycopg2 import Error, InterfaceError, OperationalError, errors
 from psycopg2.extensions import connection as PgConnection
 
 SEED_DIR = Path(__file__).resolve().parent / "healthcheck_seed"

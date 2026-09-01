@@ -1,121 +1,121 @@
 [
   {
-    "issue_id": "PG15-025228104",
-    "summary": "Fix crash after out-of-memory failure partway through creation of a cache entry for a text search dictionary (Tom Lane) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
-  },
-  {
-    "issue_id": "PG15-0fb88979b",
-    "summary": "Fix memory-safety bugs in processing of incorrect ispell/hunspell dictionary files (Andrey Rachitskiy) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
-  },
-  {
-    "issue_id": "PG15-127a0673f",
-    "summary": "Fix buffer overrun in regexp match/split functions (Masahiko Sawada) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
-  },
-  {
-    "issue_id": "PG15-1bec6b1c1",
-    "summary": "In contrib/ltree, fix integer overflow in comparisons (Ayush Tiwari) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
-  },
-  {
-    "issue_id": "PG15-1e9e62193",
-    "summary": "Fix possible PANIC due to concurrent drop of pgstats entries when track_functions is enabled (Sami Imseih, Michael Paquier) § § §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
-  },
-  {
-    "issue_id": "PG16-18955d412",
-    "summary": "Fix crash with namespace nodes in contrib/xml2's xpath_nodeset() function (Andrey Chernyy, Michael Paquier) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
-    "fixed_in_minor": 15
-  },
-  {
-    "issue_id": "PG16-3179253c2",
-    "summary": "Fix buffer overrun in regexp match/split functions (Masahiko Sawada) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
-    "fixed_in_minor": 15
-  },
-  {
-    "issue_id": "PG16-3854f4afc",
-    "summary": "In PL/Perl, avoid NULL pointer dereference crash when working with an invalid PostgreSQL::InServer::ARRAY object (Xing Guo) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
-    "fixed_in_minor": 15
-  },
-  {
-    "issue_id": "PG16-444038bb7",
-    "summary": "Fix memory-safety bugs in processing of incorrect ispell/hunspell dictionary files (Andrey Rachitskiy) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
-    "fixed_in_minor": 15
-  },
-  {
-    "issue_id": "PG16-5dbeb69bc",
-    "summary": "Fix buffer overrun with long time zone abbreviation in to_char() (Tom Lane) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
-    "fixed_in_minor": 15
-  },
-  {
-    "issue_id": "PG17-12a620686",
-    "summary": "Fix buffer overrun with long time zone abbreviation in to_char() (Tom Lane) §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
-    "fixed_in_minor": 11
-  },
-  {
-    "issue_id": "PG17-2aa6be6e6",
-    "summary": "In contrib/pgcrypto, avoid double-free crash after encountering an error while using an OSSLCipher object (Yuelin Wang) §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
-    "fixed_in_minor": 11
-  },
-  {
-    "issue_id": "PG17-2e0c61aed",
-    "summary": "Fix possible PANIC due to concurrent drop of pgstats entries when track_functions is enabled (Sami Imseih, Michael Paquier) § § §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
-    "fixed_in_minor": 11
-  },
-  {
-    "issue_id": "PG17-4a49ab289",
-    "summary": "Fix crash with namespace nodes in contrib/xml2's xpath_nodeset() function (Andrey Chernyy, Michael Paquier) §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
-    "fixed_in_minor": 11
-  },
-  {
-    "issue_id": "PG17-52af6fef4",
-    "summary": "Prevent satisfies_hash_partition() from crashing with VARIADIC NULL (Robert Haas) §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
-    "fixed_in_minor": 11
-  },
-  {
-    "issue_id": "PG18-020426268",
-    "summary": "In contrib/pgcrypto, avoid double-free crash after encountering an error while using an OSSLCipher object (Yuelin Wang) §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
-    "fixed_in_minor": 6
-  },
-  {
-    "issue_id": "PG18-028ee716a",
+    "issue_id": "PG15-1eb0d5380",
     "summary": "Fix integer overflows in memory-allocation calculations in PL/Perl and PL/Tcl (Heikki Linnakangas) §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
-    "fixed_in_minor": 6
+    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+    "fixed_in_minor": 19
   },
   {
-    "issue_id": "PG18-0c06ebf12",
-    "summary": "Prevent satisfies_hash_partition() from crashing with VARIADIC NULL (Robert Haas) §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
-    "fixed_in_minor": 6
+    "issue_id": "PG15-74916136f",
+    "summary": "Fix integer overflows in contrib/fuzzystrmatch's levenshtein() and levenshtein_less_equal() functions (Nathan Bossart) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+    "fixed_in_minor": 19
   },
   {
-    "issue_id": "PG18-1f8ab91c1",
-    "summary": "In contrib/amcheck, fix query-lifespan memory leak while verifying a GIN index (Kirill Reshke) §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
-    "fixed_in_minor": 6
+    "issue_id": "PG15-8f64cc83f",
+    "summary": "Fix buffer overrun with long time zone abbreviation in to_char() (Tom Lane) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+    "fixed_in_minor": 19
   },
   {
-    "issue_id": "PG18-35d9a6263",
+    "issue_id": "PG15-9b2a6ccc4",
+    "summary": "In PL/Perl, avoid NULL pointer dereference crash when working with an invalid PostgreSQL::InServer::ARRAY object (Xing Guo) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+    "fixed_in_minor": 19
+  },
+  {
+    "issue_id": "PG15-FIX-1273236d",
+    "summary": "Fix buffer overrun in contrib/pg_stat_statements (Álvaro Herrera)",
+    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+    "fixed_in_minor": 19
+  },
+  {
+    "issue_id": "PG16-60abb3c73",
     "summary": "Fix NULL-pointer crash when IS JSON or similar constructs have an argument that is of string category but lacks a cast to type text (Ayush Tiwari) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+    "fixed_in_minor": 15
+  },
+  {
+    "issue_id": "PG16-61481aa0e",
+    "summary": "Fix integer overflows in contrib/fuzzystrmatch's levenshtein() and levenshtein_less_equal() functions (Nathan Bossart) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+    "fixed_in_minor": 15
+  },
+  {
+    "issue_id": "PG16-6de480156",
+    "summary": "Prevent satisfies_hash_partition() from crashing with VARIADIC NULL (Robert Haas) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+    "fixed_in_minor": 15
+  },
+  {
+    "issue_id": "PG16-83336e3ed",
+    "summary": "Fix crash after out-of-memory failure partway through creation of a cache entry for a text search dictionary (Tom Lane) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+    "fixed_in_minor": 15
+  },
+  {
+    "issue_id": "PG16-8bbdc0540",
+    "summary": "Fix integer overflows in memory-allocation calculations in PL/Perl and PL/Tcl (Heikki Linnakangas) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+    "fixed_in_minor": 15
+  },
+  {
+    "issue_id": "PG17-5fdea3aa3",
+    "summary": "Fix memory-safety bugs in processing of incorrect ispell/hunspell dictionary files (Andrey Rachitskiy) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+    "fixed_in_minor": 11
+  },
+  {
+    "issue_id": "PG17-634a8dcb8",
+    "summary": "Fix crash after out-of-memory failure partway through creation of a cache entry for a text search dictionary (Tom Lane) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+    "fixed_in_minor": 11
+  },
+  {
+    "issue_id": "PG17-8ad414831",
+    "summary": "Fix memory leak in parallel vacuum worker processes (Baji Shaik) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+    "fixed_in_minor": 11
+  },
+  {
+    "issue_id": "PG17-FIX-1273236d",
+    "summary": "Fix buffer overrun in contrib/pg_stat_statements (Álvaro Herrera)",
+    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+    "fixed_in_minor": 11
+  },
+  {
+    "issue_id": "PG17-b56cc7deb",
+    "summary": "Fix integer overflows in memory-allocation calculations in PL/Perl and PL/Tcl (Heikki Linnakangas) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+    "fixed_in_minor": 11
+  },
+  {
+    "issue_id": "PG18-4154a1482",
+    "summary": "Fix memory leak in parallel vacuum worker processes (Baji Shaik) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+    "fixed_in_minor": 6
+  },
+  {
+    "issue_id": "PG18-4689ea9ce",
+    "summary": "Fix memory-safety bugs in processing of incorrect ispell/hunspell dictionary files (Andrey Rachitskiy) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+    "fixed_in_minor": 6
+  },
+  {
+    "issue_id": "PG18-4fafe2380",
+    "summary": "Fix buffer overrun with long time zone abbreviation in to_char() (Tom Lane) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+    "fixed_in_minor": 6
+  },
+  {
+    "issue_id": "PG18-5cc59834b",
+    "summary": "Fix possible PANIC due to concurrent drop of pgstats entries when track_functions is enabled (Sami Imseih, Michael Paquier) § § §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+    "fixed_in_minor": 6
+  },
+  {
+    "issue_id": "PG18-81b1e7916",
+    "summary": "Fix crash after out-of-memory failure partway through creation of a cache entry for a text search dictionary (Tom Lane) §",
     "doc_link": "https://www.postgresql.org/docs/release/18.6/",
     "fixed_in_minor": 6
   }

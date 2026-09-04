@@ -189,6 +189,8 @@ GPLv3
 
 ## Credits
 
+Logo designed and created by: [@sheeryy.bsky.social](https://bsky.app/profile/sheeryy.bsky.social)
+
 Inspired by [Brent Ozar's FirstResponderKit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit)) for SQL Server. Thank you to the SQL Server community for pioneering accessible database health monitoring!
 
 Dave-IYKYK

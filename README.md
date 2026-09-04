@@ -1,3 +1,8 @@
+<p align="center">
+  <img alt="pgFirstAid Logo" src="docs/images/logo-transparent.png" width="500">
+</p>
+
+
 # pgFirstAid
 
 Easy-to-deploy, open source PostgreSQL function (and view!) that provides a prioritized list of actions to improve database stability and performance.Inspired by Brent Ozar's [FirstResponderKit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) for SQL Server, **pgFirstAid** is designed for everyone to use - not just DBAs! Get actionable health insights from your PostgreSQL database in seconds.

@@ -6,12 +6,6 @@
     "fixed_in_minor": 19
   },
   {
-    "issue_id": "PG15-74916136f",
-    "summary": "Fix integer overflows in contrib/fuzzystrmatch's levenshtein() and levenshtein_less_equal() functions (Nathan Bossart) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
-  },
-  {
     "issue_id": "PG15-8f64cc83f",
     "summary": "Fix buffer overrun with long time zone abbreviation in to_char() (Tom Lane) §",
     "doc_link": "https://www.postgresql.org/docs/release/15.19/",
@@ -32,12 +26,6 @@
   {
     "issue_id": "PG16-60abb3c73",
     "summary": "Fix NULL-pointer crash when IS JSON or similar constructs have an argument that is of string category but lacks a cast to type text (Ayush Tiwari) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
-    "fixed_in_minor": 15
-  },
-  {
-    "issue_id": "PG16-61481aa0e",
-    "summary": "Fix integer overflows in contrib/fuzzystrmatch's levenshtein() and levenshtein_less_equal() functions (Nathan Bossart) §",
     "doc_link": "https://www.postgresql.org/docs/release/16.15/",
     "fixed_in_minor": 15
   },

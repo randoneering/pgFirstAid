@@ -167,6 +167,58 @@ class FilterProposedTests(unittest.TestCase):
         ids = {e["issue_id"] for e in out}
         self.assertEqual(ids, {"Y"})
 
+    def test_dedupes_against_existing_by_summary_and_major(self) -> None:
+        # Same fix was curated under a renamed ID; must not be re-proposed.
+        all_entries = self._entries([("PG15-NEW-ID", "high"), ("PG15-OTHER", "high")])
+        all_entries[0]["summary"] = "Fix crash on startup §"
+        existing = [{"issue_id": "PG15-RENAMED-CURATED-01",
+                     "summary": "fix crash on startup"}]
+        out = scout.filter_proposed(
+            all_entries, existing,
+            majors=["15"], min_severity="medium", top_per_major=10,
+        )
+        ids = {e["issue_id"] for e in out}
+        self.assertEqual(ids, {"PG15-OTHER"})
+
+    def test_summary_dedup_is_major_scoped(self) -> None:
+        # Same summary under a different major is new coverage, keep it.
+        all_entries = self._entries([("PG16-NEW-ID", "high")])
+        all_entries[0]["summary"] = "Fix crash on startup §"
+        all_entries[0]["doc_link"] = "https://x/release/16.5/"
+        existing = [{"issue_id": "PG15-RENAMED-CURATED-01",
+                     "summary": "Fix crash on startup §"}]
+        out = scout.filter_proposed(
+            all_entries, existing,
+            majors=["16"], min_severity="medium", top_per_major=10,
+        )
+        ids = {e["issue_id"] for e in out}
+        self.assertEqual(ids, {"PG16-NEW-ID"})
+
+    def test_skips_items_with_cve_ref_already_in_cves_json(self) -> None:
+        all_entries = self._entries([("PG15-X", "high"), ("PG15-Y", "high")])
+        all_entries[0]["_cve_refs"] = ["CVE-2026-15742"]
+        all_entries[1]["_cve_refs"] = ["CVE-2026-99999"]
+        out = scout.filter_proposed(
+            all_entries, [],
+            majors=["15"], min_severity="medium", top_per_major=10,
+            existing_cves={"CVE-2026-15742"},
+        )
+        ids = {e["issue_id"] for e in out}
+        self.assertEqual(ids, {"PG15-Y"})
+
+    def test_parser_captures_only_parenthesized_cve_refs(self) -> None:
+        html = (
+            '<li class="listitem"><p>Fix thing (Author) '
+            '<a href="https://postgr.es/c/abc1234567">§</a></p>'
+            '<p>Same type of problem as CVE-2026-6473, just elsewhere. '
+            '(CVE-2026-15742)</p></li>'
+        )
+        entries = scout.parse_release_page(
+            html, major="15", minor="19", doc_link="x/",
+        )
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["_cve_refs"], ["CVE-2026-15742"])
+
     def test_caps_per_major(self) -> None:
         all_entries = self._entries(
             [(f"PG15-X{i:02}", "high") for i in range(20)]

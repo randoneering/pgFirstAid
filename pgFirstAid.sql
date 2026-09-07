@@ -383,7 +383,7 @@ where
 		and n.nspname = pt.schemaname
 		and c.relname = pt.tablename
  );
--- CRITICAL: Unused indexes consuming significant space
+-- CRITICAL: Large indexes never used for reads consuming significant space
  insert
 	into
 	health_results
@@ -392,7 +392,7 @@ where
 	'Table Health' as category,
 	'Unused Large Index' as check_name,
 	quote_ident(psi.schemaname) || '.' || quote_ident(psio.indexrelname) as object_name,
-	'Large unused index consuming disk space and potentially impacting write performance' as issue_description,
+	'Large index never used for reads, consuming disk space and potentially impacting write performance' as issue_description,
 	pg_size_pretty(pg_relation_size(psi.indexrelid)) || ' (0 scans)' as current_value,
 	'Consider dropping this index if truly unused after monitoring usage patterns. Never drop an index without validating usage!' as recommended_action,
 	'https://www.postgresql.org/docs/current/sql-dropindex.html' as documentation_link,
@@ -401,10 +401,37 @@ from
 	pg_stat_user_indexes psi
 join pg_statio_user_indexes psio on
 	psi.indexrelid = psio.indexrelid
+join pg_index pgi on
+	pgi.indexrelid = psi.indexrelid
 where
 	idx_scan = 0
-	and pg_relation_size(psi.indexrelid) > 104857600;
--- 100MB
+	and not pgi.indisunique
+	and not pgi.indisexclusion
+	and pg_relation_size(psi.indexrelid) > 104857600; -- 100MB
+-- MEDIUM: Large unique/constraint indexes never used for reads
+ insert
+	into
+	health_results
+	select
+	'MEDIUM' as severity,
+	'Table Health' as category,
+	'Unread Large Constraint-Backing Index' as check_name,
+	quote_ident(psi.schemaname) || '.' || quote_ident(psio.indexrelname) as object_name,
+	'Large unique or constraint index never used for reads. It is enforced on every write, so review whether the constraint is needed.' as issue_description,
+	pg_size_pretty(pg_relation_size(psi.indexrelid)) || ' (0 scans)' as current_value,
+	'Confirm the underlying unique or primary-key constraint is still required. Drop the constraint if it is not necessary.' as recommended_action,
+	'https://www.postgresql.org/docs/current/ddl-constraints.html' as documentation_link,
+	3 as severity_order
+from
+	pg_stat_user_indexes psi
+join pg_statio_user_indexes psio on
+	psi.indexrelid = psio.indexrelid
+join pg_index pgi on
+	pgi.indexrelid = psi.indexrelid
+where
+	idx_scan = 0
+	and (pgi.indisunique or pgi.indisexclusion)
+	and pg_relation_size(psi.indexrelid) > 104857600; -- 100MB
 -- HIGH: Inactive Replication slots
  insert
 	into

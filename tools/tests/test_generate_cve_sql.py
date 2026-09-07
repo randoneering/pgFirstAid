@@ -6,7 +6,6 @@ these tests are pure-python stdlib assertions on the generator's outputs).
 
 from __future__ import annotations
 
-import json
 import sys
 import tempfile
 import unittest
@@ -16,7 +15,7 @@ from pathlib import Path
 TOOLS_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(TOOLS_DIR))
 
-import generate_cve_sql as gen
+import generate_cve_sql as gen  # noqa: E402
 
 
 # Static, hand-written fixtures used across the tests below.

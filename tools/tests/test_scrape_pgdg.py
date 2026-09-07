@@ -11,7 +11,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any
 
 TOOLS_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(TOOLS_DIR))
@@ -37,7 +36,7 @@ class ParseSyntheticTests(unittest.TestCase):
         self.assertEqual(len(entries), 2)
 
     def test_first_cve_ids_and_fixed_map(self) -> None:
-        entries = scraper.parse_pgdg_table(self.html)
+        entries = scraper.parse_pgdg_table(self.html, majors={"15", "16", "17", "18"})
         first = entries[0]
         self.assertEqual(first["cve_id"], "CVE-2026-19385")
         self.assertEqual(first["cvss"], 8.8)
@@ -51,7 +50,7 @@ class ParseSyntheticTests(unittest.TestCase):
         )
 
     def test_second_cve_partial_major_set(self) -> None:
-        entries = scraper.parse_pgdg_table(self.html)
+        entries = scraper.parse_pgdg_table(self.html, majors={"15", "16", "17", "18"})
         second = entries[1]
         self.assertEqual(second["cve_id"], "CVE-2024-0985")
         # Source listed only 16, 15, 14: only 15 and 16 should appear.
@@ -84,7 +83,7 @@ class ParseRealisticFixtureTests(unittest.TestCase):
         self.assertGreater(len(entries), 60, f"only {len(entries)} entries parsed")
 
     def test_every_entry_has_required_fields(self) -> None:
-        entries = scraper.parse_pgdg_table(self.html)
+        entries = scraper.parse_pgdg_table(self.html, majors={"15", "16", "17", "18"})
         for entry in entries:
             self.assertRegex(entry["cve_id"], r"^CVE-\d{4}-\d+$")
             self.assertGreaterEqual(entry["cvss"], 0.0)

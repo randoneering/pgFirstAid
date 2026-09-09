@@ -1,27 +1,33 @@
 [
   {
-    "issue_id": "PG15-1eb0d5380",
-    "summary": "Fix integer overflows in memory-allocation calculations in PL/Perl and PL/Tcl (Heikki Linnakangas) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
-  },
-  {
-    "issue_id": "PG15-8f64cc83f",
-    "summary": "Fix buffer overrun with long time zone abbreviation in to_char() (Tom Lane) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
-  },
-  {
     "issue_id": "PG15-9b2a6ccc4",
     "summary": "In PL/Perl, avoid NULL pointer dereference crash when working with an invalid PostgreSQL::InServer::ARRAY object (Xing Guo) §",
     "doc_link": "https://www.postgresql.org/docs/release/15.19/",
     "fixed_in_minor": 19
   },
   {
-    "issue_id": "PG15-FIX-1273236d",
-    "summary": "Fix buffer overrun in contrib/pg_stat_statements (Álvaro Herrera)",
+    "issue_id": "PG15-bc5775149",
+    "summary": "Fix crash with namespace nodes in contrib/xml2's xpath_nodeset() function (Andrey Chernyy, Michael Paquier) §",
     "doc_link": "https://www.postgresql.org/docs/release/15.19/",
     "fixed_in_minor": 19
+  },
+  {
+    "issue_id": "PG15-d39b9eed0",
+    "summary": "Prevent satisfies_hash_partition() from crashing with VARIADIC NULL (Robert Haas) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+    "fixed_in_minor": 19
+  },
+  {
+    "issue_id": "PG15-0b196d3db",
+    "summary": "Prevent buffer overruns when parsing an affix file for an Ispell dictionary (Tom Lane) § §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.18/",
+    "fixed_in_minor": 18
+  },
+  {
+    "issue_id": "PG15-34c18a225",
+    "summary": "In contrib/postgres_fdw, avoid crash due to premature cleanup of a failed connection (Etsuro Fujita) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.18/",
+    "fixed_in_minor": 18
   },
   {
     "issue_id": "PG16-60abb3c73",
@@ -42,8 +48,14 @@
     "fixed_in_minor": 15
   },
   {
-    "issue_id": "PG16-8bbdc0540",
-    "summary": "Fix integer overflows in memory-allocation calculations in PL/Perl and PL/Tcl (Heikki Linnakangas) §",
+    "issue_id": "PG16-aca944e33",
+    "summary": "In contrib/ltree, fix integer overflow in comparisons (Ayush Tiwari) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+    "fixed_in_minor": 15
+  },
+  {
+    "issue_id": "PG16-bf4616b59",
+    "summary": "Fix possible PANIC due to concurrent drop of pgstats entries when track_functions is enabled (Sami Imseih, Michael Paquier) § § §",
     "doc_link": "https://www.postgresql.org/docs/release/16.15/",
     "fixed_in_minor": 15
   },
@@ -66,14 +78,14 @@
     "fixed_in_minor": 11
   },
   {
-    "issue_id": "PG17-FIX-1273236d",
-    "summary": "Fix buffer overrun in contrib/pg_stat_statements (Álvaro Herrera)",
+    "issue_id": "PG17-c391c00d9",
+    "summary": "In contrib/ltree, fix integer overflow in comparisons (Ayush Tiwari) §",
     "doc_link": "https://www.postgresql.org/docs/release/17.11/",
     "fixed_in_minor": 11
   },
   {
-    "issue_id": "PG17-b56cc7deb",
-    "summary": "Fix integer overflows in memory-allocation calculations in PL/Perl and PL/Tcl (Heikki Linnakangas) §",
+    "issue_id": "PG17-d0acd2535",
+    "summary": "Fix NULL-pointer crash when IS JSON or similar constructs have an argument that is of string category but lacks a cast to type text (Ayush Tiwari) §",
     "doc_link": "https://www.postgresql.org/docs/release/17.11/",
     "fixed_in_minor": 11
   },
@@ -90,12 +102,6 @@
     "fixed_in_minor": 6
   },
   {
-    "issue_id": "PG18-4fafe2380",
-    "summary": "Fix buffer overrun with long time zone abbreviation in to_char() (Tom Lane) §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
-    "fixed_in_minor": 6
-  },
-  {
     "issue_id": "PG18-5cc59834b",
     "summary": "Fix possible PANIC due to concurrent drop of pgstats entries when track_functions is enabled (Sami Imseih, Michael Paquier) § § §",
     "doc_link": "https://www.postgresql.org/docs/release/18.6/",
@@ -104,6 +110,12 @@
   {
     "issue_id": "PG18-81b1e7916",
     "summary": "Fix crash after out-of-memory failure partway through creation of a cache entry for a text search dictionary (Tom Lane) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+    "fixed_in_minor": 6
+  },
+  {
+    "issue_id": "PG18-917fdbc63",
+    "summary": "Fix null-pointer crash in ecpg compiler (Jehan-Guillaume de Rorthais) §",
     "doc_link": "https://www.postgresql.org/docs/release/18.6/",
     "fixed_in_minor": 6
   }

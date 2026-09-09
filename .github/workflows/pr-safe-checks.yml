@@ -1,0 +1,39 @@
+name: PR Safe Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  safe-checks:
+    name: PR Safe Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Run pure contract tests
+        run: |
+          uv run pytest -q \
+            testing/test_workflow_security.py \
+            testing/integration/tests/integration/test_pgtap_suite.py::test_every_health_check_has_pgtap_coverage \
+            testing/integration/tests/integration/test_pgtap_suite.py::test_both_view_sql_files_cover_all_health_checks

@@ -5,8 +5,8 @@
 # instances your secrets point at (Neon / DigitalOcean / etc.).
 #
 # Triggers:
-#   - pull_request [opened, synchronize]: full matrix on PG15-18. Fork PRs
-#     get no secrets, so they fail at env validation. That's the point.
+#   - pull_request_target [opened, synchronize]: full matrix on PG15-18.
+#     Fork PRs skip the privileged job before runner assignment.
 #   - workflow_dispatch: pick a PG version and cloud_provider label.
 #
 # The NixOS runner already has psql, uv, and network access to the test PG
@@ -41,7 +41,7 @@ on:
           - gcp
           - azure
         default: 'direct'
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize]
     paths:
       - pgFirstAid.sql
@@ -57,14 +57,13 @@ concurrency:
 
 jobs:
   local-test:
+    if: >-
+      github.event_name != 'pull_request_target' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, nix, nixos, x86_64-linux]
-    # No job-level `if:`. The original conditional referenced
-    # `matrix.postgres_version` which is only valid in the strategy scope
-    # (after matrix evaluation), not at the job level. GitHub Actions
-    # rejects the workflow with "Unrecognized named-value: 'matrix'."
-    # The PR validation pass runs the full matrix unconditionally on
-    # pull_request; the workflow_dispatch path's per-version selection
-    # is handled by the strategy below.
+    # Skip fork pull requests before assigning a persistent self-hosted
+    # runner. The PR validation pass runs the full matrix for trusted PRs;
+    # the workflow_dispatch path's per-version selection is handled below.
     permissions:
       contents: read
     concurrency:
@@ -126,6 +125,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
       - name: Add Nix profile paths

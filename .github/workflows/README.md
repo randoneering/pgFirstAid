@@ -8,6 +8,11 @@ self-hosted NixOS runner. Installs `pg_stat_statements`, then
 `pgFirstAid.sql` + `view_pgFirstAid_managed.sql`, runs the pytest
 integration suite, and finishes with `seed_and_validate.py --managed`.
 
+Fork pull requests skip the privileged job before runner assignment
+because the job-level guard evaluates in the base workflow file; only
+same-repository pull requests and owner-triggered `workflow_dispatch`
+runs reach the self-hosted runner and the Neon secrets.
+
 Required secrets (one set per PG version):
 `PG{15,16,17,18}_{HOST,PORT,USER,PASSWORD,DATABASE}`.
 

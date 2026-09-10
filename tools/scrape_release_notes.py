@@ -16,7 +16,9 @@ Inclusion rule (project policy, matches the prior conversation):
   - Limit to the last `revisions-back` releases per major in {15,16,17,18}.
   - Each proposal needs a stable identifier. We use the upstream commit hash
     when available (`https://postgr.es/c/<HASH>`); otherwise a content hash.
-  - Dedupe against data/known_bugs.json by the proposed issue_id.
+  - Dedupe against data/known_bugs.json by issue_id OR (summary, major), so
+    curator-renamed IDs don't get re-proposed. Items whose parenthesized CVE
+    attribution is already in data/cves.json are skipped (CVE lane).
   - Output is sorted by severity (highest first), then by major, then by id.
 
 Caveats: the release-notes catalog is fundamentally noisier than the CVE
@@ -37,13 +39,13 @@ import re
 import sys
 import urllib.request
 from pathlib import Path
-from typing import Any
 
 PGDG_RELEASE_INDEX = "https://www.postgresql.org/docs/release/"
 PGDG_DOCS_BASE = "https://www.postgresql.org/docs"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUGS_JSON = REPO_ROOT / "data" / "known_bugs.json"
+CVES_JSON = REPO_ROOT / "data" / "cves.json"
 
 DEFAULT_MAJORS = ["15", "16", "17", "18"]
 DEFAULT_REVISIONS_BACK = 2  # how many recent minors per major to scan
@@ -222,6 +224,15 @@ _FIRST_P_RE = re.compile(r"<p>(.*?)</p>", re.DOTALL)
 _COMMIT_LINK_RE = re.compile(r'href="https://postgr\.es/c/([0-9a-f]{6,})"')
 _TAG_STRIP_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
+# Only parenthesized CVE refs count as an item's own CVE attribution; bare
+# inline mentions ("same type of problem as CVE-XXXX") are cross-references.
+_CVE_ATTRIBUTION_RE = re.compile(r"\((CVE-\d{4}-\d{4,7})\)")
+_ISSUE_MAJOR_RE = re.compile(r"^PG(\d+)-")
+
+
+def _norm_summary(summary: str) -> str:
+    text = summary.strip().rstrip("§")
+    return _WHITESPACE_RE.sub(" ", text).strip().lower()
 
 
 def _strip_tags(html_text: str) -> str:
@@ -275,6 +286,7 @@ def parse_release_page(html: str, *, major: str, minor: str, doc_link: str) -> l
             # Internal fields: stripped by to_json_format.
             "_severity": severity,
             "_commit": commit_match.group(1) if commit_match else None,
+            "_cve_refs": _CVE_ATTRIBUTION_RE.findall(body),
         })
     return entries
 
@@ -288,10 +300,13 @@ def filter_proposed(
     majors: list[str],
     min_severity: str = "medium",
     top_per_major: int = DEFAULT_TOP_PER_MAJOR,
+    existing_cves: set[str] | None = None,
 ) -> list[dict]:
     """Reduce scraped listitems to a human-reviewable proposal set.
 
-    - Skip existing entries (matched by issue_id).
+    - Skip existing entries (matched by issue_id or (summary, major), the
+      latter catches entries whose IDs were renamed during curation).
+    - Skip items whose CVE attribution is already curated in data/cves.json.
     - Keep only entries whose severity is >= min_severity.
     - Limit to N entries per major, highest severity first.
     """
@@ -299,6 +314,11 @@ def filter_proposed(
     threshold = sev_rank[min_severity]
 
     existing_ids = {row["issue_id"] for row in existing}
+    existing_keys = {
+        (_norm_summary(row["summary"]), m.group(1))
+        for row in existing
+        if row.get("summary") and (m := _ISSUE_MAJOR_RE.match(row["issue_id"]))
+    }
 
     # Filter + score.
     qualifying = []
@@ -307,6 +327,10 @@ def filter_proposed(
         if major not in majors:
             continue
         if entry["issue_id"] in existing_ids:
+            continue
+        if (_norm_summary(entry["summary"]), major) in existing_keys:
+            continue
+        if existing_cves and set(entry.get("_cve_refs", ())) & existing_cves:
             continue
         sev = entry["_severity"]
         if sev_rank[sev] < threshold:
@@ -355,13 +379,27 @@ def load_existing() -> list[dict]:
     return json.loads(BUGS_JSON.read_text()).get("bugs", [])
 
 
+def load_existing_cves() -> set[str]:
+    if not CVES_JSON.exists():
+        return set()
+    return {row["cve_id"] for row in json.loads(CVES_JSON.read_text()).get("cves", [])}
+
+
 def merge_into_data(proposed: list[dict]) -> None:
     """Patch data/known_bugs.json in place with the proposed additions."""
     doc = json.loads(BUGS_JSON.read_text())
     doc.setdefault("bugs", [])
     by_id = {row["issue_id"]: row for row in doc["bugs"]}
+    existing_keys = {
+        (_norm_summary(row["summary"]), m.group(1))
+        for row in doc["bugs"]
+        if row.get("summary") and (m := _ISSUE_MAJOR_RE.match(row["issue_id"]))
+    }
     for row in to_json_format(proposed):
         if row["issue_id"] in by_id:
+            continue
+        m = _ISSUE_MAJOR_RE.match(row["issue_id"])
+        if m and (_norm_summary(row["summary"]), m.group(1)) in existing_keys:
             continue
         doc["bugs"].append(row)
     from datetime import date
@@ -444,6 +482,7 @@ def main(argv: list[str] | None = None) -> int:
         majors=majors,
         min_severity=args.min_severity,
         top_per_major=args.top_per_major,
+        existing_cves=load_existing_cves(),
     )
     cleaned = to_json_format(proposed)
 

@@ -15,7 +15,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    runs-on: [self-hosted, nix, nixos, x86_64-linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: release-drafter/release-drafter@v5
         env:

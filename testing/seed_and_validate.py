@@ -693,6 +693,7 @@ _STATIC_CHECKS: frozenset[str] = frozenset(
         "Empty Table",
         "Index With Very Low Usage",
         "Unread Large Constraint-Backing Index",
+        "Autovacuum Disabled On Table",
     }
 )
 
@@ -739,7 +740,6 @@ _NEVER_SEEDED: frozenset[str] = frozenset(
         "Replication Slots Near Max Wal Size",
         "Table Bloat (Detailed)",
         "Idle Connections Over 1 Hour",
-        "Autovacuum Disabled On Table",
         "Timestamp Without Time Zone",
         "Varchar With Length Limit",
         "Serial Column Legacy",

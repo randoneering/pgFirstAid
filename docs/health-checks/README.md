@@ -48,7 +48,7 @@ A check only fires when its conditions are met, so an empty result for any check
 - **Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
 - **Query Duration Logging Disabled** - `log_min_duration_statement = -1` so slow queries never get logged
 - **Known Bug Affecting Your Version** - Notable non-CVE bugs from PostgreSQL release notes that match your running version (data integrity, replication, vacuum). Covers PG 15-18.
-- **Unread Large Constraint-Backing Index** - Large unique or exclusion constraint indexes (>100MB, 0 scans) that are still enforced on every write but never used for reads. Review whether the underlying unique, primary-key, or exclusion constraint is still required before dropping the index.
+- **Unread Large Constraint-Backing Index** - Large unique or exclusion indexes (>100MB, 0 scans) that are still enforced on every write but never used for reads. The check fires on any `indisunique` or `indisexclusion` index, regardless of whether it backs a constraint. To clear the row: drop the index directly if it is standalone, or drop the underlying unique, primary-key, or exclusion constraint (PostgreSQL does not allow `DROP INDEX` on a constraint-backed index).
 
 ## LOW Priority Issues
 

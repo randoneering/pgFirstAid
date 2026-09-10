@@ -692,6 +692,8 @@ _STATIC_CHECKS: frozenset[str] = frozenset(
         "Role Never Logged In",
         "Empty Table",
         "Index With Very Low Usage",
+        "Unread Large Constraint-Backing Index",
+        "Autovacuum Disabled On Table",
     }
 )
 
@@ -738,6 +740,15 @@ _NEVER_SEEDED: frozenset[str] = frozenset(
         "Replication Slots Near Max Wal Size",
         "Table Bloat (Detailed)",
         "Idle Connections Over 1 Hour",
+        "Timestamp Without Time Zone",
+        "Varchar With Length Limit",
+        "Serial Column Legacy",
+        "Rules On Tables",
+        "Query Duration Logging Disabled",
+        "listen_addresses Wildcard",
+        "Known CVE Affecting Your Version",
+        "Known Bug Affecting Your Version",
+        "Not In With Subquery",
     }
 )
 

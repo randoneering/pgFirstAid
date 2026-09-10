@@ -1,1 +1,16 @@
-* @randoneering
+# Code owners for pgFirstAid.
+# When a pull request changes a matched path, GitHub auto-assigns
+# @randoneering as the required reviewer. The ruleset on `main` already
+# requires 1 approving review, so this provides an explicit, auditable
+# reviewer for security-relevant paths rather than a second review.
+
+# Workflow integrity: any change to the GitHub Actions workflows, the
+# workflow-security regression test, or the CODEOWNERS file itself
+# requires review from the owner.
+/.github/workflows/                @randoneering
+/.github/CODEOWNERS                 @randoneering
+
+# Regression coverage for the workflow-integrity contract: any change
+# to the test file that locks in fork-secret boundaries requires the
+# same owner review.
+testing/test_workflow_security.py   @randoneering

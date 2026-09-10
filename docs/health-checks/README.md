@@ -48,6 +48,7 @@ A check only fires when its conditions are met, so an empty result for any check
 - **Tables Larger Than 50GB** - Identifies tables larger than 50GB (but less than 100GB)
 - **Query Duration Logging Disabled** - `log_min_duration_statement = -1` so slow queries never get logged
 - **Known Bug Affecting Your Version** - Notable non-CVE bugs from PostgreSQL release notes that match your running version (data integrity, replication, vacuum). Covers PG 15-18.
+- **Unread Large Constraint-Backing Index** - Large unique or exclusion constraint indexes (>100MB, 0 scans) that are still enforced on every write but never used for reads. Review whether the underlying unique, primary-key, or exclusion constraint is still required before dropping the index.
 
 ## LOW Priority Issues
 

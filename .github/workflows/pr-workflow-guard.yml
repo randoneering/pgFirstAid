@@ -46,7 +46,9 @@ jobs:
             pr-workflow-guard.yml \
             neon-before-after-validate.yml \
             neon-integration-pg-matrix.yml \
-            nixos-local-test.yml; do
+            nixos-local-test.yml \
+            pgdg-cve-scraper.yml \
+            release-notes-scout.yml; do
             gh api \
               "repos/${HEAD_REPO}/contents/.github/workflows/${f}?ref=${HEAD_SHA}" \
               --jq .content | base64 -d > "/tmp/pr-workflows/${f}"

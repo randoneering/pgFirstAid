@@ -11,15 +11,15 @@
 #   PG17_HOST, PG17_PORT, PG17_USER, PG17_PASSWORD, PG17_DATABASE
 #   PG18_HOST, PG18_PORT, PG18_USER, PG18_PASSWORD, PG18_DATABASE
 #
-# Note: pull_request from forks gets no repo secrets. Fork PRs fail at
-# "Validate required PG env vars". Maintainers can validate by pushing
-# the change to a same-repo branch first.
+# Note: fork pull requests skip the privileged job before runner assignment.
+# Maintainers can validate a fork PR by running workflow_dispatch manually,
+# or by pushing the change to a same-repo branch first.
 
 name: Neon Integration (PG15-PG18)
 
 on:
   workflow_dispatch:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize]
     paths:
       - pgFirstAid.sql
@@ -35,6 +35,9 @@ concurrency:
 
 jobs:
   integration:
+    if: >-
+      github.event_name != 'pull_request_target' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, nix, nixos, x86_64-linux]
     permissions:
       contents: read
@@ -109,6 +112,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
       - name: Add Nix profile paths

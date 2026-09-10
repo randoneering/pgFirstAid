@@ -39,15 +39,14 @@
 #     (b) leave it blank and apply changes outside this workflow
 #         (you only need the pre- and post- comparison jobs).
 #
-# Note: pull_request from forks gets no repo secrets. Fork PRs fail at
-# "Create Neon branch". That is the intended safe failure mode.
+# Note: fork pull requests skip the privileged job before runner assignment.
 # Maintainers can validate a fork PR by running workflow_dispatch manually,
 # or by pushing the change to a same-repo branch first.
 
 name: Neon Before/After Validation
 
 on:
-  pull_request:
+  pull_request_target:
     paths:
       - 'migrations/**'
       - 'pgFirstAid.sql'
@@ -75,6 +74,9 @@ env:
 jobs:
   before-after-validation:
     name: Before/After Health Validation
+    if: >-
+      github.event_name != 'pull_request_target' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, nix, nixos, x86_64-linux]
     timeout-minutes: 20
     permissions:
@@ -90,7 +92,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
       - name: Add Nix profile paths
         run: |
@@ -174,7 +177,7 @@ jobs:
           echo "  Pre-change baseline captured above."
           echo ""
           echo "  The change being tested:"
-          echo "    ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || 'manual dispatch' }}"
+          echo "    ${{ github.event_name == 'pull_request_target' && format('PR #{0}', github.event.number) || 'manual dispatch' }}"
           echo ""
           echo "  Now applying SQL changes..."
           echo ""
@@ -251,7 +254,7 @@ jobs:
           fi
 
       - name: Post PR comment
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request_target' }}
         uses: actions/github-script@v7
         with:
           script: |

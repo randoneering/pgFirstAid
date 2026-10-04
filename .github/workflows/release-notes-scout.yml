@@ -45,7 +45,7 @@ jobs:
       - name: Sync deps
         run: uv sync --quiet
 
-      - name: Run scout (CI mode)
+      - name: Run scout and publish branch (CI mode)
         # --check exit codes:
         #   0 = no proposed additions
         #   1 = proposed additions, written to stdout (this is what we want
@@ -54,6 +54,24 @@ jobs:
         #       sentinel, etc.). Propagate as a workflow failure WITHOUT
         #       writing the (likely empty or partial) stdout, so the
         #       resulting commit doesn't carry a misleading file.
+        #
+        # This step writes the file, commits it on the source branch ref,
+        # and pushes to origin. The next step opens (or updates) the PR.
+        #
+        # History: the original workflow used peter-evans/create-pull-request
+        # with untracked proposed-*.json. That worked when the source branch
+        # existed on origin but silently no-op'd when it didn't: peter-evans
+        # stashed uncommitted changes, failed to find the remote ref, and
+        # bailed with "Branch is not ahead of base and will not be created".
+        # Both source branches were deleted after PRs #42 and #45 merged in
+        # Aug-Sep, so every scheduled run since then has silently failed.
+        #
+        # The fix: bypass peter-evans. Write the file, move HEAD onto the
+        # source branch ref (so the commit lands on a real ref, not detached
+        # on HEAD), force-push to origin, then open the PR with `gh pr create`.
+        # --force-with-lease is safe: on the first push the remote ref is
+        # absent and the lease is vacuous; on later runs it protects against
+        # overwriting a concurrent human edit.
         id: scout
         run: |
           set +e
@@ -62,8 +80,45 @@ jobs:
           set -e
           echo "scout exit code: $rc"
           if [ $rc -eq 1 ]; then
-            echo "needs_pr=true" >> "$GITHUB_OUTPUT"
-            echo "$PROPOSED" > proposed-bugs.json
+            printf '%s\n' "$PROPOSED" > proposed-bugs.json
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            # Fetch the source branch's current state on origin so
+            # --force-with-lease below has a real remote-tracking ref to
+            # compare against. The fetch fails silently on the first push
+            # (branch doesn't exist yet), which is the correct behavior.
+            git fetch origin chore/release-notes-scout:refs/remotes/origin/chore/release-notes-scout 2>/dev/null || true
+            # Move HEAD onto the source branch ref so the commit lands on
+            # a real branch. Base on the just-fetched remote ref if it
+            # exists (subsequent runs), or on HEAD if not (first push).
+            # HEAD is the dispatched ref tip that actions/checkout gave us;
+            # using origin/main here would fail because the runner only
+            # fetches the dispatched ref. Without this split,
+            # --force-with-lease has nothing meaningful to compare against
+            # on the first push.
+            if git show-ref --verify --quiet refs/remotes/origin/chore/release-notes-scout; then
+              git checkout -B chore/release-notes-scout origin/chore/release-notes-scout
+            else
+              git checkout -B chore/release-notes-scout HEAD
+            fi
+            git add -f proposed-bugs.json
+            # Skip commit + push when proposed-bugs.json matches what we
+            # already pushed (no new proposals since last run). Without
+            # this guard, 'git commit' fails with "nothing to commit" and
+            # --force-with-lease is never reached, marking the step failed
+            # even though there is genuinely nothing to do.
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: scout release notes for new bug fixes"
+              # --force-with-lease now has a meaningful lease because the
+              # remote-tracking ref was refreshed above. If origin has
+              # moved since our fetch (concurrent human edit), this
+              # fails safely instead of silently overwriting.
+              git push --force-with-lease origin chore/release-notes-scout
+              echo "needs_pr=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "proposed-bugs.json matches origin; no new proposals to push"
+              echo "needs_pr=false" >> "$GITHUB_OUTPUT"
+            fi
           elif [ $rc -eq 0 ]; then
             echo "needs_pr=false" >> "$GITHUB_OUTPUT"
           else
@@ -71,63 +126,45 @@ jobs:
             exit "$rc"
           fi
 
-      - name: Commit proposed bug entries
-        # Commit the untracked proposed file BEFORE peter-evans runs.
-        # When the source branch doesn't exist on origin (e.g. after a
-        # previous PR merged with delete-branch and the cleanup ran),
-        # peter-evans stashes uncommitted changes, sees "0 commits ahead
-        # of base", and silently skips PR creation. A real commit makes
-        # the branch non-empty in either case.
-        if: steps.scout.outputs.needs_pr == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add proposed-bugs.json
-          git commit -m "chore: scout release notes for new bug fixes"
-
       - name: Open PR with proposed bug entries
         if: steps.scout.outputs.needs_pr == 'true'
-        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6.1.0
-        with:
-          # Explicit base is required when the push event delivers a merge
-          # commit (detached HEAD), e.g. after merging main into the source
-          # branch on a feature PR. Default would otherwise fail with
-          # "the 'base' input must be supplied."
-          base: ${{ github.event.repository.default_branch }}
-          branch: chore/release-notes-scout
-          title: "chore: add notable PostgreSQL bug fixes"
-          body: |
-            Automated PostgreSQL release-notes scout.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$(gh pr list --head chore/release-notes-scout --state open --json number -q 'length')" -gt 0 ]; then
+            echo "an open PR for chore/release-notes-scout already exists; nothing to do"
+            exit 0
+          fi
+          gh pr create \
+            --base "${{ github.event.repository.default_branch }}" \
+            --head chore/release-notes-scout \
+            --title "chore: add notable PostgreSQL bug fixes" \
+            --label automated \
+            --body "Automated PostgreSQL release-notes scout.
 
-            `tools/scrape_release_notes.py` fetched the latest ~2 minor
-            release notes per major in {15,16,17,18}, filtered the
-            `<li class="listitem">` entries by severity keywords, deduped
-            against `data/known_bugs.json`, and surfaced the top 5 per
-            major for review. The candidates are in `proposed-bugs.json`.
+          \`tools/scrape_release_notes.py\` fetched the latest ~2 minor
+          release notes per major in {15,16,17,18}, filtered the
+          \`<li class=\"listitem\">\` entries by severity keywords, deduped
+          against \`data/known_bugs.json\`, and surfaced the top 5 per
+          major for review. The candidates are in \`proposed-bugs.json\`.
 
-            **Action items for a human:**
-            - [ ] Decide which entries earn a permanent seat. The list
-                  is biased toward data-integrity / crash / replication
-                  bugs; doc-only or trivial entries should be dropped.
-            - [ ] Rename curator IDs if needed (e.g. `PG17-a1b2c3d4e`
-                  → `PG17-MERGE-RACE-CONDITION-01`) before merging.
-            - [ ] Merge selected entries into `data/known_bugs.json`:
-                  ```bash
-                  uv run python tools/scrape_release_notes.py --write --yes
-                  uv run python tools/generate_cve_sql.py
-                  git add data/known_bugs.json pgFirstAid.sql view_pgFirstAid.sql view_pgFirstAid_managed.sql
-                  git commit -m "chore: refresh known-bugs catalog"
-                  ```
-            - [ ] Delete `proposed-bugs.json` before merge.
+          **Action items for a human:**
+          - [ ] Decide which entries earn a permanent seat. The list
+                is biased toward data-integrity / crash / replication
+                bugs; doc-only or trivial entries should be dropped.
+          - [ ] Rename curator IDs if needed (e.g. \`PG17-a1b2c3d4e\`
+                → \`PG17-MERGE-RACE-CONDITION-01\`) before merging.
+          - [ ] Merge selected entries into \`data/known_bugs.json\`:
+                \`\`\`bash
+                uv run python tools/scrape_release_notes.py --write --yes
+                uv run python tools/generate_cve_sql.py
+                git add data/known_bugs.json pgFirstAid.sql view_pgFirstAid.sql view_pgFirstAid_managed.sql
+                git commit -m \"chore: refresh known-bugs catalog\"
+                \`\`\`
+          - [ ] Delete \`proposed-bugs.json\` before merge.
 
-            Notes on the keyword filter (`HIGH`/`MEDIUM` lists live in
-            `tools/scrape_release_notes.py`): the curated list is small,
-            intent is curated quality over recall, and silent false
-            negatives are preferred over noisy false positives. Tune the
-            keyword lists if the proposals get noisy or thin.
-
-            scout exit code: ${{ steps.scout.outputs.needs_pr }} (non-zero = proposals pending)
-          add-paths: proposed-bugs.json
-          commit-message: "chore: scout release notes for new bug fixes"
-          delete-branch: true
-          labels: automated
+          Notes on the keyword filter (\`HIGH\`/\`MEDIUM\` lists live in
+          \`tools/scrape_release_notes.py\`): the curated list is small,
+          intent is curated quality over recall, and silent false
+          negatives are preferred over noisy false positives. Tune the
+          keyword lists if the proposals get noisy or thin."

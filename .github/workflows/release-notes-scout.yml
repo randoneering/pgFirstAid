@@ -91,13 +91,16 @@ jobs:
             git fetch origin chore/release-notes-scout:refs/remotes/origin/chore/release-notes-scout 2>/dev/null || true
             # Move HEAD onto the source branch ref so the commit lands on
             # a real branch. Base on the just-fetched remote ref if it
-            # exists (subsequent runs), or on origin/main if not (first
-            # push). Without this split, --force-with-lease has nothing
-            # meaningful to compare against on the first push.
+            # exists (subsequent runs), or on HEAD if not (first push).
+            # HEAD is the dispatched ref tip that actions/checkout gave us;
+            # using origin/main here would fail because the runner only
+            # fetches the dispatched ref. Without this split,
+            # --force-with-lease has nothing meaningful to compare against
+            # on the first push.
             if git show-ref --verify --quiet refs/remotes/origin/chore/release-notes-scout; then
               git checkout -B chore/release-notes-scout origin/chore/release-notes-scout
             else
-              git checkout -B chore/release-notes-scout origin/main
+              git checkout -B chore/release-notes-scout HEAD
             fi
             git add -f proposed-bugs.json
             git commit -m "chore: scout release notes for new bug fixes"

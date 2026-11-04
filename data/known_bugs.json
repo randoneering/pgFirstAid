@@ -4,7 +4,7 @@
     "Edit this file; regenerate with `python tools/generate_cve_sql.py`."
   ],
   "version": 1,
-  "last_reviewed": "2026-08-24",
+  "last_reviewed": "2026-11-04",
   "bugs": [
     {
       "issue_id": "PG15-025228104",
@@ -35,6 +35,36 @@
       "summary": "Fix possible PANIC due to concurrent drop of pgstats entries when track_functions is enabled (Sami Imseih, Michael Paquier) § § §",
       "doc_link": "https://www.postgresql.org/docs/release/15.19/",
       "fixed_in_minor": 19
+    },
+    {
+      "issue_id": "PG15-9b2a6ccc4",
+      "summary": "In PL/Perl, avoid NULL pointer dereference crash when working with an invalid PostgreSQL::InServer::ARRAY object",
+      "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+      "fixed_in_minor": 19
+    },
+    {
+      "issue_id": "PG15-bc5775149",
+      "summary": "Fix crash with namespace nodes in contrib/xml2's xpath_nodeset() function",
+      "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+      "fixed_in_minor": 19
+    },
+    {
+      "issue_id": "PG15-d39b9eed0",
+      "summary": "Prevent satisfies_hash_partition() from crashing with VARIADIC NULL",
+      "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+      "fixed_in_minor": 19
+    },
+    {
+      "issue_id": "PG15-0b196d3db",
+      "summary": "Prevent buffer overruns when parsing an affix file for an Ispell dictionary",
+      "doc_link": "https://www.postgresql.org/docs/release/15.18/",
+      "fixed_in_minor": 18
+    },
+    {
+      "issue_id": "PG15-34c18a225",
+      "summary": "In contrib/postgres_fdw, avoid crash due to premature cleanup of a failed connection",
+      "doc_link": "https://www.postgresql.org/docs/release/15.18/",
+      "fixed_in_minor": 18
     },
     {
       "issue_id": "PG15-LOGREP-SUBSCRIBER-CRASH-03",
@@ -81,6 +111,36 @@
     {
       "issue_id": "PG16-5dbeb69bc",
       "summary": "Fix buffer overrun with long time zone abbreviation in to_char() (Tom Lane) §",
+      "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+      "fixed_in_minor": 15
+    },
+    {
+      "issue_id": "PG16-60abb3c73",
+      "summary": "Fix NULL-pointer crash when IS JSON or similar constructs have an argument that is of string category but lacks a cast to type text",
+      "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+      "fixed_in_minor": 15
+    },
+    {
+      "issue_id": "PG16-6de480156",
+      "summary": "Prevent satisfies_hash_partition() from crashing with VARIADIC NULL",
+      "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+      "fixed_in_minor": 15
+    },
+    {
+      "issue_id": "PG16-83336e3ed",
+      "summary": "Fix crash after out-of-memory failure partway through creation of a cache entry for a text search dictionary",
+      "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+      "fixed_in_minor": 15
+    },
+    {
+      "issue_id": "PG16-aca944e33",
+      "summary": "In contrib/ltree, fix integer overflow in comparisons",
+      "doc_link": "https://www.postgresql.org/docs/release/16.15/",
+      "fixed_in_minor": 15
+    },
+    {
+      "issue_id": "PG16-bf4616b59",
+      "summary": "Fix possible PANIC due to concurrent drop of pgstats entries when track_functions is enabled",
       "doc_link": "https://www.postgresql.org/docs/release/16.15/",
       "fixed_in_minor": 15
     },
@@ -133,6 +193,36 @@
       "fixed_in_minor": 11
     },
     {
+      "issue_id": "PG17-5fdea3aa3",
+      "summary": "Fix memory-safety bugs in processing of incorrect ispell/hunspell dictionary files",
+      "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+      "fixed_in_minor": 11
+    },
+    {
+      "issue_id": "PG17-634a8dcb8",
+      "summary": "Fix crash after out-of-memory failure partway through creation of a cache entry for a text search dictionary",
+      "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+      "fixed_in_minor": 11
+    },
+    {
+      "issue_id": "PG17-8ad414831",
+      "summary": "Fix memory leak in parallel vacuum worker processes",
+      "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+      "fixed_in_minor": 11
+    },
+    {
+      "issue_id": "PG17-c391c00d9",
+      "summary": "In contrib/ltree, fix integer overflow in comparisons",
+      "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+      "fixed_in_minor": 11
+    },
+    {
+      "issue_id": "PG17-d0acd2535",
+      "summary": "Fix NULL-pointer crash when IS JSON or similar constructs have an argument that is of string category but lacks a cast to type text",
+      "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+      "fixed_in_minor": 11
+    },
+    {
       "issue_id": "PG17-PG-CREATESUBSCRIBER-08",
       "summary": "pg_createsubscriber can leave slots uninitialized, breaking logical failover on first switchover",
       "doc_link": "https://www.postgresql.org/docs/release/17.4/",
@@ -171,6 +261,30 @@
     {
       "issue_id": "PG18-35d9a6263",
       "summary": "Fix NULL-pointer crash when IS JSON or similar constructs have an argument that is of string category but lacks a cast to type text (Ayush Tiwari) §",
+      "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+      "fixed_in_minor": 6
+    },
+    {
+      "issue_id": "PG18-4154a1482",
+      "summary": "Fix memory leak in parallel vacuum worker processes",
+      "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+      "fixed_in_minor": 6
+    },
+    {
+      "issue_id": "PG18-4689ea9ce",
+      "summary": "Fix memory-safety bugs in processing of incorrect ispell/hunspell dictionary files",
+      "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+      "fixed_in_minor": 6
+    },
+    {
+      "issue_id": "PG18-5cc59834b",
+      "summary": "Fix possible PANIC due to concurrent drop of pgstats entries when track_functions is enabled",
+      "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+      "fixed_in_minor": 6
+    },
+    {
+      "issue_id": "PG18-81b1e7916",
+      "summary": "Fix crash after out-of-memory failure partway through creation of a cache entry for a text search dictionary",
       "doc_link": "https://www.postgresql.org/docs/release/18.6/",
       "fixed_in_minor": 6
     },

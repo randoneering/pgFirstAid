@@ -1,0 +1,122 @@
+[
+  {
+    "issue_id": "PG15-4da71fc37",
+    "summary": "Guard against integer overflow in calculations of frame start and end positions for window aggregates (Richard Guo) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.18/",
+    "fixed_in_minor": 18
+  },
+  {
+    "issue_id": "PG15-6916f4410",
+    "summary": "Fix crashes in some ecpg functions when called without any established connection (Shruthi Gowda) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.18/",
+    "fixed_in_minor": 18
+  },
+  {
+    "issue_id": "PG15-f033abc6c",
+    "summary": "Fix possible server crash when processing extended statistics on expressions of extension data types (Michael Paquier) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.18/",
+    "fixed_in_minor": 18
+  },
+  {
+    "issue_id": "PG15-065cbfb88",
+    "summary": "Avoid exposing a WAL receiver's full connection string during timeline jumps (Chao Li) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+    "fixed_in_minor": 19
+  },
+  {
+    "issue_id": "PG15-126141425",
+    "summary": "Fix possible mis-decoding of index tuples during GiST and SP-GiST index-only scans (Peter Geoghegan) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
+    "fixed_in_minor": 19
+  },
+  {
+    "issue_id": "PG16-04745ba9c",
+    "summary": "Fix possible server crash when processing extended statistics on expressions of extension data types (Michael Paquier) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
+    "fixed_in_minor": 14
+  },
+  {
+    "issue_id": "PG16-0fe032e6a",
+    "summary": "Guard against integer overflow in calculations of frame start and end positions for window aggregates (Richard Guo) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
+    "fixed_in_minor": 14
+  },
+  {
+    "issue_id": "PG16-1352651c2",
+    "summary": "In contrib/postgres_fdw, avoid crash due to premature cleanup of a failed connection (Etsuro Fujita) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
+    "fixed_in_minor": 14
+  },
+  {
+    "issue_id": "PG16-42383d32d",
+    "summary": "Prevent buffer overruns when parsing an affix file for an Ispell dictionary (Tom Lane) § §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
+    "fixed_in_minor": 14
+  },
+  {
+    "issue_id": "PG16-7e4c871f4",
+    "summary": "Fix crashes in some ecpg functions when called without any established connection (Shruthi Gowda) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
+    "fixed_in_minor": 14
+  },
+  {
+    "issue_id": "PG17-d424d06ed",
+    "summary": "In PL/Perl, avoid NULL pointer dereference crash when working with an invalid PostgreSQL::InServer::ARRAY object (Xing Guo) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
+    "fixed_in_minor": 11
+  },
+  {
+    "issue_id": "PG17-4761f2eee",
+    "summary": "Fix minor memory leaks in ICU-based string processing (Jeff Davis) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.10/",
+    "fixed_in_minor": 10
+  },
+  {
+    "issue_id": "PG17-530b6b02f",
+    "summary": "Fix possible server crash when processing extended statistics on expressions of extension data types (Michael Paquier) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.10/",
+    "fixed_in_minor": 10
+  },
+  {
+    "issue_id": "PG17-5d67549d9",
+    "summary": "Fix crashes in some ecpg functions when called without any established connection (Shruthi Gowda) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.10/",
+    "fixed_in_minor": 10
+  },
+  {
+    "issue_id": "PG17-af8f9248f",
+    "summary": "In contrib/postgres_fdw, avoid crash due to premature cleanup of a failed connection (Etsuro Fujita) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.10/",
+    "fixed_in_minor": 10
+  },
+  {
+    "issue_id": "PG18-917fdbc63",
+    "summary": "Fix null-pointer crash in ecpg compiler (Jehan-Guillaume de Rorthais) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+    "fixed_in_minor": 6
+  },
+  {
+    "issue_id": "PG18-91b57eade",
+    "summary": "Fix crash with namespace nodes in contrib/xml2's xpath_nodeset() function (Andrey Chernyy, Michael Paquier) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+    "fixed_in_minor": 6
+  },
+  {
+    "issue_id": "PG18-c3e36a9a5",
+    "summary": "In contrib/ltree, fix integer overflow in comparisons (Ayush Tiwari) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+    "fixed_in_minor": 6
+  },
+  {
+    "issue_id": "PG18-e430ecc59",
+    "summary": "In PL/Perl, avoid NULL pointer dereference crash when working with an invalid PostgreSQL::InServer::ARRAY object (Xing Guo) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
+    "fixed_in_minor": 6
+  },
+  {
+    "issue_id": "PG18-00c6e0819",
+    "summary": "Prevent buffer overruns when parsing an affix file for an Ispell dictionary (Tom Lane) § §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.4/",
+    "fixed_in_minor": 4
+  }
+]

@@ -120,6 +120,44 @@ def test_non_info_findings_include_targets_and_evidence(
         assert "explicit human approval" in prompt
 
 
+def test_prompt_distinguishes_report_connection_from_finding_target(
+    prompt_database: PgConnection,
+) -> None:
+    with prompt_database.cursor() as cur:
+        cur.execute(
+            "SELECT pgfirstaid_agent_prompt('MEDIUM', 'Query Health', "
+            "'Current Blocked/Blocking Queries', 'blocked target', "
+            "NULL, 'blocking target', NULL, NULL)"
+        )
+        prompt = cur.fetchone()[0]
+    assert "Report connection database:" in prompt
+    assert "per-finding evidence" in prompt
+    assert "target database and role" in prompt
+    assert "never assume" in prompt.lower()
+
+
+def test_prompt_requires_approved_transactional_staging_rehearsal(
+    prompt_database: PgConnection,
+) -> None:
+    with prompt_database.cursor() as cur:
+        cur.execute(
+            "SELECT pgfirstaid_agent_prompt('MEDIUM', 'Table Health', "
+            "'Missing Primary Key', 'target', NULL, NULL, NULL, NULL)"
+        )
+        prompt = cur.fetchone()[0]
+    assert "BEGIN;" in prompt and "ROLLBACK;" in prompt
+    assert "staging" in prompt.lower()
+    assert "explicit human approval" in prompt
+    assert "SET LOCAL lock_timeout = '2s'" in prompt
+    assert "SET LOCAL statement_timeout = '30s'" in prompt
+    assert "external" in prompt and "nontransactional" in prompt
+    assert "sequence" in prompt
+    assert "VACUUM and concurrent index operations" in prompt
+    assert "outside a transaction" in prompt
+    assert "EXPLAIN ANALYZE" in prompt
+    assert "Do not execute the proposed SQL without approval" in prompt
+
+
 def test_info_findings_keep_rows_without_prompts(prompt_database: PgConnection) -> None:
     columns, rows = findings(prompt_database)
     assert "agent_prompt" in columns

@@ -51,10 +51,12 @@ uv run pytest tests/integration -m integration
 From the repository root, run against a disposable database using the standard `PG*` variables above:
 
 ```bash
-uv run pytest testing/test_agent_prompts.py
+uv run pytest testing/test_agent_prompts.py testing/test_query_context.py testing/test_audit_workflows.py
 ```
 
 `PGFA_PROMPT_TEST_DSN` can override the standard connection variables.
 The tests install each SQL variant inside a transaction and roll back the fixture afterward.
 They cover exact object evidence, every curated prompt, INFO omission, severity order, view grants/dependencies, explicit function recreation, and helper grants for restricted monitoring roles.
+Query-context fixtures use transaction-local catalog shadows to test colliding query IDs and sessions from other databases without creating live blockers.
+Workflow tests run the shipped psql installation commands against injected SQL failures and check handled Python audit errors without posting PR comments.
 The self-hosted variants require access to the configured PostgreSQL log directory, even when it is empty.

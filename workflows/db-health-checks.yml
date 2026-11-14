@@ -42,7 +42,7 @@ jobs:
 
       - name: Install pgFirstAid
         run: |
-          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" <<'EOF'
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" <<'EOF'
           CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
           -- Install pgFirstAid function
@@ -181,7 +181,7 @@ jobs:
 
       - name: Install pgFirstAid
         run: |
-          psql -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" <<'EOF'
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 -h "${{ env.PGHOST }}" -U "${{ env.PGUSER }}" -d "${{ env.PGDATABASE }}" <<'EOF'
           CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
           \i pgFirstAid.sql
           \i view_pgFirstAid.sql

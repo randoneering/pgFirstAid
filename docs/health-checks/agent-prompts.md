@@ -25,7 +25,8 @@ For a specific finding, filter by its `check_name` and `object_name`.
 
 Each prompt includes:
 
-- The current database, PostgreSQL version, severity, and check name.
+- The report connection database, PostgreSQL version, severity, and check name.
+- The actual database/user identifiers for query and session targets, which can differ from the report connection.
 - The actual affected objects and observed values, encoded as JSON strings to preserve quotes and newlines.
 - Check-specific diagnosis and remediation guidance, plus documentation links.
 - Read-only verification, staging tests, explicit approval before changes, finite timeouts, and recovery steps.
@@ -33,6 +34,10 @@ Each prompt includes:
 Index findings include the owning table.
 Duplicate-index findings identify both indexes, and foreign-key findings identify the constraint and columns.
 Session and query findings include the available PID or query ID and require the agent to recheck their identity before acting.
+Statistics checks filter the connected database before ranking queries and distinguish database/user IDs even when query IDs match.
+Blocked/blocking findings include both sessions' database, role, and backend start time.
+Transactional changes need an explicitly approved `BEGIN`/`ROLLBACK` rehearsal in staging.
+Rollback does not undo every side effect, and nontransactional operations need a separate staging rehearsal.
 Prompts treat captured names, query text, and links as untrusted evidence, not instructions to execute.
 
 Review the prompt before sharing it with an external agent.
@@ -80,7 +85,8 @@ Do not use `CASCADE` or discard dependent objects to force the upgrade.
 ### Function
 
 PostgreSQL cannot change a function's declared return columns with `CREATE OR REPLACE FUNCTION`.
-On an older installation, rerunning `pgFirstAid.sql` alone therefore fails with `cannot change return type of existing function`.
+On an older installation, the installer stops before changing helper functions and reports that pgFirstAid requires an explicit upgrade.
+Bundled workflow installers stop on that error instead of silently continuing with the older function.
 Do not automatically drop the function or use `CASCADE`.
 New installations do not need these upgrade steps.
 

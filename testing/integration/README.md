@@ -39,6 +39,30 @@ export PGFA_TEST_ACTIVE_CONN_SLEEP_SECONDS=20
 export PGFA_TEST_WAIT_TIMEOUT_SECONDS=45
 ```
 
+## Existing CI installations
+
+Dedicated CI databases can opt into the return-type upgrade with `PGFA_TEST_ALLOW_LEGACY_UPGRADE=1`.
+The integration fixture and local workflow scripts then use `testing/ci_install.py` instead of bypassing the normal installer's guard.
+The helper upgrades only the known eight-column function, in one transaction, preserving its owner, EXECUTE grants/grantors/options, and comment.
+It refuses dependent objects with `RESTRICT` and rolls back on any error.
+Unknown shapes and unsupported custom metadata require the manual upgrade procedure.
+Use this opt-in only for dedicated test databases or disposable branches.
+
+```bash
+uv run python testing/ci_install.py --allow-legacy-upgrade
+# Read a branch DSN from the named environment variable, not command arguments.
+uv run python testing/ci_install.py --allow-legacy-upgrade --dsn-env DB_URL
+```
+
+Run these commands from the repository root.
+`PG*` variables configure the first command.
+The normal SQL installer remains guarded; production upgrades still need explicit review.
+Regression tests for this helper use `PGFA_CI_INSTALL_TEST_DSN` and run with `uv run pytest testing/test_ci_install.py`.
+`testing/test_ci_wiring.py` checks opt-in routing without database access and runs in PR Safe Checks.
+
+`pull_request_target` loads workflow definitions from the base branch.
+When a PR changes those definitions, dispatch the workflow with the PR branch as its ref to validate the updated configuration before merging.
+
 ## Run tests
 
 ```bash

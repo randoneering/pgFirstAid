@@ -38,5 +38,6 @@ jobs:
         run: |
           uv run pytest -q \
             testing/test_workflow_security.py \
+            testing/test_ci_wiring.py \
             testing/integration/tests/integration/test_pgtap_suite.py::test_every_health_check_has_pgtap_coverage \
             testing/integration/tests/integration/test_pgtap_suite.py::test_both_view_sql_files_cover_all_health_checks

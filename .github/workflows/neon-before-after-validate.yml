@@ -102,13 +102,18 @@ jobs:
           echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
           echo "/etc/profiles/per-user/$USER/bin" >> "$GITHUB_PATH"
 
-      - name: Verify PostgreSQL client is installed
+      - name: Verify PostgreSQL client and uv are installed
         run: |
           if ! command -v psql >/dev/null 2>&1; then
             echo "::error::psql not found on runner. Install postgresql-client on the self-hosted VM."
             exit 1
           fi
           psql --version
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "::error::uv not found on runner. Install uv before running CI upgrades."
+            exit 1
+          fi
+          uv --version
 
       - name: Set branch name
         id: branch-name
@@ -131,9 +136,9 @@ jobs:
         env:
           DB_URL: ${{ steps.create-branch.outputs.db_url }}
         run: |
+          uv run python testing/ci_install.py --allow-legacy-upgrade --dsn-env DB_URL
           psql "$DB_URL" -v ON_ERROR_STOP=1 <<'EOF'
           CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
-          \i pgFirstAid.sql
           \i view_pgFirstAid.sql
           \i view_pgFirstAid_managed.sql
           EOF

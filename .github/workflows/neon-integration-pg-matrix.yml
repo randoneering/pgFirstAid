@@ -87,6 +87,7 @@ jobs:
       PGDATABASE: ${{ secrets[matrix.pg_database_secret] }}
       PGSSLMODE: require
       PGFA_TEST_VIEW_MODE: managed
+      PGFA_TEST_ALLOW_LEGACY_UPGRADE: "1"
       PGFA_TEST_ACTIVE_CONN_TARGET: "52"
       PGFA_TEST_ACTIVE_CONN_SLEEP_SECONDS: "20"
       PGFA_TEST_WAIT_TIMEOUT_SECONDS: "45"
@@ -171,17 +172,14 @@ jobs:
 
       - name: Install pgFirstAid function
         run: |
-          psql -v ON_ERROR_STOP=1 -f ../../pgFirstAid.sql
+          uv run python ../ci_install.py --allow-legacy-upgrade
           # Smoke test: ensure the function is callable. A silent install
           # failure (wrong search_path, missing extension, etc.) used to
           # surface much later as an UndefinedFunction in the pgTAP suite.
           psql -v ON_ERROR_STOP=1 -c "SELECT pg_firstaid() IS NOT NULL;"
 
-      - name: Recreate managed view only
+      - name: Install managed view only
         run: |
-          psql -v ON_ERROR_STOP=1 \
-            -c "SET lock_timeout = '30s'" \
-            -c "DROP VIEW IF EXISTS v_pgfirstaid"
           psql -v ON_ERROR_STOP=1 \
             -c "SET lock_timeout = '30s'" \
             -f ../../view_pgFirstAid_managed.sql

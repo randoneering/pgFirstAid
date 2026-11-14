@@ -134,3 +134,12 @@ ROLLBACK;
 
 Commit an approved upgrade only after replaying the recorded metadata and validating dependencies and access.
 If the rehearsal fails, roll it back and resolve the specific dependency or permission issue before retrying.
+
+### Dedicated CI databases
+
+`testing/ci_install.py --allow-legacy-upgrade` provides an explicit CI-only path for the known eight-column installation.
+It recreates the function in one transaction, preserves ownership, EXECUTE grants including grantors/options, and comments, and refuses dependencies with `RESTRICT`.
+It retains existing prompt-helper grants and adds access only for previously authorized function callers.
+Unsupported metadata, unknown shapes, missing grantor privileges, or SQL errors roll back the upgrade.
+Use trusted, transaction-safe installer SQL and dedicated test databases or disposable branches only.
+See [CI setup and tests](../../testing/integration/README.md#existing-ci-installations).

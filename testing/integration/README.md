@@ -59,6 +59,7 @@ Run these commands from the repository root.
 The normal SQL installer remains guarded; production upgrades still need explicit review.
 Regression tests for this helper use `PGFA_CI_INSTALL_TEST_DSN` and run with `uv run pytest testing/test_ci_install.py`.
 `testing/test_ci_wiring.py` checks opt-in routing without database access and runs in PR Safe Checks.
+Set `PGFA_TEST_NIX_PYTHON` to a Nix Python interpreter to also run the real binary-driver import regression in a fresh uv environment without `LD_LIBRARY_PATH`.
 
 `pull_request_target` loads workflow definitions from the base branch.
 When a PR changes those definitions, dispatch the workflow with the PR branch as its ref to validate the updated configuration before merging.

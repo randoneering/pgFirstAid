@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import zlib  # noqa: F401 - Preload Nix's libz for psycopg2's binary wheel.
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4

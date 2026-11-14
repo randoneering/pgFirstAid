@@ -113,3 +113,36 @@ def test_cloned_branch_installer_upgrades_before_installing_views(
     assert arguments[dsn_option + 1] == "DB_URL"
     assert "synthetic-ci-dsn" not in arguments[:boundary]
     assert "\\i pgFirstAid.sql" not in install["run"]
+
+
+def test_ci_installer_loads_its_binary_driver_on_nix(tmp_path: Path) -> None:
+    python = os.getenv("PGFA_TEST_NIX_PYTHON")
+    if not python:
+        pytest.skip("Set PGFA_TEST_NIX_PYTHON to a Nix Python interpreter")
+    assert Path(python).resolve().is_relative_to(Path("/nix/store"))
+    env = os.environ.copy()
+    env.pop("LD_LIBRARY_PATH", None)
+    env.pop("VIRTUAL_ENV", None)
+    env["UV_LINK_MODE"] = "copy"
+    env["UV_PROJECT_ENVIRONMENT"] = str(tmp_path / "nix-environment")
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "--frozen",
+            "--project",
+            str(ROOT),
+            "--python",
+            python,
+            "python",
+            "testing/ci_install.py",
+            "--help",
+        ],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--allow-legacy-upgrade" in result.stdout

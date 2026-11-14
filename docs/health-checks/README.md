@@ -4,6 +4,10 @@ The full list of checks pgFirstAid runs, grouped by severity.
 
 A check only fires when its conditions are met, so an empty result for any check is a pass. Checks tagged *(pg_stat_statements)* require that extension to be installed.
 
+Every CRITICAL, HIGH, MEDIUM, and LOW finding includes a copyable `agent_prompt` with its actual targets, observed values, and check-specific guidance.
+INFO rows return `NULL` for this column.
+See [agent remediation prompts](agent-prompts.md) for usage, safety guidance, and existing-install upgrade steps.
+
 ## CRITICAL Issues
 
 - **Missing Primary Keys** - Tables without primary keys that can cause replication issues and poor performance

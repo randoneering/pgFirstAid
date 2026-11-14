@@ -15,6 +15,7 @@ It uses:
 - Python integration scenarios that need concurrent sessions and timing control
 - End-to-end seeded validation via `testing/seed_and_validate.py --managed` in the managed CI workflows
 - Function/view parity assertions
+- Per-finding agent prompts, quoted targets, all curated check branches, and function/view upgrades (`testing/test_agent_prompts.py`)
 - A coverage guard test that ensures every `check_name` in `pgFirstAid.sql` is
   referenced by at least one pgTAP assertion
 
@@ -44,3 +45,16 @@ export PGFA_TEST_WAIT_TIMEOUT_SECONDS=45
 uv sync
 uv run pytest tests/integration -m integration
 ```
+
+## Agent prompt tests
+
+From the repository root, run against a disposable database using the standard `PG*` variables above:
+
+```bash
+uv run pytest testing/test_agent_prompts.py
+```
+
+`PGFA_PROMPT_TEST_DSN` can override the standard connection variables.
+The tests install each SQL variant inside a transaction and roll back the fixture afterward.
+They cover exact object evidence, every curated prompt, INFO omission, severity order, view grants/dependencies, explicit function recreation, and helper grants for restricted monitoring roles.
+The self-hosted variants require access to the configured PostgreSQL log directory, even when it is empty.

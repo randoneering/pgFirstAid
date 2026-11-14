@@ -38,6 +38,7 @@ Thank you OSUOSL for providing hosting for our testing infrastructure and CI/CD 
 - **Detailed Checks** - built-in health checks covering critical performance and stability issues
 - **Prioritized Results** - Issues ranked by severity (CRITICAL → HIGH → MEDIUM → LOW → INFO)
 - **Actionable Recommendations** - Each issue includes specific remediation steps
+- **Copyable Agent Prompts** - Every non-INFO finding includes check-specific guidance with its actual objects and observed values
 - **Documentation Links** - Direct links to official PostgreSQL documentation for deeper learning
 - **Optional `pg_stat_statements` Checks** - Runs additional query workload checks when `pg_stat_statements` is installed
 
@@ -58,6 +59,10 @@ SELECT * FROM v_pgfirstAid;
 
 That's it! No configuration needed. Deploy as a user with the highest possible privileges (in your environment) to avoid issues.
 
+**Upgrading an existing function installation?**
+The new `agent_prompt` return column requires an explicit function-recreation upgrade.
+See [upgrade instructions](docs/health-checks/agent-prompts.md#upgrade-an-existing-installation) before rerunning the installer.
+
 ### Example Output
 
 | severity | category | check_name | object_name | issue_description | current_value | recommended_action | documentation_link |
@@ -65,9 +70,28 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 | CRITICAL | Table Health| Missing Primary Key | public.users | Table missing a primary key... | No primary key defined | Add a primary key or unique constraint... | https://www.postgresql.org/... |
 | HIGH | Table Health | Missing Statistics | public.orders | Table has never been analyzed... | Last analyze: Never | Run ANALYZE on this table... | https://www.postgresql.org/... |
 
+The `agent_prompt` column is omitted from this compact example.
+View results also include `severity_order` before `agent_prompt`.
+
 ## What Does It Check?
 
 See the full list of checks, grouped by severity, in [`docs/health-checks/README.md`](docs/health-checks/README.md).
+
+## Copy a Remediation Prompt
+
+Each non-INFO result includes an `agent_prompt` tailored to that finding's affected objects and measured values.
+Copy the complete cell into your agent to start with read-only diagnosis and an approval-gated remediation plan.
+
+```sql
+SELECT severity, check_name, object_name, agent_prompt
+FROM pg_firstAid()
+WHERE severity <> 'INFO';
+```
+
+Use `FROM v_pgfirstaid` for either view installation.
+INFO rows return `NULL` for `agent_prompt`.
+Review prompts for sensitive object names or captured SQL before sharing them externally.
+See [agent prompts and upgrades](docs/health-checks/agent-prompts.md) for details.
 
 ## Usage Tips
 

@@ -53,7 +53,7 @@ def context_database(
                 "CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA public"
             )
             cur.execute(
-                "CREATE TEMP TABLE pg_stat_statements (LIKE public.pg_stat_statements)"
+                "CREATE TABLE pg_stat_statements (LIKE public.pg_stat_statements)"
             )
         yield conn, request.param
     finally:
@@ -184,10 +184,8 @@ def test_blocked_and_blocking_findings_keep_both_session_identities(
     conn, installer = context_database
     with conn.cursor() as cur:
         # Catalog shadows avoid creating live locks or cancelling another backend.
-        cur.execute(
-            "CREATE TEMP TABLE pg_stat_activity (LIKE pg_catalog.pg_stat_activity)"
-        )
-        cur.execute("CREATE TEMP TABLE pg_locks (LIKE pg_catalog.pg_locks)")
+        cur.execute("CREATE TABLE pg_stat_activity (LIKE pg_catalog.pg_stat_activity)")
+        cur.execute("CREATE TABLE pg_locks (LIKE pg_catalog.pg_locks)")
         cur.execute(
             "SELECT datname FROM pg_database "
             "WHERE datname <> current_database() LIMIT 1"
@@ -241,9 +239,7 @@ def test_idle_connection_prompt_keeps_its_actual_database_and_backend(
 ) -> None:
     conn, installer = context_database
     with conn.cursor() as cur:
-        cur.execute(
-            "CREATE TEMP TABLE pg_stat_activity (LIKE pg_catalog.pg_stat_activity)"
-        )
+        cur.execute("CREATE TABLE pg_stat_activity (LIKE pg_catalog.pg_stat_activity)")
         cur.execute(
             "SELECT datname, quote_ident(datname) FROM pg_database "
             "WHERE datname <> current_database() LIMIT 1"

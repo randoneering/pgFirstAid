@@ -71,17 +71,25 @@ uv sync
 uv run pytest tests/integration -m integration
 ```
 
+## SQL helper generation
+
+Edit `data/agent_prompt.sql` or `data/view_installer.sql`, then run `uv run python tools/sync_sql_helpers.py`.
+`uv run python tools/sync_sql_helpers.py --check` validates the embedded copies without writing files.
+Generator regression tests live in `tools/tests/test_sync_sql_helpers.py` and run in PR Safe Checks.
+
 ## Agent prompt tests
 
 From the repository root, run against a disposable database using the standard `PG*` variables above:
 
 ```bash
-uv run pytest testing/test_agent_prompts.py testing/test_query_context.py testing/test_audit_workflows.py
+uv run pytest testing/test_agent_prompts.py testing/test_query_context.py testing/test_audit_workflows.py testing/test_view_installation.py
 ```
 
 `PGFA_PROMPT_TEST_DSN` can override the standard connection variables.
 The tests install each SQL variant inside a transaction and roll back the fixture afterward.
 They cover exact object evidence, every curated prompt, INFO omission, severity order, view grants/dependencies, explicit function recreation, and helper grants for restricted monitoring roles.
-Query-context fixtures use transaction-local catalog shadows to test colliding query IDs and sessions from other databases without creating live blockers.
+Query-context fixtures use schema-local catalog doubles inside rollback-only transactions to test colliding query IDs and sessions from other databases without creating live blockers.
+They use ordinary tables so the permanent report view can safely reference them.
+View-installation tests cover column-layout recovery, metadata preservation, dependency refusal, bounded locks, and rollback.
 Workflow tests run the shipped psql installation commands against injected SQL failures and check handled Python audit errors without posting PR comments.
 The self-hosted variants require access to the configured PostgreSQL log directory, even when it is empty.

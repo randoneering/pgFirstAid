@@ -429,9 +429,16 @@ def test_physical_slot_without_database_or_restart_lsn_keeps_evidence(
     upgrade_database: PgConnection,
 ) -> None:
     with upgrade_database.cursor() as cur:
-        # Slots outlive transactions; shadow the catalog to avoid creating a real one.
+        # Keep the catalog double schema-local so permanent views can reference it.
+        cur.execute("SELECT current_schema()")
+        schema = cur.fetchone()[0]
         cur.execute(
-            "CREATE TEMP TABLE pg_replication_slots AS SELECT "
+            sql.SQL("SET LOCAL search_path TO {}, public, pg_catalog").format(
+                sql.Identifier(schema)
+            )
+        )
+        cur.execute(
+            "CREATE TABLE pg_replication_slots AS SELECT "
             "'physical_prompt_test'::name AS slot_name, NULL::name AS plugin, "
             "NULL::name AS database, NULL::pg_lsn AS restart_lsn, "
             "false AS active, NULL::bigint AS safe_wal_size"

@@ -206,6 +206,11 @@ Copy any workflow file to `.github/workflows/` in your repo. See [`workflows/REA
 
 ## Contributing
 
+Prompt and view-installation helpers each have one maintained source under `data/`.
+Edit the canonical helper, then run `uv run python tools/sync_sql_helpers.py` to refresh the standalone installers.
+PR Safe Checks rejects embedded copies that differ from their canonical source.
+See [SQL helper generation](tools/README.md#edit-shared-sql-helpers) for details.
+
 Found a bug? Have an idea for a new health check? Let me know! I want this to grow to be a tool that is available for all, accidental DBA or not.
 
 ## License

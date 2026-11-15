@@ -389,6 +389,9 @@ begin
 end;
 $$;
 
+-- GENERATED agent_prompt BEGIN
+-- Edit this canonical source, then regenerate the standalone installers.
+-- Source: data/agent_prompt.sql; run uv run python tools/sync_sql_helpers.py
 CREATE OR REPLACE FUNCTION pgfirstaid_agent_prompt(
     p_severity text,
     p_category text,
@@ -564,6 +567,7 @@ $template$,
     );
 END;
 $prompt$;
+-- GENERATED agent_prompt END
 
 create or replace
 function pg_firstAid()

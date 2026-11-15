@@ -45,6 +45,19 @@ Database names, object names, session information, and captured SQL can contain 
 The prompt does not grant access to your database or authorize changes.
 An agent can still make mistakes; review its evidence and proposed commands yourself.
 
+## Edit shared SQL helpers
+
+Maintain prompt guidance in `data/agent_prompt.sql` and view-recovery logic in `data/view_installer.sql`.
+Generate their embedded copies rather than editing each standalone installer:
+
+```bash
+uv run python tools/sync_sql_helpers.py
+uv run python tools/sync_sql_helpers.py --check
+```
+
+PR Safe Checks rejects stale copies.
+Users still install a single SQL file with no generator or external SQL dependency.
+
 ## Upgrade an existing installation
 
 The new column is appended after the existing output columns.
@@ -76,11 +89,21 @@ If calls fail with `permission denied for function pgfirstaid_agent_prompt`, che
 ### Views
 
 Run your existing view installer again: `view_pgFirstAid.sql` or `view_pgFirstAid_managed.sql`.
-Both use `CREATE OR REPLACE VIEW` to append the column while preserving the view's identity, owner, grants, and dependent objects.
+Compatible replacements keep the view's identity, ownership, grants, comments, security options, and dependents in place.
 An existing dependent view defined with `SELECT *` retains its original columns until you explicitly update its definition.
-If your deployed view has a different column layout from the previous nine-column definition, replacement may fail.
-Stop and inventory its definition, dependencies, ownership, and complete grants before planning an explicit recreation with `RESTRICT` in a transaction.
-Do not use `CASCADE` or discard dependent objects to force the upgrade.
+
+For incompatible column types, names, order, or collations, the installer rebuilds `v_pgfirstaid` atomically with `RESTRICT`.
+It restores the owner, complete table/column grants including grantors and grant options, retained column comments, view comments, and view options.
+A failure rolls back the replacement, including metadata changes.
+The installer limits lock waits to at most two seconds and restores the caller's lock timeout and role setting.
+
+Dependent objects block an incompatible rebuild instead of being dropped.
+Unsupported custom metadata, metadata on removed columns, or unavailable grantor roles also require manual migration.
+Do not use `CASCADE` to force those cases.
+
+Installation requires schema creation rights and database `TEMP` permission for a session-local staging view.
+An incompatible rebuild also requires permission to assume its recorded grantor roles.
+Readers need no access to the internal `_pgfirstaid_install_view` helper.
 
 ### Function
 

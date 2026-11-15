@@ -1,79 +1,84 @@
 # Agent remediation prompts
 
-Every CRITICAL, HIGH, MEDIUM, and LOW finding includes an `agent_prompt` column.
-Copy one finding's prompt into your agent to investigate that specific issue.
-INFO findings remain in the results with a `NULL` prompt.
-pgFirstAid generates text only; it never sends prompts to an agent or applies changes.
-
-## Copy a prompt
-
-```sql
--- Function installation
-SELECT severity, check_name, object_name, agent_prompt
-FROM pg_firstAid()
-WHERE severity <> 'INFO';
-
--- Either view installation
-SELECT severity, check_name, object_name, agent_prompt
-FROM v_pgfirstaid
-WHERE severity <> 'INFO';
-```
-
-Use your SQL client's cell-copy or expanded-output feature to copy the complete `agent_prompt` value.
-Each row has its own prompt, including when the same check flags several objects.
-For a specific finding, filter by its `check_name` and `object_name`.
-
-Each prompt includes:
-
-- The report connection database, PostgreSQL version, severity, and check name.
-- The actual database/user identifiers for query and session targets, which can differ from the report connection.
-- The actual affected objects and observed values, encoded as JSON strings to preserve quotes and newlines.
-- Check-specific diagnosis and remediation guidance, plus documentation links.
-- Read-only verification, staging tests, explicit approval before changes, finite timeouts, and recovery steps.
-
-Index findings include the owning table.
-Duplicate-index findings identify both indexes, and foreign-key findings identify the constraint and columns.
-Session and query findings include the available PID or query ID and require the agent to recheck their identity before acting.
-Statistics checks filter the connected database before ranking queries and distinguish database/user IDs even when query IDs match.
-Blocked/blocking findings include both sessions' database, role, and backend start time.
-Transactional changes need an explicitly approved `BEGIN`/`ROLLBACK` rehearsal in staging.
-Rollback does not undo every side effect, and nontransactional operations need a separate staging rehearsal.
-Prompts treat captured names, query text, and links as untrusted evidence, not instructions to execute.
-
-Review the prompt before sharing it with an external agent.
-Database names, object names, session information, and captured SQL can contain sensitive information.
-The prompt does not grant access to your database or authorize changes.
-An agent can still make mistakes; review its evidence and proposed commands yourself.
-
-## Edit shared SQL helpers
-
-Maintain prompt guidance in `data/agent_prompt.sql` and view-recovery logic in `data/view_installer.sql`.
-Generate their embedded copies rather than editing each standalone installer:
-
-```bash
-uv run python tools/sync_sql_helpers.py
-uv run python tools/sync_sql_helpers.py --check
-```
-
-PR Safe Checks rejects stale copies.
-Users still install a single SQL file with no generator or external SQL dependency.
+Every CRITICAL, HIGH, MEDIUM, and LOW finding includes a copyable `agent_prompt`.
+Each prompt names the affected objects and includes observed values and check-specific guidance.
+INFO rows keep a `NULL` prompt.
+pgFirstAid generates text only; it never sends prompts or applies remediation.
 
 ## Upgrade an existing installation
 
-The new column is appended after the existing output columns.
-Function results now have nine columns.
-View results now have ten columns, retaining `severity_order` in its original position.
-Update consumers that require a fixed column count or use positional inserts and `SELECT *`.
+**Run the latest matching SQL file again.**
+The same file handles a new installation or an upgrade.
+You do not need to drop the old function, run Python, or use a separate upgrader.
 
-### Caller permissions
+| Your installation | File to run |
+|---|---|
+| `pg_firstAid()` function | `pgFirstAid.sql` |
+| Self-hosted `v_pgfirstaid` view | `view_pgFirstAid.sql` |
+| Managed `v_pgfirstaid` view | `view_pgFirstAid_managed.sql` |
 
-The installers respect your default function privileges and do not grant extra access automatically.
-The new `pgfirstaid_agent_prompt(text, text, text, text, text, text, text, text)` helper runs with the caller's privileges.
-Every authorized caller of the function or either view needs `EXECUTE` on this helper, in addition to their existing permissions.
-When default privileges revoke PUBLIC function execution, restoring the main function's grants or retaining view SELECT access alone is insufficient.
+Use the same database and schema as the existing installation, as its owner or a database administrator.
+Use a writable direct/session connection, not a transaction-pooling connection.
 
-Grant helper execution to each approved existing caller role before committing the upgrade.
-Replace `monitoring_role` with an actual role from your access inventory, and replace `public` if needed:
+### SQL editor
+
+Open the matching file and **execute the entire script**, with stop-on-error enabled.
+Do not execute only the first statement or a selected function definition.
+
+### psql
+
+From the directory containing the SQL files, run **one** matching command:
+
+```bash
+# Function installation or upgrade
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f pgFirstAid.sql
+
+# Self-hosted view installation or upgrade
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f view_pgFirstAid.sql
+
+# Managed view installation or upgrade
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f view_pgFirstAid_managed.sql
+```
+
+Then run your usual query:
+
+```sql
+SELECT * FROM pg_firstAid();
+-- Or, for either view installation:
+SELECT * FROM v_pgfirstaid;
+```
+
+The results include the new `agent_prompt` column.
+Function results have nine columns; view results have ten, including `severity_order`.
+Update consumers that require a fixed column count.
+
+### What the installer handles
+
+- The known older eight-column function upgrades automatically, preserving ownership, EXECUTE grants/grantors/options, and comments.
+- Compatible function and view updates retain their identities and dependent objects.
+- Incompatible view layouts rebuild atomically while preserving supported permissions, comments, and security options.
+- Existing function callers receive needed access to shared report helpers without widening access beyond the old caller policy.
+- Permanent function changes apply together; failures roll back rather than leaving a partially replaced function installation.
+
+### If the installer stops
+
+- **Dependent objects:** an incompatible replacement uses `RESTRICT` and refuses to remove dependents.
+  Have an administrator plan their migration; never force it with `CASCADE`.
+- **Overlapping overloads:** defaulted or variadic routines that overlap a published call must be reconciled before upgrading.
+  The installer leaves those routines untouched.
+- **Custom definition or security settings:** unknown signatures and unsupported metadata require an administrator's review.
+  The existing function or view remains in place.
+- **Grantor permissions:** preserving delegated grants requires permission to assume their recorded grantor roles.
+  Run as an appropriately authorized administrator.
+- **Reserved temporary name:** reconnect with a fresh session and rerun the complete script.
+
+Installation requires schema creation rights and database `TEMP` permission.
+Readers do not need access to the temporary installation helpers.
+
+### Permission denied for the prompt helper
+
+View callers, or roles granted access after installation, may need an explicit helper grant when PUBLIC function execution is disabled.
+Grant only to the actual authorized role; replace `monitoring_role` and the schema below as needed:
 
 ```sql
 GRANT EXECUTE ON FUNCTION public.pgfirstaid_agent_prompt(
@@ -82,87 +87,43 @@ GRANT EXECUTE ON FUNCTION public.pgfirstaid_agent_prompt(
 ```
 
 Keep existing permissions on the other pgFirstAid helper functions.
-Do not grant PUBLIC execution unless public access is intended.
-Test access as each monitoring role with `SET ROLE`, then `RESET ROLE`, before committing.
-If calls fail with `permission denied for function pgfirstaid_agent_prompt`, check this helper grant first.
+Do not grant PUBLIC execution just to suppress an error.
 
-### Views
-
-Run your existing view installer again: `view_pgFirstAid.sql` or `view_pgFirstAid_managed.sql`.
-Compatible replacements keep the view's identity, ownership, grants, comments, security options, and dependents in place.
-An existing dependent view defined with `SELECT *` retains its original columns until you explicitly update its definition.
-
-For incompatible column types, names, order, or collations, the installer rebuilds `v_pgfirstaid` atomically with `RESTRICT`.
-It restores the owner, complete table/column grants including grantors and grant options, retained column comments, view comments, and view options.
-A failure rolls back the replacement, including metadata changes.
-The installer limits lock waits to at most two seconds and restores the caller's lock timeout and role setting.
-
-Dependent objects block an incompatible rebuild instead of being dropped.
-Unsupported custom metadata, metadata on removed columns, or unavailable grantor roles also require manual migration.
-Do not use `CASCADE` to force those cases.
-
-Installation requires schema creation rights and database `TEMP` permission for a session-local staging view.
-An incompatible rebuild also requires permission to assume its recorded grantor roles.
-Readers need no access to the internal `_pgfirstaid_install_view` helper.
-
-### Function
-
-PostgreSQL cannot change a function's declared return columns with `CREATE OR REPLACE FUNCTION`.
-On an older installation, the installer stops before changing helper functions and reports that pgFirstAid requires an explicit upgrade.
-Bundled workflow installers stop on that error instead of silently continuing with the older function.
-Do not automatically drop the function or use `CASCADE`.
-New installations do not need these upgrade steps.
-
-1. Rehearse in a disposable copy of the database.
-2. Save a schema-only dump and record the function's owner, complete grants including grant options, comments, and dependent definitions.
-   Inspect dependencies with the query below.
-3. Get approval for the exact upgrade and any dependent objects that need explicit recreation.
-4. In one transaction with finite timeouts, recreate the function using `DROP FUNCTION ... RESTRICT` and the new installer.
-   `RESTRICT` stops the upgrade if dependencies remain; a failed transaction leaves the old installation intact after rollback.
-5. Restore the recorded owner and complete privileges before committing, including the original PUBLIC privileges rather than relying on defaults.
-   Grant the new helper's EXECUTE privilege to approved callers as described above.
-   Restore comments and other captured metadata, and explicitly recreate approved dependent objects with their original metadata.
-6. Validate results, grants, and dependent consumers before committing.
+## Copy a prompt
 
 ```sql
-SELECT pg_describe_object(classid, objid, objsubid) AS dependent_object,
-       deptype
-FROM pg_depend
-WHERE refclassid = 'pg_proc'::regclass
-  AND refobjid = 'public.pg_firstaid()'::regprocedure;
-
-SELECT pg_get_userbyid(proowner) AS owner, proacl,
-       obj_description(oid, 'pg_proc') AS comment
-FROM pg_proc
-WHERE oid = 'public.pg_firstaid()'::regprocedure;
+SELECT severity, check_name, object_name, agent_prompt
+FROM pg_firstAid()
+WHERE severity <> 'INFO';
 ```
 
-Replace `public` if you installed pgFirstAid in a different schema.
-The following **psql rehearsal** assumes the repository root is your working directory and the installation schema is `public`.
-It rolls back deliberately.
+Use `FROM v_pgfirstaid` for either view installation.
+Copy the complete `agent_prompt` cell using your SQL client's copy or expanded-output feature.
+Each finding has its own prompt, including when one check flags several objects.
 
-```sql
-\set ON_ERROR_STOP on
-BEGIN;
-SET LOCAL search_path TO public, pg_catalog;
-SET LOCAL lock_timeout = '2s';
-SET LOCAL statement_timeout = '30s';
-DROP FUNCTION public.pg_firstaid() RESTRICT;
-\i pgFirstAid.sql
--- Restore captured ownership, privileges, comments, and approved dependencies here.
--- Grant the new prompt helper's EXECUTE privilege to each approved caller role.
-SELECT severity, check_name, object_name, agent_prompt FROM public.pg_firstaid();
-ROLLBACK;
+Prompts include database/user identities, object names, observed values, and documentation.
+Index findings include their table, and duplicate-index findings identify both indexes.
+Query/session prompts distinguish the report connection from the actual target database.
+Evidence is JSON-encoded and treated as untrusted data, never commands to execute.
+
+The guidance starts with read-only diagnosis and requires approval before changes.
+Supported transactional changes need an approved `BEGIN`/`ROLLBACK` rehearsal in staging.
+Nontransactional operations need a separate supported staging test and recovery plan.
+
+Review prompts before sharing them externally.
+Object names, session details, and captured SQL can contain sensitive information.
+An agent can still make mistakes; review its evidence and proposed commands yourself.
+
+## Edit shared SQL helpers
+
+Contributors maintain prompt guidance in `data/agent_prompt.sql` and migration logic in `data/function_installer.sql` and `data/view_installer.sql`.
+Generate the embedded copies instead of editing each installer:
+
+```bash
+uv run python tools/sync_sql_helpers.py
+uv run python tools/sync_sql_helpers.py --check
 ```
 
-Commit an approved upgrade only after replaying the recorded metadata and validating dependencies and access.
-If the rehearsal fails, roll it back and resolve the specific dependency or permission issue before retrying.
-
-### Dedicated CI databases
-
-`testing/ci_install.py --allow-legacy-upgrade` provides an explicit CI-only path for the known eight-column installation.
-It recreates the function in one transaction, preserves ownership, EXECUTE grants including grantors/options, and comments, and refuses dependencies with `RESTRICT`.
-It retains existing prompt-helper grants and adds access only for previously authorized function callers.
-Unsupported metadata, unknown shapes, missing grantor privileges, or SQL errors roll back the upgrade.
-Use trusted, transaction-safe installer SQL and dedicated test databases or disposable branches only.
-See [CI setup and tests](../../testing/integration/README.md#existing-ci-installations).
+PR Safe Checks rejects stale copies.
+The function installer uses private staging names; the generator changes declarations only, keeping the maintained prompt body shared.
+Users still run a single SQL file with no generator or external SQL dependency.

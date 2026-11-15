@@ -125,10 +125,10 @@ def run_audit(database_url: str, sql: str) -> list[dict[str, Any]]:
             return [dict(row) for row in cur.fetchall()]
     except psycopg2.errors.InvalidFunctionDefinition:
         logger.error(
-            "pgFirstAid needs an explicit upgrade before this audit can run. "
-            "Review docs/health-checks/agent-prompts.md#upgrade-an-existing-installation "
-            "and preserve dependencies, ownership, and caller grants. "
-            "Pin PGFIRSTAID_VERSION to your installed release until the upgrade is approved."
+            "pgFirstAid could not replace a function definition safely. "
+            "Use the latest matching SQL file as the installation owner, and review "
+            "docs/health-checks/agent-prompts.md#upgrade-an-existing-installation "
+            "for unsupported definitions or dependencies. Do not use CASCADE."
         )
         sys.exit(1)
     except psycopg2.OperationalError as e:

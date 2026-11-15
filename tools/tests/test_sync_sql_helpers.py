@@ -20,6 +20,16 @@ VIEW = (
     b"BEGIN EXECUTE p_sql; END;\n"
     b"$view_install$;"
 )
+FUNCTION = (
+    b"CREATE OR REPLACE FUNCTION pg_temp._pgfirstaid_install_function(target_schema text)\n"
+    b"RETURNS void LANGUAGE plpgsql AS $function_install$\n"
+    b"BEGIN RETURN; END;\n"
+    b"$function_install$;"
+)
+STAGED_PROMPT = PROMPT.replace(
+    b"FUNCTION pgfirstaid_agent_prompt(",
+    b"FUNCTION pg_temp._pgfirstaid_stage_prompt(",
+)
 PREFIX = b"-- unrelated header\r\nSELECT 'caf\xc3\xa9';\r\n\r\n"
 SUFFIX = (
     b"\r\n\r\n-- GENERATED cves BEGIN (do not edit)\r\n"
@@ -35,10 +45,13 @@ def repo(tmp_path: Path) -> Path:
     data.mkdir()
     (data / "agent_prompt.sql").write_bytes(PROMPT + b"\n")
     (data / "view_installer.sql").write_bytes(VIEW + b"\n")
+    (data / "function_installer.sql").write_bytes(FUNCTION + b"\n")
     for name in TARGETS:
         helpers = PROMPT
         if name != "pgFirstAid.sql":
             helpers += b"\n\n" + VIEW
+        else:
+            helpers += b"\n\n" + FUNCTION
         (tmp_path / name).write_bytes(PREFIX + helpers + SUFFIX)
     return tmp_path
 
@@ -80,21 +93,43 @@ def test_bootstrap_wraps_each_helper_and_preserves_unrelated_bytes(repo: Path) -
         expected = prompt_block
         if name != "pgFirstAid.sql":
             expected += b"\n\n" + view_block
+        else:
+            expected = expected.replace(PROMPT, STAGED_PROMPT)
+            expected += (
+                b"\n\n-- GENERATED function_installer BEGIN\n"
+                + FUNCTION
+                + b"\n-- GENERATED function_installer END"
+            )
         assert (repo / name).read_bytes() == PREFIX + expected + SUFFIX
 
 
-@pytest.mark.parametrize("kind", ["agent_prompt", "view_installer"])
+@pytest.mark.parametrize(
+    "kind", ["agent_prompt", "view_installer", "function_installer"]
+)
 def test_canonical_edit_updates_every_mapped_copy(repo: Path, kind: str) -> None:
     assert_sync(repo)
     source = repo / "data" / f"{kind}.sql"
-    original = PROMPT if kind == "agent_prompt" else VIEW
+    original = {
+        "agent_prompt": PROMPT,
+        "view_installer": VIEW,
+        "function_installer": FUNCTION,
+    }[kind]
     updated = original.replace(b"END;", b"RAISE NOTICE 'updated'; END;")
     source.write_bytes(updated + b"\n")
     before = {name: (repo / name).read_bytes() for name in TARGETS}
     assert_sync(repo)
     for name in TARGETS:
         expected = before[name]
-        if kind == "agent_prompt" or name != "pgFirstAid.sql":
+        if kind == "agent_prompt" and name == "pgFirstAid.sql":
+            expected = expected.replace(
+                STAGED_PROMPT,
+                STAGED_PROMPT.replace(b"END;", b"RAISE NOTICE 'updated'; END;"),
+            )
+        elif (
+            kind == "agent_prompt"
+            or (kind == "view_installer" and name != "pgFirstAid.sql")
+            or (kind == "function_installer" and name == "pgFirstAid.sql")
+        ):
             expected = expected.replace(original, updated)
         assert (repo / name).read_bytes() == expected
     assert run_tool(repo, "--check").returncode == 0
@@ -285,6 +320,80 @@ def test_indented_duplicate_helper_is_rejected(repo: Path, kind: str) -> None:
     result = run_tool(repo)
     assert result.returncode != 0
     assert target.name in result.stdout + result.stderr
+    assert snapshot(repo) == before
+
+
+def test_alias_rendering_changes_only_declaration(repo: Path) -> None:
+    source = repo / "data/agent_prompt.sql"
+    source.write_bytes(
+        PROMPT.replace(
+            b"original prompt",
+            b"pgfirstaid_agent_prompt pg_temp._pgfirstaid_stage_prompt",
+        )
+    )
+    assert_sync(repo)
+    for name in TARGETS:
+        rendered = (repo / name).read_bytes()
+        assert (
+            b"RETURN 'pgfirstaid_agent_prompt pg_temp._pgfirstaid_stage_prompt'"
+        ) in rendered
+        declaration = (
+            b"FUNCTION pg_temp._pgfirstaid_stage_prompt("
+            if name == "pgFirstAid.sql"
+            else b"FUNCTION pgfirstaid_agent_prompt("
+        )
+        assert declaration in rendered
+    assert b"FUNCTION pgfirstaid_agent_prompt(" in source.read_bytes()
+    assert run_tool(repo, "--check").returncode == 0
+
+
+@pytest.mark.parametrize(
+    "alias",
+    [
+        b"pgfirstaid_agent_prompt",
+        b"pg_temp.wrong_alias",
+        b"public.pgfirstaid_agent_prompt",
+    ],
+)
+def test_check_rejects_stale_or_wrong_root_alias(repo: Path, alias: bytes) -> None:
+    assert_sync(repo)
+    target = repo / TARGETS[0]
+    target.write_bytes(
+        target.read_bytes().replace(
+            b"FUNCTION pg_temp._pgfirstaid_stage_prompt(", b"FUNCTION " + alias + b"("
+        )
+    )
+    before = snapshot(repo)
+    assert run_tool(repo, "--check").returncode != 0
+    assert snapshot(repo) == before
+
+
+def test_canonical_declaration_case_does_not_break_alias_rendering(repo: Path) -> None:
+    canonical = PROMPT.replace(
+        b"FUNCTION pgfirstaid_agent_prompt", b"FUNCTION\nPGFIRSTAID_AGENT_PROMPT"
+    )
+    (repo / "data/agent_prompt.sql").write_bytes(canonical)
+    assert_sync(repo)
+    assert (
+        b"FUNCTION\npg_temp._pgfirstaid_stage_prompt("
+        in (repo / TARGETS[0]).read_bytes()
+    )
+    assert run_tool(repo, "--check").returncode == 0
+
+
+def test_canonical_source_cannot_use_target_alias(repo: Path) -> None:
+    (repo / "data/agent_prompt.sql").write_bytes(STAGED_PROMPT)
+    before = snapshot(repo)
+    assert run_tool(repo).returncode != 0
+    assert snapshot(repo) == before
+
+
+def test_root_alias_and_original_duplicate_is_rejected(repo: Path) -> None:
+    assert_sync(repo)
+    target = repo / TARGETS[0]
+    target.write_bytes(target.read_bytes() + b"\n" + PROMPT)
+    before = snapshot(repo)
+    assert run_tool(repo).returncode != 0
     assert snapshot(repo) == before
 
 

@@ -44,24 +44,27 @@ Thank you OSUOSL for providing hosting for our testing infrastructure and CI/CD 
 
 ## Quick Start
 
-### Installation
+### Install or upgrade
 
-```sql
--- Copy and paste the function or view definition into your PostgreSQL database
--- Then run it:
+Run the complete matching SQL file as the installation owner or a database administrator.
+Use the same file for new installations and upgrades; no manual `DROP` is needed.
 
---- function
-SELECT * FROM pg_firstAid();
+| Installation | SQL file | Query afterward |
+|---|---|---|
+| Function | [`pgFirstAid.sql`](pgFirstAid.sql) | `SELECT * FROM pg_firstAid();` |
+| Self-hosted view | [`view_pgFirstAid.sql`](view_pgFirstAid.sql) | `SELECT * FROM v_pgfirstaid;` |
+| Managed view | [`view_pgFirstAid_managed.sql`](view_pgFirstAid_managed.sql) | `SELECT * FROM v_pgfirstaid;` |
 
---- view
-SELECT * FROM v_pgfirstAid;
+In a SQL editor, execute the entire file as a script with stop-on-error enabled.
+For the function, the equivalent psql command is:
+
+```bash
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f pgFirstAid.sql
 ```
 
-That's it! No configuration needed. Deploy as a user with the highest possible privileges (in your environment) to avoid issues.
-
-**Upgrading an existing function installation?**
-The new `agent_prompt` return column requires an explicit function-recreation upgrade.
-See [upgrade instructions](docs/health-checks/agent-prompts.md#upgrade-an-existing-installation) before rerunning the installer.
+The installer preserves existing ownership, grants, and comments.
+Unsupported custom definitions or blocking dependencies stop safely instead of being discarded.
+See the [short upgrade guide](docs/health-checks/agent-prompts.md#upgrade-an-existing-installation) for view commands and troubleshooting.
 
 ### Example Output
 
@@ -193,7 +196,7 @@ Copy any workflow file to `.github/workflows/` in your repo. See [`workflows/REA
 - A coverage guard ensures every `check_name` in `pgFirstAid.sql` is referenced by at least one pgTAP assertion.
 - The GitHub Actions validation workflows also run `testing/seed_and_validate.py --managed` against live database targets to confirm the seeded checks actually fire end-to-end.
 - Managed database validation is exercised through the reusable workflow in `.github/workflows/managed-db-validate.yml`.
-- Dedicated CI databases explicitly opt into the metadata-preserving legacy upgrade in [`testing/ci_install.py`](testing/ci_install.py); the normal installer remains guarded.
+- Function-upgrade tests cover the normal SQL file on fresh and existing installations, including grant preservation, dependency protection, and rollback.
 
 > **Important:** We currently validate managed-database testing against AWS, but we do not have the funding or credits needed to keep Azure and GCP test environments running. If you have access to Azure Database for PostgreSQL or GCP Cloud SQL and want to help validate pgFirstAid there, we would be happy to have the help.
 
@@ -206,7 +209,7 @@ Copy any workflow file to `.github/workflows/` in your repo. See [`workflows/REA
 
 ## Contributing
 
-Prompt and view-installation helpers each have one maintained source under `data/`.
+Prompt and function/view migration helpers each have one maintained source under `data/`.
 Edit the canonical helper, then run `uv run python tools/sync_sql_helpers.py` to refresh the standalone installers.
 PR Safe Checks rejects embedded copies that differ from their canonical source.
 See [SQL helper generation](tools/README.md#edit-shared-sql-helpers) for details.

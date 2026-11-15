@@ -152,16 +152,13 @@ def legacy(db: Database, *, public: bool = False) -> None:
         cur.execute(sql.SQL("SET LOCAL ROLE {}").format(sql.Identifier(original)))
 
 
-def test_normal_installer_reproduces_legacy_guard(database: Database) -> None:
+def test_normal_installer_upgrades_legacy_in_same_file(database: Database) -> None:
     legacy(database)
+    old_acl = acl(database.conn)
     with database.conn.cursor() as cur:
-        cur.execute("SAVEPOINT expected_guard")
-        with pytest.raises(psycopg2.Error) as error:
-            cur.execute(CANONICAL.read_text())
-        assert error.value.pgcode == "42P13"
-        cur.execute("ROLLBACK TO SAVEPOINT expected_guard")
-        cur.execute("RELEASE SAVEPOINT expected_guard")
-    assert "agent_prompt" not in definition(database.conn)
+        cur.execute(CANONICAL.read_text())
+    assert "agent_prompt" in definition(database.conn)
+    assert acl(database.conn) == old_acl
 
 
 @pytest.mark.parametrize("public", [False, True])
@@ -335,10 +332,12 @@ def test_existing_helper_acl_is_preserved_with_legacy_callers(
     assert all(grant[1] != 0 for grant in acl(database.conn, helper))
 
 
-def test_integration_fixture_upgrades_only_with_explicit_ci_opt_in(
+@pytest.mark.parametrize("use_wrapper", [False, True])
+def test_integration_fixture_supports_direct_sql_and_ci_wrapper(
     database: Database,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    use_wrapper: bool,
 ) -> None:
     legacy(database)
     before = acl(database.conn)
@@ -358,7 +357,10 @@ def test_integration_fixture_upgrades_only_with_explicit_ci_opt_in(
     monkeypatch.setattr(module, "connect", existing_connection)
     monkeypatch.setattr(module, "_setup_sql_path", lambda: empty)
     monkeypatch.setattr(module, "_teardown_sql_path", lambda: empty)
-    monkeypatch.setenv("PGFA_TEST_ALLOW_LEGACY_UPGRADE", "1")
+    if use_wrapper:
+        monkeypatch.setenv("PGFA_TEST_ALLOW_LEGACY_UPGRADE", "1")
+    else:
+        monkeypatch.delenv("PGFA_TEST_ALLOW_LEGACY_UPGRADE", raising=False)
     fixture = module.prepared_database.__wrapped__(None)
     next(fixture)
     assert "agent_prompt" in definition(database.conn)

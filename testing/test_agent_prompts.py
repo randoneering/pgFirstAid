@@ -341,7 +341,7 @@ def test_view_upgrade_preserves_identity_grants_and_dependencies(
         assert [column.name for column in cur.description] == ["check_name"]
 
 
-def test_function_upgrade_requires_explicit_recreation_and_preserves_metadata(
+def test_function_upgrade_in_same_file_preserves_metadata(
     upgrade_database: PgConnection,
 ) -> None:
     with upgrade_database.cursor() as cur:
@@ -359,16 +359,7 @@ def test_function_upgrade_requires_explicit_recreation_and_preserves_metadata(
             "WHERE oid = 'pg_firstaid()'::regprocedure"
         )
         before = cur.fetchone()
-        cur.execute("SAVEPOINT return_type_change")
-        with pytest.raises(psycopg2.errors.InvalidFunctionDefinition):
-            cur.execute((ROOT / "pgFirstAid.sql").read_text())
-        cur.execute("ROLLBACK TO SAVEPOINT return_type_change")
-        cur.execute("SELECT check_name FROM pg_firstaid()")
-        assert cur.fetchone()[0] == "Legacy"
-        cur.execute("DROP FUNCTION pg_firstaid() RESTRICT")
         cur.execute((ROOT / "pgFirstAid.sql").read_text())
-        cur.execute("REVOKE ALL ON FUNCTION pg_firstaid() FROM PUBLIC")
-        cur.execute("COMMENT ON FUNCTION pg_firstaid() IS 'Recorded metadata'")
         cur.execute(
             "SELECT proowner, proacl, obj_description(oid, 'pg_proc') FROM pg_proc "
             "WHERE oid = 'pg_firstaid()'::regprocedure"
@@ -383,13 +374,16 @@ def test_function_upgrade_restrict_keeps_dependent_objects(
 ) -> None:
     with upgrade_database.cursor() as cur:
         cur.execute(
-            "CREATE FUNCTION pg_firstaid() RETURNS SETOF text LANGUAGE sql "
-            "AS $$ SELECT 'Legacy'::text $$"
+            "CREATE FUNCTION pg_firstaid() RETURNS TABLE (severity text, category text, "
+            "check_name text, object_name text, issue_description text, current_value text, "
+            "recommended_action text, documentation_link text) LANGUAGE sql "
+            "AS $$ SELECT 'Legacy'::text, NULL::text, NULL::text, NULL::text, "
+            "NULL::text, NULL::text, NULL::text, NULL::text $$"
         )
         cur.execute("CREATE VIEW dependent_finding AS SELECT * FROM pg_firstaid()")
         cur.execute("SAVEPOINT dependency_guard")
         with pytest.raises(psycopg2.errors.DependentObjectsStillExist):
-            cur.execute("DROP FUNCTION pg_firstaid() RESTRICT")
+            cur.execute((ROOT / "pgFirstAid.sql").read_text())
         cur.execute("ROLLBACK TO SAVEPOINT dependency_guard")
         cur.execute("SELECT * FROM dependent_finding")
         assert cur.fetchone()[0] == "Legacy"
@@ -537,11 +531,20 @@ def test_standalone_installers_share_the_same_prompt_guidance() -> None:
     helpers = []
     for installer in INSTALLERS:
         source = (ROOT / installer).read_text()
+        name = (
+            "pg_temp._pgfirstaid_stage_prompt"
+            if installer == "pgFirstAid.sql"
+            else "pgfirstaid_agent_prompt"
+        )
         match = re.search(
-            r"CREATE OR REPLACE FUNCTION pgfirstaid_agent_prompt\(.*?\$prompt\$;",
+            rf"CREATE OR REPLACE FUNCTION {re.escape(name)}\(.*?\$prompt\$;",
             source,
             flags=re.DOTALL,
         )
         assert match, installer
-        helpers.append(match.group())
+        helpers.append(
+            match.group().replace(
+                f"FUNCTION {name}(", "FUNCTION pgfirstaid_agent_prompt(", 1
+            )
+        )
     assert helpers[0] == helpers[1] == helpers[2]

@@ -7,11 +7,14 @@ import shutil
 import subprocess
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 from uuid import uuid4
 
 import psycopg2
 import pytest
 import yaml
+from psycopg2.extensions import connection as PgConnection
+from psycopg2.extensions import cursor as PgCursor
 from psycopg2.extensions import parse_dsn
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,30 +53,68 @@ def audit_dsn() -> str:
     pytest.skip("Set PGFA_PROMPT_TEST_DSN or PG* for a disposable PostgreSQL database")
 
 
-def test_legacy_audit_install_reports_explicit_upgrade(
+class TransactionBoundAuditConnection:
+    # Exercise real audit SQL without committing or closing the rollback-only fixture.
+    def __init__(self, conn: PgConnection) -> None:
+        self.conn = conn
+
+    @property
+    def autocommit(self) -> bool:
+        return self.conn.autocommit
+
+    @autocommit.setter
+    def autocommit(self, _value: bool) -> None:
+        return None
+
+    def cursor(self, *args: Any, **kwargs: Any) -> PgCursor:
+        return self.conn.cursor(*args, **kwargs)
+
+    def close(self) -> None:
+        return None
+
+
+def test_audit_upgrades_an_existing_function_without_manual_steps(
     audit_module: ModuleType,
     audit_dsn: str,
-    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     schema = f"legacy_audit_{uuid4().hex[:8]}"
-    legacy = (
-        f"CREATE SCHEMA {schema}; SET LOCAL search_path TO {schema}, public; "
-        "CREATE FUNCTION pg_firstaid() RETURNS TABLE (severity text, category text, "
-        "check_name text, object_name text, issue_description text, current_value text, "
-        "recommended_action text, documentation_link text) LANGUAGE sql "
-        "AS $$ SELECT 'INFO', 'Test', 'Legacy', 'System', NULL::text, "
-        "NULL::text, NULL::text, NULL::text $$;\n"
-    )
-    with pytest.raises(SystemExit) as error:
-        audit_module.run_audit(
-            audit_dsn, legacy + (ROOT / "pgFirstAid.sql").read_text()
+    conn = psycopg2.connect(audit_dsn)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"CREATE SCHEMA {schema}; SET LOCAL search_path TO {schema}, public; "
+                "CREATE FUNCTION pg_firstaid() RETURNS TABLE (severity text, category text, "
+                "check_name text, object_name text, issue_description text, current_value text, "
+                "recommended_action text, documentation_link text) LANGUAGE sql "
+                "AS $$ SELECT 'INFO', 'Test', 'Legacy', 'System', NULL::text, "
+                "NULL::text, NULL::text, NULL::text $$"
+            )
+            cur.execute("SELECT 'pg_firstaid()'::regprocedure::oid")
+            old_oid = cur.fetchone()[0]
+        adapter = TransactionBoundAuditConnection(conn)
+
+        def existing_connection(
+            _database_url: str,
+            **_kwargs: Any,
+        ) -> TransactionBoundAuditConnection:
+            return adapter
+
+        monkeypatch.setattr(audit_module.psycopg2, "connect", existing_connection)
+        results = audit_module.run_audit(
+            audit_dsn, (ROOT / "pgFirstAid.sql").read_text()
         )
-    assert error.value.code == 1
-    assert "explicit upgrade" in caplog.text.lower()
-    assert "agent-prompts.md" in caplog.text
-    with psycopg2.connect(audit_dsn) as conn, conn.cursor() as cur:
-        cur.execute("SELECT to_regnamespace(%s)", (schema,))
-        assert cur.fetchone()[0] is None
+        assert results and all("agent_prompt" in row for row in results)
+        with conn.cursor() as cur:
+            cur.execute("SELECT 'pg_firstaid()'::regprocedure::oid")
+            assert cur.fetchone()[0] != old_oid
+        conn.rollback()
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regnamespace(%s)", (schema,))
+            assert cur.fetchone()[0] is None
+    finally:
+        conn.rollback()
+        conn.close()
 
 
 def test_audit_sql_errors_exit_without_an_unhandled_traceback(

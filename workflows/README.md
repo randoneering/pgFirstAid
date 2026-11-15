@@ -18,11 +18,11 @@ This directory contains five non-overlapping GitHub Actions workflows for integr
 
 ## Existing installations
 
-The `agent_prompt` column changes the function's return type.
-Upgrade an existing database using the [explicit upgrade steps](../docs/health-checks/agent-prompts.md#upgrade-an-existing-installation) before running these templates against it.
-Installers stop on a legacy function instead of dropping it, losing grants, or silently reporting through an older definition.
-The Python audit reports the same upgrade requirement without an unhandled traceback.
-Keep `PGFIRSTAID_VERSION` pinned to your tested installed release until you approve the upgrade.
+The normal SQL installer upgrades the known older function automatically while preserving ownership, grants, and comments.
+Run the latest matching SQL file again, or let these templates install it as usual.
+See the [short upgrade guide](../docs/health-checks/agent-prompts.md#upgrade-an-existing-installation).
+Installations stop safely for blocking dependencies, unknown signatures, or unsupported custom metadata.
+Keep `PGFIRSTAID_VERSION` pinned to a release you have tested.
 
 ## Available Workflows
 

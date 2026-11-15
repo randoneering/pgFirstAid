@@ -41,12 +41,14 @@ export PGFA_TEST_WAIT_TIMEOUT_SECONDS=45
 
 ## Existing CI installations
 
-Dedicated CI databases can opt into the return-type upgrade with `PGFA_TEST_ALLOW_LEGACY_UPGRADE=1`.
-The integration fixture and local workflow scripts then use `testing/ci_install.py` instead of bypassing the normal installer's guard.
-The helper upgrades only the known eight-column function, in one transaction, preserving its owner, EXECUTE grants/grantors/options, and comment.
-It refuses dependent objects with `RESTRICT` and rolls back on any error.
-Unknown shapes and unsupported custom metadata require the manual upgrade procedure.
-Use this opt-in only for dedicated test databases or disposable branches.
+The normal `pgFirstAid.sql` file now installs or upgrades known function layouts directly.
+End users do not need the Python CI wrapper.
+
+CI suites can retain `PGFA_TEST_ALLOW_LEGACY_UPGRADE=1` to use the optional `testing/ci_install.py` wrapper.
+That flag controls the wrapper's explicit upgrade policy, not the normal SQL file.
+Both paths preserve ownership, EXECUTE grants/grantors/options, and comments, and refuse unsafe dependencies with `RESTRICT`.
+Unknown shapes and unsupported metadata stop without forcing a migration.
+Use the wrapper only for dedicated test databases or disposable branches.
 
 ```bash
 uv run python testing/ci_install.py --allow-legacy-upgrade
@@ -56,7 +58,7 @@ uv run python testing/ci_install.py --allow-legacy-upgrade --dsn-env DB_URL
 
 Run these commands from the repository root.
 `PG*` variables configure the first command.
-The normal SQL installer remains guarded; production upgrades still need explicit review.
+Ordinary installations and upgrades use the matching SQL file; see the [upgrade guide](../../docs/health-checks/agent-prompts.md#upgrade-an-existing-installation).
 Regression tests for this helper use `PGFA_CI_INSTALL_TEST_DSN` and run with `uv run pytest testing/test_ci_install.py`.
 `testing/test_ci_wiring.py` checks opt-in routing without database access and runs in PR Safe Checks.
 Set `PGFA_TEST_NIX_PYTHON` to a Nix Python interpreter to also run the real binary-driver import regression in a fresh uv environment without `LD_LIBRARY_PATH`.
@@ -73,7 +75,7 @@ uv run pytest tests/integration -m integration
 
 ## SQL helper generation
 
-Edit `data/agent_prompt.sql` or `data/view_installer.sql`, then run `uv run python tools/sync_sql_helpers.py`.
+Edit `data/agent_prompt.sql`, `data/function_installer.sql`, or `data/view_installer.sql`, then run `uv run python tools/sync_sql_helpers.py`.
 `uv run python tools/sync_sql_helpers.py --check` validates the embedded copies without writing files.
 Generator regression tests live in `tools/tests/test_sync_sql_helpers.py` and run in PR Safe Checks.
 
@@ -82,12 +84,12 @@ Generator regression tests live in `tools/tests/test_sync_sql_helpers.py` and ru
 From the repository root, run against a disposable database using the standard `PG*` variables above:
 
 ```bash
-uv run pytest testing/test_agent_prompts.py testing/test_query_context.py testing/test_audit_workflows.py testing/test_view_installation.py
+uv run pytest testing/test_agent_prompts.py testing/test_query_context.py testing/test_audit_workflows.py testing/test_function_installation.py testing/test_view_installation.py
 ```
 
 `PGFA_PROMPT_TEST_DSN` can override the standard connection variables.
 The tests install each SQL variant inside a transaction and roll back the fixture afterward.
-They cover exact object evidence, every curated prompt, INFO omission, severity order, view grants/dependencies, explicit function recreation, and helper grants for restricted monitoring roles.
+They cover exact object evidence, every curated prompt, INFO omission, severity order, view grants/dependencies, automatic same-file function upgrades, and helper grants for restricted monitoring roles.
 Query-context fixtures use schema-local catalog doubles inside rollback-only transactions to test colliding query IDs and sessions from other databases without creating live blockers.
 They use ordinary tables so the permanent report view can safely reference them.
 View-installation tests cover column-layout recovery, metadata preservation, dependency refusal, bounded locks, and rollback.

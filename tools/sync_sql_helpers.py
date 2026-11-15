@@ -22,6 +22,7 @@ class Fragment:
     function_name: str
     dollar_tag: bytes
     targets: tuple[str, ...]
+    target_aliases: tuple[tuple[str, str], ...] = ()
 
 
 FRAGMENTS: dict[str, Fragment] = {
@@ -30,6 +31,13 @@ FRAGMENTS: dict[str, Fragment] = {
         function_name="pgfirstaid_agent_prompt",
         dollar_tag=b"$prompt$",
         targets=SQL_INSTALLERS,
+        target_aliases=(("pgFirstAid.sql", "pg_temp._pgfirstaid_stage_prompt"),),
+    ),
+    "function_installer": Fragment(
+        source=Path("data/function_installer.sql"),
+        function_name="pg_temp._pgfirstaid_install_function",
+        dollar_tag=b"$function_install$",
+        targets=SQL_INSTALLERS[:1],
     ),
     "view_installer": Fragment(
         source=Path("data/view_installer.sql"),
@@ -44,10 +52,16 @@ class HelperSyncError(ValueError):
     pass
 
 
-def function_span(data: bytes, spec: Fragment, label: str) -> tuple[int, int]:
+def function_span(
+    data: bytes, spec: Fragment, label: str, names: tuple[str, ...] | None = None
+) -> tuple[int, int]:
     signature = re.compile(
         rb"^[ \t]*CREATE[ \t\r\n]+OR[ \t\r\n]+REPLACE[ \t\r\n]+FUNCTION[ \t\r\n]+"
-        + re.escape(spec.function_name.encode())
+        + rb"(?:"
+        + b"|".join(
+            re.escape(name.encode()) for name in (names or (spec.function_name,))
+        )
+        + rb")"
         + rb"[ \t\r\n]*\(",
         re.IGNORECASE | re.MULTILINE,
     )
@@ -82,8 +96,10 @@ def function_span(data: bytes, spec: Fragment, label: str) -> tuple[int, int]:
     return match.start(), end
 
 
-def validate_source(data: bytes, spec: Fragment, label: str) -> bytes:
-    start, end = function_span(data, spec, label)
+def validate_source(
+    data: bytes, spec: Fragment, label: str, names: tuple[str, ...] | None = None
+) -> bytes:
+    start, end = function_span(data, spec, label, names)
     comments_only = re.fullmatch(rb"(?:[ \t]*(?:--[^\r\n]*)?\r?\n)*", data[:start])
     markers = re.search(
         rb"^[ \t]*--[ \t]*GENERATED[ \t]+", data, re.MULTILINE | re.IGNORECASE
@@ -101,9 +117,13 @@ def validate_source(data: bytes, spec: Fragment, label: str) -> bytes:
 
 
 def replacement_span(
-    data: bytes, kind: str, spec: Fragment, label: str
+    data: bytes,
+    kind: str,
+    spec: Fragment,
+    label: str,
+    names: tuple[str, ...] | None = None,
 ) -> tuple[int, int]:
-    function_start, function_end = function_span(data, spec, label)
+    function_start, function_end = function_span(data, spec, label, names)
     marker_prefix = f"-- GENERATED {kind}".encode()
     markers = list(
         re.finditer(
@@ -129,7 +149,7 @@ def replacement_span(
     newline = b"\r\n" if interior.startswith(b"\r\n") else b"\n"
     if not interior.startswith(newline):
         raise HelperSyncError(f"{label}: BEGIN marker must occupy its own line")
-    validate_source(interior[len(newline) :], spec, label)
+    validate_source(interior[len(newline) :], spec, label, names)
     if not (begin.end() < function_start < function_end <= end.start()):
         raise HelperSyncError(
             f"{label}: markers must enclose only {spec.function_name}; "
@@ -153,10 +173,25 @@ def plan_sync(root: Path) -> dict[Path, tuple[bytes, bytes]]:
         for kind, spec in FRAGMENTS.items():
             if target not in spec.targets:
                 continue
-            start, end = replacement_span(original, kind, spec, f"{target}: {kind}")
+            alias = dict(spec.target_aliases).get(target, spec.function_name)
+            names = tuple(dict.fromkeys((alias, spec.function_name)))
+            start, end = replacement_span(
+                original, kind, spec, f"{target}: {kind}", names
+            )
+            source = sources[kind]
+            if alias != spec.function_name:
+                declaration_start, _ = function_span(source, spec, str(spec.source))
+                name_start = source.lower().index(
+                    spec.function_name.lower().encode(), declaration_start
+                )
+                source = (
+                    source[:name_start]
+                    + alias.encode()
+                    + source[name_start + len(spec.function_name) :]
+                )
             block = (
                 f"-- GENERATED {kind} BEGIN\n".encode()
-                + sources[kind]
+                + source
                 + f"\n-- GENERATED {kind} END".encode()
             )
             replacements.append((start, end, block))

@@ -10,6 +10,7 @@ data/
  known_bugs.json curated non-CVE release-note bugs
  agent_prompt.sql canonical pgfirstaid_agent_prompt function
  view_installer.sql canonical _pgfirstaid_install_view function
+ function_installer.sql canonical private atomic function installer
 tools/
  sync_sql_helpers.py embeds canonical helpers in standalone SQL installers
  generate_cve_sql.py reads JSON → writes VALUES rows into the SQL files
@@ -33,7 +34,7 @@ tools/
 
 ## Edit shared SQL helpers
 
-Edit only `data/agent_prompt.sql` or `data/view_installer.sql`, then regenerate:
+Edit the helper in `data/agent_prompt.sql`, `data/view_installer.sql`, or `data/function_installer.sql`, then regenerate:
 
 ```bash
 uv run python tools/sync_sql_helpers.py
@@ -42,10 +43,15 @@ uv run python -m pytest tools/tests/test_sync_sql_helpers.py
 ```
 
 The prompt helper appears in all three root installers.
+Only `pgFirstAid.sql` stages its declaration as `pg_temp._pgfirstaid_stage_prompt`; its body stays identical to the canonical source.
 The view installer helper appears only in `view_pgFirstAid.sql` and `view_pgFirstAid_managed.sql`.
+The function installer appears only in `pgFirstAid.sql` as `pg_temp._pgfirstaid_install_function`.
+It applies all four permanent functions and removes reserved temporary objects in one SQL statement.
+Known eight-column installations upgrade automatically; compatible nine-column installations keep their function OID and dependents.
+Unsupported signatures, custom security metadata, and dependencies that block recreation cause an error without permanent changes.
 Their embedded functions remain generated release artifacts, so each installer still works alone without runtime file dependencies.
 
-The tool replaces only `-- GENERATED agent_prompt BEGIN/END` and `-- GENERATED view_installer BEGIN/END` blocks.
+The tool replaces only `-- GENERATED agent_prompt BEGIN/END`, `-- GENERATED view_installer BEGIN/END`, and `-- GENERATED function_installer BEGIN/END` blocks.
 On the first run, it wraps uniquely identified unmarked helper functions.
 It validates every source and target before writing, preserves unrelated SQL and CVE/bug blocks byte-for-byte, and leaves current files untouched.
 `--check` never writes and exits nonzero for drift, missing helpers, or malformed blocks.

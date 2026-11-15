@@ -1,13 +1,13 @@
 -- Apply all permanent definitions together, after validating the old installation.
-CREATE OR REPLACE FUNCTION pg_temp._pgfirstaid_install_function(target_schema text)
+CREATE OR REPLACE FUNCTION pg_temp._pgfirstaid_install_function_v2(target_schema text)
 RETURNS void
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
 AS $function_install$
 DECLARE
     stage_names text[] := ARRAY[
-        '_pgfirstaid_stage_statements', '_pgfirstaid_stage_checkpoint',
-        '_pgfirstaid_stage_prompt', '_pgfirstaid_stage_main'
+        '_pgfirstaid_stage2_statements', '_pgfirstaid_stage2_checkpoint',
+        '_pgfirstaid_stage2_prompt', '_pgfirstaid_stage2_main'
     ];
     target_names text[] := ARRAY[
         'pgfirstaid_pg_stat_statements_checks', '_pg_firstaid_checkpoint_stats',

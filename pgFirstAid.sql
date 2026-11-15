@@ -1,5 +1,8 @@
+-- pgFirstAid atomic installer v1
+DO $pgfirstaid_install$
+BEGIN
 -- Install or upgrade by executing this entire script as the installation owner.
--- Use a direct/session connection and stop on the first error; no manual DROP needed.
+-- One statement keeps pooled connections on one backend; no manual DROP needed.
 -- Capture the destination before creating the session's temporary namespace.
 -- Reserved temporary names are reused only when marked by this installer.
 DO $install_context$
@@ -7,9 +10,9 @@ DECLARE
     destination text := current_schema();
     leftover record;
     reserved text[] := ARRAY[
-        '_pgfirstaid_stage_statements', '_pgfirstaid_stage_checkpoint',
-        '_pgfirstaid_stage_prompt', '_pgfirstaid_stage_main',
-        '_pgfirstaid_install_function'
+        '_pgfirstaid_stage2_statements', '_pgfirstaid_stage2_checkpoint',
+        '_pgfirstaid_stage2_prompt', '_pgfirstaid_stage2_main',
+        '_pgfirstaid_install_function_v2'
     ];
 BEGIN
     IF destination IS NULL THEN
@@ -18,12 +21,12 @@ BEGIN
     IF EXISTS (SELECT FROM pg_catalog.pg_class c
         WHERE c.relnamespace = pg_catalog.pg_my_temp_schema()
         AND (c.relname = ANY(reserved) OR
-            (c.relname = '_pgfirstaid_install_context' AND
+            (c.relname = '_pgfirstaid_install_context_v2' AND
                 (c.relkind <> 'v' OR pg_catalog.obj_description(c.oid, 'pg_class')
                 IS DISTINCT FROM 'pgFirstAid private installation staging'))))
         OR EXISTS (SELECT FROM pg_catalog.pg_proc p
             WHERE p.pronamespace = pg_catalog.pg_my_temp_schema()
-            AND (p.proname = '_pgfirstaid_install_context' OR
+            AND (p.proname = '_pgfirstaid_install_context_v2' OR
                 (p.proname = ANY(reserved) AND
                 pg_catalog.obj_description(p.oid, 'pg_proc') IS DISTINCT FROM
                     'pgFirstAid private installation staging'))) THEN
@@ -39,15 +42,15 @@ BEGIN
             pg_catalog.pg_get_function_identity_arguments(leftover.oid));
     END LOOP;
     EXECUTE pg_catalog.format(
-        'CREATE OR REPLACE TEMP VIEW _pgfirstaid_install_context AS SELECT %L::text AS target_schema',
+        'CREATE OR REPLACE TEMP VIEW _pgfirstaid_install_context_v2 AS SELECT %L::text AS target_schema',
         destination);
-    COMMENT ON VIEW pg_temp._pgfirstaid_install_context
+    COMMENT ON VIEW pg_temp._pgfirstaid_install_context_v2
         IS 'pgFirstAid private installation staging';
 END;
 $install_context$;
 
 create or replace
-function pg_temp._pgfirstaid_stage_statements()
+function pg_temp._pgfirstaid_stage2_statements()
 returns table (
  severity TEXT,
  category TEXT,
@@ -389,7 +392,7 @@ $$ language plpgsql;
 -- Helper: returns formatted checkpoint stats compatible with PG15/16 (pg_stat_bgwriter)
 -- and PG17+ (pg_stat_checkpointer, which replaced the checkpoint columns in pg_stat_bgwriter)
 create or replace
-function pg_temp._pgfirstaid_stage_checkpoint()
+function pg_temp._pgfirstaid_stage2_checkpoint()
 returns text
 language plpgsql
 stable
@@ -421,7 +424,7 @@ $$;
 -- GENERATED agent_prompt BEGIN
 -- Edit this canonical source, then regenerate the standalone installers.
 -- Source: data/agent_prompt.sql; run uv run python tools/sync_sql_helpers.py
-CREATE OR REPLACE FUNCTION pg_temp._pgfirstaid_stage_prompt(
+CREATE OR REPLACE FUNCTION pg_temp._pgfirstaid_stage2_prompt(
     p_severity text,
     p_category text,
     p_check_name text,
@@ -599,7 +602,7 @@ $prompt$;
 -- GENERATED agent_prompt END
 
 create or replace
-function pg_temp._pgfirstaid_stage_main()
+function pg_temp._pgfirstaid_stage2_main()
 returns table (
  severity TEXT,
  category TEXT,
@@ -2467,15 +2470,15 @@ $$ language plpgsql;
 
 -- GENERATED function_installer BEGIN
 -- Apply all permanent definitions together, after validating the old installation.
-CREATE OR REPLACE FUNCTION pg_temp._pgfirstaid_install_function(target_schema text)
+CREATE OR REPLACE FUNCTION pg_temp._pgfirstaid_install_function_v2(target_schema text)
 RETURNS void
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
 AS $function_install$
 DECLARE
     stage_names text[] := ARRAY[
-        '_pgfirstaid_stage_statements', '_pgfirstaid_stage_checkpoint',
-        '_pgfirstaid_stage_prompt', '_pgfirstaid_stage_main'
+        '_pgfirstaid_stage2_statements', '_pgfirstaid_stage2_checkpoint',
+        '_pgfirstaid_stage2_prompt', '_pgfirstaid_stage2_main'
     ];
     target_names text[] := ARRAY[
         'pgfirstaid_pg_stat_statements_checks', '_pg_firstaid_checkpoint_stats',
@@ -2755,27 +2758,30 @@ END;
 $function_install$;
 -- GENERATED function_installer END
 
-COMMENT ON FUNCTION pg_temp._pgfirstaid_stage_statements()
+COMMENT ON FUNCTION pg_temp._pgfirstaid_stage2_statements()
     IS 'pgFirstAid private installation staging';
-COMMENT ON FUNCTION pg_temp._pgfirstaid_stage_checkpoint()
+COMMENT ON FUNCTION pg_temp._pgfirstaid_stage2_checkpoint()
     IS 'pgFirstAid private installation staging';
-COMMENT ON FUNCTION pg_temp._pgfirstaid_stage_prompt(text,text,text,text,text,text,text,text)
+COMMENT ON FUNCTION pg_temp._pgfirstaid_stage2_prompt(text,text,text,text,text,text,text,text)
     IS 'pgFirstAid private installation staging';
-COMMENT ON FUNCTION pg_temp._pgfirstaid_stage_main()
+COMMENT ON FUNCTION pg_temp._pgfirstaid_stage2_main()
     IS 'pgFirstAid private installation staging';
-COMMENT ON FUNCTION pg_temp._pgfirstaid_install_function(text)
+COMMENT ON FUNCTION pg_temp._pgfirstaid_install_function_v2(text)
     IS 'pgFirstAid private installation staging';
 
 -- Cleanup shares the apply statement: even a cleanup error rolls back public DDL.
 DO $install_apply$
 BEGIN
-    PERFORM pg_temp._pgfirstaid_install_function(
-        (SELECT target_schema FROM pg_temp._pgfirstaid_install_context));
-    DROP FUNCTION pg_temp._pgfirstaid_stage_statements() RESTRICT;
-    DROP FUNCTION pg_temp._pgfirstaid_stage_checkpoint() RESTRICT;
-    DROP FUNCTION pg_temp._pgfirstaid_stage_prompt(text,text,text,text,text,text,text,text) RESTRICT;
-    DROP FUNCTION pg_temp._pgfirstaid_stage_main() RESTRICT;
-    DROP FUNCTION pg_temp._pgfirstaid_install_function(text) RESTRICT;
-    DROP VIEW pg_temp._pgfirstaid_install_context RESTRICT;
+    PERFORM pg_temp._pgfirstaid_install_function_v2(
+        (SELECT target_schema FROM pg_temp._pgfirstaid_install_context_v2));
+    DROP FUNCTION pg_temp._pgfirstaid_stage2_statements() RESTRICT;
+    DROP FUNCTION pg_temp._pgfirstaid_stage2_checkpoint() RESTRICT;
+    DROP FUNCTION pg_temp._pgfirstaid_stage2_prompt(text,text,text,text,text,text,text,text) RESTRICT;
+    DROP FUNCTION pg_temp._pgfirstaid_stage2_main() RESTRICT;
+    DROP FUNCTION pg_temp._pgfirstaid_install_function_v2(text) RESTRICT;
+    DROP VIEW pg_temp._pgfirstaid_install_context_v2 RESTRICT;
 END;
 $install_apply$;
+
+END;
+$pgfirstaid_install$;

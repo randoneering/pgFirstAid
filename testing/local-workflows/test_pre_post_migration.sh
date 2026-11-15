@@ -38,7 +38,7 @@ chmod 600 "$PGPASSFILE"
 _cleanup_passfile() { rm -f "$PGPASSFILE"; }
 trap _cleanup_passfile EXIT
 
-PSQL=(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1)
+PSQL=(pgfirstaid_test_psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1)
 source "$REPO_ROOT/testing/local-workflows/install_pgfirstaid.sh"
 
 # Schema we'll create and then drop

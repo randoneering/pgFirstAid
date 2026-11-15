@@ -21,16 +21,20 @@ VIEW = (
     b"$view_install$;"
 )
 FUNCTION = (
-    b"CREATE OR REPLACE FUNCTION pg_temp._pgfirstaid_install_function(target_schema text)\n"
+    b"CREATE OR REPLACE FUNCTION pg_temp._pgfirstaid_install_function_v2(target_schema text)\n"
     b"RETURNS void LANGUAGE plpgsql AS $function_install$\n"
     b"BEGIN RETURN; END;\n"
     b"$function_install$;"
 )
 STAGED_PROMPT = PROMPT.replace(
     b"FUNCTION pgfirstaid_agent_prompt(",
-    b"FUNCTION pg_temp._pgfirstaid_stage_prompt(",
+    b"FUNCTION pg_temp._pgfirstaid_stage2_prompt(",
 )
 PREFIX = b"-- unrelated header\r\nSELECT 'caf\xc3\xa9';\r\n\r\n"
+VIEW_FOOTER = (
+    b"\nSELECT _pgfirstaid_install_view('pg_temp._pgfirstaid_view_stage'::regclass);\n"
+    b"DROP VIEW pg_temp._pgfirstaid_view_stage RESTRICT;\n"
+)
 SUFFIX = (
     b"\r\n\r\n-- GENERATED cves BEGIN (do not edit)\r\n"
     b"('CVE-2026-0001', 8.1),\r\n-- GENERATED cves END\r\n"
@@ -52,7 +56,8 @@ def repo(tmp_path: Path) -> Path:
             helpers += b"\n\n" + VIEW
         else:
             helpers += b"\n\n" + FUNCTION
-        (tmp_path / name).write_bytes(PREFIX + helpers + SUFFIX)
+        footer = VIEW_FOOTER if name != "pgFirstAid.sql" else b""
+        (tmp_path / name).write_bytes(PREFIX + helpers + SUFFIX + footer)
     return tmp_path
 
 
@@ -100,7 +105,17 @@ def test_bootstrap_wraps_each_helper_and_preserves_unrelated_bytes(repo: Path) -
                 + FUNCTION
                 + b"\n-- GENERATED function_installer END"
             )
-        assert (repo / name).read_bytes() == PREFIX + expected + SUFFIX
+        rendered = (repo / name).read_bytes()
+        assert rendered.startswith(b"-- pgFirstAid atomic installer v1\nDO ")
+        sys.path.insert(0, str(SCRIPT.parent))
+        from sql_installer import unwrap_installer
+
+        footer = (
+            VIEW_FOOTER.replace(b"\nSELECT ", b"\nPERFORM ")
+            if name != TARGETS[0]
+            else b""
+        )
+        assert unwrap_installer(rendered) == PREFIX + expected + SUFFIX + footer
 
 
 @pytest.mark.parametrize(
@@ -148,6 +163,55 @@ def test_manual_artifact_edit_fails_read_only_check(repo: Path, name: str) -> No
     assert snapshot(repo) == before
     assert_sync(repo)
     assert b"manual edit" not in target.read_bytes()
+
+
+def test_wrapper_refresh_after_new_canonical_delimiter_preserves_raw_bytes(
+    repo: Path,
+) -> None:
+    assert_sync(repo)
+    source = repo / "data/agent_prompt.sql"
+    source.write_bytes(
+        source.read_bytes().replace(b"original prompt", b"$pgfirstaid_install$")
+    )
+    assert_sync(repo)
+    for name in TARGETS:
+        data = (repo / name).read_bytes()
+        assert b"DO $pgfirstaid_install_1$\nBEGIN\n" in data
+        assert b"RETURN '$pgfirstaid_install$'" in data
+    before = snapshot(repo)
+    assert_sync(repo)
+    assert snapshot(repo) == before
+    assert run_tool(repo, "--check").returncode == 0
+
+
+def test_view_footer_conversion_does_not_change_matching_literal_data(
+    repo: Path,
+) -> None:
+    source = repo / "data/view_installer.sql"
+    literal = b"SELECT _pgfirstaid_install_view(''pg_temp._pgfirstaid_view_stage''::regclass);"
+    source.write_bytes(
+        VIEW.replace(b"BEGIN EXECUTE", b"-- " + literal + b"\nBEGIN EXECUTE")
+    )
+    assert_sync(repo)
+    for name in TARGETS[1:]:
+        rendered = (repo / name).read_bytes()
+        assert literal in rendered
+        assert rendered.count(b"PERFORM _pgfirstaid_install_view(") == 1
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_malformed_outer_wrapper_is_rejected_without_writes(
+    repo: Path, check: bool
+) -> None:
+    assert_sync(repo)
+    path = repo / TARGETS[-1]
+    data = path.read_bytes()
+    path.write_bytes(data.removesuffix(b"$pgfirstaid_install$;\n"))
+    before = snapshot(repo)
+    result = run_tool(repo, *(["--check"] if check else []))
+    assert result.returncode != 0
+    assert "malformed" in result.stderr and "wrapper" in result.stderr
+    assert snapshot(repo) == before
 
 
 def test_canonical_helper_comments_are_embedded_inside_generated_block(
@@ -328,17 +392,17 @@ def test_alias_rendering_changes_only_declaration(repo: Path) -> None:
     source.write_bytes(
         PROMPT.replace(
             b"original prompt",
-            b"pgfirstaid_agent_prompt pg_temp._pgfirstaid_stage_prompt",
+            b"pgfirstaid_agent_prompt pg_temp._pgfirstaid_stage2_prompt",
         )
     )
     assert_sync(repo)
     for name in TARGETS:
         rendered = (repo / name).read_bytes()
         assert (
-            b"RETURN 'pgfirstaid_agent_prompt pg_temp._pgfirstaid_stage_prompt'"
+            b"RETURN 'pgfirstaid_agent_prompt pg_temp._pgfirstaid_stage2_prompt'"
         ) in rendered
         declaration = (
-            b"FUNCTION pg_temp._pgfirstaid_stage_prompt("
+            b"FUNCTION pg_temp._pgfirstaid_stage2_prompt("
             if name == "pgFirstAid.sql"
             else b"FUNCTION pgfirstaid_agent_prompt("
         )
@@ -360,7 +424,7 @@ def test_check_rejects_stale_or_wrong_root_alias(repo: Path, alias: bytes) -> No
     target = repo / TARGETS[0]
     target.write_bytes(
         target.read_bytes().replace(
-            b"FUNCTION pg_temp._pgfirstaid_stage_prompt(", b"FUNCTION " + alias + b"("
+            b"FUNCTION pg_temp._pgfirstaid_stage2_prompt(", b"FUNCTION " + alias + b"("
         )
     )
     before = snapshot(repo)
@@ -375,7 +439,7 @@ def test_canonical_declaration_case_does_not_break_alias_rendering(repo: Path) -
     (repo / "data/agent_prompt.sql").write_bytes(canonical)
     assert_sync(repo)
     assert (
-        b"FUNCTION\npg_temp._pgfirstaid_stage_prompt("
+        b"FUNCTION\npg_temp._pgfirstaid_stage2_prompt("
         in (repo / TARGETS[0]).read_bytes()
     )
     assert run_tool(repo, "--check").returncode == 0

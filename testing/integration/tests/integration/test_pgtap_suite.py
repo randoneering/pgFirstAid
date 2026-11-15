@@ -202,7 +202,7 @@ def test_checkpoint_stats_helper_body_matches_across_install_scripts() -> None:
     for script in scripts:
         body = _extract_function_body(
             script.read_text(encoding="utf-8"),
-            "pg_temp._pgfirstaid_stage_checkpoint"
+            "pg_temp._pgfirstaid_stage2_checkpoint"
             if script.name == "pgFirstAid.sql"
             else "_pg_firstaid_checkpoint_stats",
         )

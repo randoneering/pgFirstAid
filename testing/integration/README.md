@@ -47,6 +47,8 @@ End users do not need the Python CI wrapper.
 CI suites can retain `PGFA_TEST_ALLOW_LEGACY_UPGRADE=1` to use the optional `testing/ci_install.py` wrapper.
 That flag controls the wrapper's explicit upgrade policy, not the normal SQL file.
 Both paths preserve ownership, EXECUTE grants/grantors/options, and comments, and refuse unsafe dependencies with `RESTRICT`.
+Each SQL installer is one atomic statement so pooled connections cannot separate private staging steps.
+Local shell report clients also use one transaction per psql invocation, including stdin and multiple `-c` queries, to keep temporary snapshots available.
 Unknown shapes and unsupported metadata stop without forcing a migration.
 Use the wrapper only for dedicated test databases or disposable branches.
 
@@ -76,7 +78,8 @@ uv run pytest tests/integration -m integration
 ## SQL helper generation
 
 Edit `data/agent_prompt.sql`, `data/function_installer.sql`, or `data/view_installer.sql`, then run `uv run python tools/sync_sql_helpers.py`.
-`uv run python tools/sync_sql_helpers.py --check` validates the embedded copies without writing files.
+`uv run python tools/sync_sql_helpers.py --check` validates the embedded copies and single-statement wrappers without writing files.
+`tools/sql_installer.py` chooses collision-free outer delimiters; CVE generation refreshes them when generated data changes.
 Generator regression tests live in `tools/tests/test_sync_sql_helpers.py` and run in PR Safe Checks.
 
 ## Agent prompt tests

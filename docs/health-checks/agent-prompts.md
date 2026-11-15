@@ -18,7 +18,8 @@ You do not need to drop the old function, run Python, or use a separate upgrader
 | Managed `v_pgfirstaid` view | `view_pgFirstAid_managed.sql` |
 
 Use the same database and schema as the existing installation, as its owner or a database administrator.
-Use a writable direct/session connection, not a transaction-pooling connection.
+Use a writable connection.
+Each installer executes as one atomic SQL statement, including on transaction-pooled connections.
 
 ### SQL editor
 
@@ -58,7 +59,7 @@ Update consumers that require a fixed column count.
 - Compatible function and view updates retain their identities and dependent objects.
 - Incompatible view layouts rebuild atomically while preserving supported permissions, comments, and security options.
 - Existing function callers receive needed access to shared report helpers without widening access beyond the old caller policy.
-- Permanent function changes apply together; failures roll back rather than leaving a partially replaced function installation.
+- Each file applies its database changes in one statement; a failure rolls them back rather than leaving a partial installation.
 
 ### If the installer stops
 

@@ -8,6 +8,12 @@ from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
 
+if __package__:
+    from .sql_installer import InstallerWrapperError, unwrap_installer, wrap_installer
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from sql_installer import InstallerWrapperError, unwrap_installer, wrap_installer
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SQL_INSTALLERS = (
     "pgFirstAid.sql",
@@ -31,11 +37,11 @@ FRAGMENTS: dict[str, Fragment] = {
         function_name="pgfirstaid_agent_prompt",
         dollar_tag=b"$prompt$",
         targets=SQL_INSTALLERS,
-        target_aliases=(("pgFirstAid.sql", "pg_temp._pgfirstaid_stage_prompt"),),
+        target_aliases=(("pgFirstAid.sql", "pg_temp._pgfirstaid_stage2_prompt"),),
     ),
     "function_installer": Fragment(
         source=Path("data/function_installer.sql"),
-        function_name="pg_temp._pgfirstaid_install_function",
+        function_name="pg_temp._pgfirstaid_install_function_v2",
         dollar_tag=b"$function_install$",
         targets=SQL_INSTALLERS[:1],
     ),
@@ -169,6 +175,7 @@ def plan_sync(root: Path) -> dict[Path, tuple[bytes, bytes]]:
     for target in SQL_INSTALLERS:
         path = root / target
         original = path.read_bytes()
+        logical = unwrap_installer(original)
         replacements: list[tuple[int, int, bytes]] = []
         for kind, spec in FRAGMENTS.items():
             if target not in spec.targets:
@@ -176,7 +183,7 @@ def plan_sync(root: Path) -> dict[Path, tuple[bytes, bytes]]:
             alias = dict(spec.target_aliases).get(target, spec.function_name)
             names = tuple(dict.fromkeys((alias, spec.function_name)))
             start, end = replacement_span(
-                original, kind, spec, f"{target}: {kind}", names
+                logical, kind, spec, f"{target}: {kind}", names
             )
             source = sources[kind]
             if alias != spec.function_name:
@@ -201,11 +208,23 @@ def plan_sync(root: Path) -> dict[Path, tuple[bytes, bytes]]:
                 raise HelperSyncError(
                     f"{target}: overlapping helper blocks; restore separate boundaries"
                 )
-        updated = original
+        updated = logical
         # Original offsets remain valid when replacements run from bottom to top.
         for start, end, block in reversed(replacements):
             updated = updated[:start] + block + updated[end:]
-        plan[path] = original, updated
+        if target != SQL_INSTALLERS[0]:
+            footer = (
+                b"_pgfirstaid_install_view('pg_temp._pgfirstaid_view_stage'::regclass);\n"
+                b"DROP VIEW pg_temp._pgfirstaid_view_stage RESTRICT;\n"
+            )
+            if updated.endswith(b"\nSELECT " + footer):
+                updated = updated[: -len(b"SELECT " + footer)] + b"PERFORM " + footer
+            elif not updated.endswith(b"\nPERFORM " + footer):
+                raise HelperSyncError(
+                    f"{target}: expected exact final view installer SELECT/PERFORM "
+                    "and private stage cleanup; restore the footer"
+                )
+        plan[path] = original, wrap_installer(updated)
     return plan
 
 
@@ -239,7 +258,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if stale:
             print("Run uv run python tools/sync_sql_helpers.py to regenerate helpers.")
         return int(stale)
-    except (OSError, HelperSyncError) as exc:
+    except (OSError, HelperSyncError, InstallerWrapperError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 

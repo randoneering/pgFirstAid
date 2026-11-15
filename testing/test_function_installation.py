@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+import sys
 import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -16,6 +18,9 @@ from psycopg2.extensions import TRANSACTION_STATUS_INTRANS
 from psycopg2.extensions import connection as PgConnection
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from sql_installer import unwrap_installer, wrap_installer
+
 COLUMNS = [
     "severity",
     "category",
@@ -115,6 +120,93 @@ def role(conn: PgConnection, name: str) -> str:
     return sql.Identifier(name).as_string(conn)
 
 
+@pytest.mark.parametrize("upgrade", [False, True])
+def test_unmarked_v1_pool_debris_is_preserved(db: PgConnection, upgrade: bool) -> None:
+    if upgrade:
+        legacy(db)
+    names = [
+        "_pgfirstaid_stage_statements",
+        "_pgfirstaid_stage_checkpoint",
+        "_pgfirstaid_stage_prompt",
+        "_pgfirstaid_stage_main",
+        "_pgfirstaid_install_function",
+    ]
+    for name in names:
+        run(
+            db,
+            f"CREATE FUNCTION pg_temp.{name}() RETURNS text "
+            "LANGUAGE sql AS 'SELECT ''caller data''::text'",
+        )
+    run(
+        db,
+        "CREATE TEMP VIEW _pgfirstaid_install_context AS SELECT 'caller data' AS data",
+    )
+    before = value(
+        db,
+        "SELECT jsonb_agg(jsonb_build_array(oid, pg_get_functiondef(oid), proacl, "
+        "obj_description(oid, 'pg_proc')) ORDER BY oid) FROM pg_proc "
+        "WHERE pronamespace = pg_my_temp_schema()",
+    )
+    before_view = value(
+        db,
+        "SELECT jsonb_build_array(oid, relacl, pg_get_viewdef(oid), "
+        "obj_description(oid, 'pg_class')) FROM pg_class "
+        "WHERE oid='pg_temp._pgfirstaid_install_context'::regclass",
+    )
+    run(db)
+    assert (
+        value(
+            db,
+            "SELECT jsonb_agg(jsonb_build_array(oid, pg_get_functiondef(oid), proacl, "
+            "obj_description(oid, 'pg_proc')) ORDER BY oid) FROM pg_proc "
+            "WHERE pronamespace = pg_my_temp_schema()",
+        )
+        == before
+    )
+    assert (
+        value(
+            db,
+            "SELECT jsonb_build_array(oid, relacl, pg_get_viewdef(oid), "
+            "obj_description(oid, 'pg_class')) FROM pg_class "
+            "WHERE oid='pg_temp._pgfirstaid_install_context'::regclass",
+        )
+        == before_view
+    )
+    assert (
+        value(db, "SELECT data FROM pg_temp._pgfirstaid_install_context")
+        == "caller data"
+    )
+    assert value(
+        db, "SELECT count(*) FROM pg_firstaid() WHERE agent_prompt IS NOT NULL"
+    )
+
+
+@pytest.mark.parametrize(
+    "installer",
+    ["pgFirstAid.sql", "view_pgFirstAid.sql", "view_pgFirstAid_managed.sql"],
+)
+def test_cve_delimiter_collision_installs_and_queries(
+    db: PgConnection, tmp_path: Path, installer: str
+) -> None:
+    import generate_cve_sql as generator
+
+    cves = json.loads((ROOT / "data/cves.json").read_text())
+    cves["cves"][0]["summary"] = (
+        "Quoted 'data' $pgfirstaid_install$ $pgfirstaid_install_1$\n"
+        "END;\n$pgfirstaid_install$;\n-- still quoted CVE data"
+    )
+    bugs = json.loads((ROOT / "data/known_bugs.json").read_text())
+    path = tmp_path / installer
+    path.write_bytes((ROOT / installer).read_bytes())
+    rendered = generator.regenerate_one(
+        path, generator.render_cve_rows(cves), generator.render_bug_rows(bugs)
+    )
+    assert "DO $pgfirstaid_install_2$\nBEGIN\n" in rendered
+    run(db, rendered)
+    target = "pg_firstaid()" if installer == "pgFirstAid.sql" else "v_pgfirstaid"
+    assert value(db, f"SELECT count(*) FROM {target} WHERE agent_prompt IS NOT NULL")
+
+
 def test_same_file_upgrades_known_eight_columns(db: PgConnection) -> None:
     legacy(db)
     run(db)
@@ -209,19 +301,23 @@ def test_stale_private_collector_cannot_be_published_as_an_upgrade(
 ) -> None:
     legacy(db)
     before = snapshot(db)
-    preparation = source().split("-- Cleanup shares the apply statement:", 1)[0]
+    preparation = (
+        unwrap_installer(source().encode())
+        .decode()
+        .split("-- Cleanup shares the apply statement:", 1)[0]
+    )
     run(db, preparation)
     columns = ", ".join(f"{name} text" for name in COLUMNS)
     run(
         db,
-        "DROP FUNCTION pg_temp._pgfirstaid_stage_main() RESTRICT; "
-        f"CREATE FUNCTION pg_temp._pgfirstaid_stage_main() RETURNS TABLE ({columns}) "
+        "DROP FUNCTION pg_temp._pgfirstaid_stage2_main() RESTRICT; "
+        f"CREATE FUNCTION pg_temp._pgfirstaid_stage2_main() RETURNS TABLE ({columns}) "
         "LANGUAGE sql AS 'SELECT NULL::text, NULL::text, NULL::text, NULL::text, "
         "NULL::text, NULL::text, NULL::text, NULL::text WHERE false'",
     )
     run(db, "SAVEPOINT incomplete_stage")
     with pytest.raises(psycopg2.Error, match="Invalid private collector stage"):
-        run(db, "SELECT pg_temp._pgfirstaid_install_function(current_schema())")
+        run(db, "SELECT pg_temp._pgfirstaid_install_function_v2(current_schema())")
     run(db, "ROLLBACK TO SAVEPOINT incomplete_stage")
     assert snapshot(db) == before
 
@@ -297,7 +393,8 @@ def test_same_file_reinstall_keeps_oid_and_dependents(db: PgConnection) -> None:
         == 0
     )
     assert (
-        value(db, "SELECT to_regclass('pg_temp._pgfirstaid_install_context')") is None
+        value(db, "SELECT to_regclass('pg_temp._pgfirstaid_install_context_v2')")
+        is None
     )
 
 
@@ -481,23 +578,35 @@ def test_apply_is_atomic_with_autocommit_and_retry(failure: str) -> None:
             )
         elif failure == "cleanup":
             text = text.replace(
-                "    DROP VIEW pg_temp._pgfirstaid_install_context RESTRICT;",
+                "    DROP VIEW pg_temp._pgfirstaid_install_context_v2 RESTRICT;",
                 "    RAISE EXCEPTION 'injected cleanup';",
             )
-        prepare, apply = text.split("DO $install_apply$", 1)
-        run(conn, prepare)
         if failure == "cleanup_dependency":
-            run(
-                conn,
-                "CREATE TEMP VIEW caller_dependency AS "
-                "SELECT * FROM pg_temp._pgfirstaid_install_context",
+            text = text.replace(
+                "    DROP VIEW pg_temp._pgfirstaid_install_context_v2 RESTRICT;",
+                "    CREATE TEMP VIEW caller_dependency AS SELECT * FROM "
+                "pg_temp._pgfirstaid_install_context_v2;\n"
+                "    DROP VIEW pg_temp._pgfirstaid_install_context_v2 RESTRICT;",
             )
         assert snapshot(conn) == old
         saved = settings(conn)
         with pytest.raises(psycopg2.Error):
-            run(conn, "DO $install_apply$" + apply)
+            run(conn, text)
         assert snapshot(conn) == old
         assert settings(conn) == saved
+        assert (
+            value(
+                conn,
+                "SELECT count(*) FROM pg_proc WHERE pronamespace=pg_my_temp_schema() "
+                "AND (proname LIKE '_pgfirstaid_stage2_%' "
+                "OR proname='_pgfirstaid_install_function_v2')",
+            )
+            == 0
+        )
+        assert (
+            value(conn, "SELECT to_regclass('pg_temp._pgfirstaid_install_context_v2')")
+            is None
+        )
         if failure not in {
             "shape",
             "security",
@@ -548,21 +657,24 @@ def test_reserved_temporary_collision_is_not_overwritten(
     if kind == "function":
         run(
             db,
-            "CREATE FUNCTION pg_temp._pgfirstaid_stage_main() RETURNS text "
+            "CREATE FUNCTION pg_temp._pgfirstaid_stage2_main() RETURNS text "
             "LANGUAGE sql AS 'SELECT ''caller data''::text'",
         )
     elif kind == "view":
-        run(db, "CREATE TEMP VIEW _pgfirstaid_install_context AS SELECT 'caller data'")
+        run(
+            db,
+            "CREATE TEMP VIEW _pgfirstaid_install_context_v2 AS SELECT 'caller data'",
+        )
     else:
-        run(db, "CREATE TEMP TABLE _pgfirstaid_install_context (id integer)")
+        run(db, "CREATE TEMP TABLE _pgfirstaid_install_context_v2 (id integer)")
     run(db, "SAVEPOINT collision")
     with pytest.raises(psycopg2.Error, match="Reserved pgFirstAid temporary name"):
         run(db)
     run(db, "ROLLBACK TO SAVEPOINT collision")
     if kind == "function":
-        assert value(db, "SELECT pg_temp._pgfirstaid_stage_main()") == "caller data"
+        assert value(db, "SELECT pg_temp._pgfirstaid_stage2_main()") == "caller data"
     else:
-        assert value(db, "SELECT to_regclass('pg_temp._pgfirstaid_install_context')")
+        assert value(db, "SELECT to_regclass('pg_temp._pgfirstaid_install_context_v2')")
 
 
 @pytest.mark.parametrize("version", [8, 9])
@@ -633,7 +745,7 @@ BEGIN
         'pg_temp.pg_firstaid()'::regprocedure) <>
         ARRAY['severity','category','check_name','object_name','issue_description',
         'current_value','recommended_action','documentation_link','agent_prompt']
-        OR to_regclass('pg_temp._pgfirstaid_install_context') IS NOT NULL THEN
+        OR to_regclass('pg_temp._pgfirstaid_install_context_v2') IS NOT NULL THEN
         RAISE EXCEPTION 'installation or cleanup failed';
     END IF;
 END;
@@ -658,6 +770,103 @@ $assert_install$;
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "installer", ["view_pgFirstAid.sql", "view_pgFirstAid_managed.sql"]
+)
+@pytest.mark.parametrize("legacy_first", [False, True])
+@pytest.mark.parametrize("autocommit_probe", [False, True])
+def test_view_entire_file_in_psql(
+    installer: str, legacy_first: bool, autocommit_probe: bool
+) -> None:
+    container = os.getenv("PGFA_SQL_TEST_CONTAINER")
+    if container not in {"pgfirstaid-prompts-test", "pgfirstaid-prompts-test18"}:
+        pytest.skip("Set PGFA_SQL_TEST_CONTAINER to an approved disposable container")
+    schema = f"psql_view_install_{uuid4().hex}"
+    # PostgreSQL excludes temporary schemas from unqualified function lookup.
+    setup = f"CREATE SCHEMA {schema}; SET LOCAL search_path={schema},public;"
+    if legacy_first:
+        setup += (
+            "CREATE VIEW v_pgfirstaid AS SELECT 'INFO'::text AS severity, "
+            "'Test'::text AS category, 'Legacy'::text AS check_name, "
+            "'System'::text COLLATE \"C\" AS object_name, "
+            'NULL::text COLLATE "C" AS issue_description, '
+            'NULL::text COLLATE "C" AS current_value, '
+            'NULL::text COLLATE "C" AS recommended_action, '
+            "NULL::text AS documentation_link, 5 AS severity_order;"
+            "GRANT SELECT ON v_pgfirstaid TO PUBLIC;"
+            "CREATE TEMP VIEW dependent_finding AS SELECT check_name FROM v_pgfirstaid;"
+            "CREATE TEMP TABLE before_install AS SELECT oid,relowner,relacl FROM pg_class "
+            "WHERE oid='v_pgfirstaid'::regclass;"
+        )
+    checks = """
+DO $assert_view$
+BEGIN
+    IF NOT EXISTS (SELECT FROM v_pgfirstaid WHERE agent_prompt IS NOT NULL)
+        OR to_regclass('pg_temp._pgfirstaid_view_stage') IS NOT NULL THEN
+        RAISE EXCEPTION 'view installation or cleanup failed';
+    END IF;
+    IF to_regclass('pg_temp.before_install') IS NOT NULL THEN
+        IF EXISTS (SELECT FROM before_install b JOIN pg_class c ON c.oid=b.oid
+            WHERE (c.relowner,c.relacl) IS DISTINCT FROM (b.relowner,b.relacl))
+            OR NOT EXISTS (SELECT FROM before_install b JOIN pg_class c ON c.oid=b.oid)
+            THEN RAISE EXCEPTION 'view metadata changed';
+        END IF;
+        PERFORM * FROM dependent_finding;
+    END IF;
+END;
+$assert_view$;
+"""
+    text = (ROOT / installer).read_text()
+    probe_success = "pgFirstAid autocommit view probe passed"
+    if autocommit_probe:
+        # Keep setup and assertions in the installer's own statement, then roll
+        # back its success so the autocommit probe leaves no permanent schema.
+        body = unwrap_installer(text.encode()).decode()
+        script = wrap_installer(
+            (
+                setup
+                + body
+                + checks
+                + body
+                + checks
+                + f"RAISE EXCEPTION '{probe_success}';"
+            ).encode()
+        ).decode()
+    else:
+        script = "BEGIN;" + setup + text + checks + text + checks + "ROLLBACK;"
+    result = subprocess.run(
+        [
+            "docker",
+            "exec",
+            "--interactive",
+            container,
+            "psql",
+            "--username=postgres",
+            "--dbname=postgres",
+            "--no-psqlrc",
+            "--quiet",
+            "--set=ON_ERROR_STOP=1",
+        ],
+        input=script,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if autocommit_probe:
+        assert result.returncode == 3, result.stdout + result.stderr
+        assert f"ERROR:  {probe_success}" in result.stderr, (
+            result.stdout + result.stderr
+        )
+    else:
+        assert result.returncode == 0, result.stdout + result.stderr
+    conn = connect()
+    try:
+        assert value(conn, "SELECT to_regnamespace(%s)", (schema,)) is None
+    finally:
+        conn.rollback()
+        conn.close()
 
 
 def test_preflight_lock_excludes_concurrent_acl_changes() -> None:

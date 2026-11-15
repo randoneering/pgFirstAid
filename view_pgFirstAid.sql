@@ -1,3 +1,6 @@
+-- pgFirstAid atomic installer v1
+DO $pgfirstaid_install$
+BEGIN
 create or replace
 function pgfirstaid_pg_stat_statements_checks()
 returns table (
@@ -644,8 +647,11 @@ BEGIN
        OR EXISTS (
            SELECT 1 FROM pg_catalog.pg_attribute a
            WHERE a.attrelid = target_oid AND a.attnum > 0 AND NOT a.attisdropped
-             AND (a.attoptions IS NOT NULL OR a.attfdwoptions IS NOT NULL
-                  OR a.attstattarget <> -1 OR
+             -- PostgreSQL owns pg_ options such as pg_attver; new columns get new values.
+             AND (EXISTS (SELECT FROM pg_catalog.unnest(a.attoptions) AS opt(value)
+                          WHERE pg_catalog.split_part(opt.value, '=', 1) !~ '^pg_')
+                  OR a.attfdwoptions IS NOT NULL
+                  OR coalesce(a.attstattarget, -1) <> -1 OR
                   ((a.attacl IS NOT NULL OR
                     pg_catalog.col_description(target_oid, a.attnum) IS NOT NULL)
                    AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute s
@@ -2472,5 +2478,8 @@ order by
  health_results.category,
  health_results.check_name;
 
-SELECT _pgfirstaid_install_view('pg_temp._pgfirstaid_view_stage'::regclass);
+PERFORM _pgfirstaid_install_view('pg_temp._pgfirstaid_view_stage'::regclass);
 DROP VIEW pg_temp._pgfirstaid_view_stage RESTRICT;
+
+END;
+$pgfirstaid_install$;

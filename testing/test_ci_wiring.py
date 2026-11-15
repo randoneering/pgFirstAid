@@ -68,6 +68,47 @@ def test_local_installer_routes_legacy_upgrades_only_when_enabled(
         assert arguments == ["PSQL", "-f", str(ROOT / "pgFirstAid.sql")]
 
 
+@pytest.mark.parametrize(
+    ("arguments", "stdin"),
+    [
+        ([], True),
+        (["-c", "SELECT 1"], False),
+        (["-f", "fixture.sql"], False),
+        (["--command=SELECT 1"], False),
+        (["--file=fixture.sql"], False),
+        (["-d", "-c"], True),
+    ],
+)
+def test_report_client_pins_all_queries_to_one_transaction(
+    command_environment: dict[str, str],
+    arguments: list[str],
+    stdin: bool,
+) -> None:
+    env = command_environment.copy()
+    env["REPO_ROOT"] = str(ROOT)
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                'source "$REPO_ROOT/testing/local-workflows/install_pgfirstaid.sh"; '
+                'pgfirstaid_test_psql "$@"'
+            ),
+            "fixture",
+            *arguments,
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    expected = ["PSQL", "--single-transaction"]
+    if stdin:
+        expected.append("--file=-")
+    assert result.stdout.splitlines() == [*expected, *arguments]
+
+
 def test_long_lived_database_jobs_explicitly_enable_ci_upgrades() -> None:
     for name, job in [
         ("nixos-local-test.yml", "local-test"),

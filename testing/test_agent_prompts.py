@@ -532,7 +532,7 @@ def test_standalone_installers_share_the_same_prompt_guidance() -> None:
     for installer in INSTALLERS:
         source = (ROOT / installer).read_text()
         name = (
-            "pg_temp._pgfirstaid_stage_prompt"
+            "pg_temp._pgfirstaid_stage2_prompt"
             if installer == "pgFirstAid.sql"
             else "pgfirstaid_agent_prompt"
         )

@@ -46,9 +46,8 @@ jobs:
 
       - name: Install pgFirstAid
         run: |
-          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} <<'EOF'
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} <<'EOF'
           CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
-          DROP FUNCTION IF EXISTS pg_firstAid();
           \i pgFirstAid.sql
           EOF
         env:
@@ -170,9 +169,8 @@ jobs:
 
       - name: Re-install pgFirstAid
         run: |
-          psql -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} <<'EOF'
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 -h ${{ secrets.PGHOST }} -U ${{ secrets.PGUSER }} -d ${{ secrets.PGDATABASE }} <<'EOF'
           CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
-          DROP FUNCTION IF EXISTS pg_firstAid();
           \i pgFirstAid.sql
           EOF
         env:

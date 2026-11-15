@@ -1,12 +1,15 @@
-from pathlib import Path
+import os
 import sys
-from typing import Iterator
+from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
-import psycopg2
 from psycopg2.extensions import connection as PgConnection
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from ci_install import install_pgfirstaid
 
 from pgfirstaid_pytest import TestConfig, connect, execute_sql_file
 
@@ -49,7 +52,10 @@ def config() -> TestConfig:
 def prepared_database(config: TestConfig) -> Iterator[None]:
     with connect(config, autocommit=True) as conn:
         execute_sql_file(conn, _setup_sql_path())
-        execute_sql_file(conn, _pgfirstaid_sql_path())
+        if os.getenv("PGFA_TEST_ALLOW_LEGACY_UPGRADE") == "1":
+            install_pgfirstaid(conn, _pgfirstaid_sql_path(), allow_legacy_upgrade=True)
+        else:
+            execute_sql_file(conn, _pgfirstaid_sql_path())
         execute_sql_file(conn, _managed_view_sql_path())
     yield
     with connect(config, autocommit=True) as conn:

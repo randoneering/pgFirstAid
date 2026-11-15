@@ -123,8 +123,19 @@ def run_audit(database_url: str, sql: str) -> list[dict[str, Any]]:
                     check_name
             """)
             return [dict(row) for row in cur.fetchall()]
+    except psycopg2.errors.InvalidFunctionDefinition:
+        logger.error(
+            "pgFirstAid could not replace a function definition safely. "
+            "Use the latest matching SQL file as the installation owner, and review "
+            "docs/health-checks/agent-prompts.md#upgrade-an-existing-installation "
+            "for unsupported definitions or dependencies. Do not use CASCADE."
+        )
+        sys.exit(1)
     except psycopg2.OperationalError as e:
         logger.error("Database connection failed: %s", e)
+        sys.exit(1)
+    except psycopg2.Error as e:
+        logger.error("Database audit failed: %s", e)
         sys.exit(1)
     finally:
         if conn:

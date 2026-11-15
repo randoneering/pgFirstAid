@@ -33,7 +33,8 @@ chmod 600 "$PGPASSFILE"
 _cleanup() { rm -f "$PGPASSFILE"; }
 trap _cleanup EXIT
 
-PSQL=(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1)
+PSQL=(pgfirstaid_test_psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1)
+source "$REPO_ROOT/testing/local-workflows/install_pgfirstaid.sh"
 
 # ---- 0. Verify tools ----
 for tool in psql; do
@@ -48,7 +49,7 @@ mkdir -p "$REPORTS_DIR"
 # ---- 1. Install pgFirstAid ----
 echo "$PREFIX Installing pgFirstAid..."
 "${PSQL[@]}" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements"
-"${PSQL[@]}" -f "${REPO_ROOT}/pgFirstAid.sql"
+install_pgfirstaid_for_test
 "${PSQL[@]}" -f "${REPO_ROOT}/view_pgFirstAid.sql"
 "${PSQL[@]}" -f "${REPO_ROOT}/view_pgFirstAid_managed.sql"
 echo "$PREFIX pgFirstAid installed."

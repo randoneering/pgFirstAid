@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
 
-from psycopg2.extensions import connection as PgConnection
 import pytest
+from psycopg2.extensions import connection as PgConnection
 
 from pgfirstaid_pytest import TestConfig as PgConfig
 from pgfirstaid_pytest import execute_sql_file
@@ -202,7 +202,9 @@ def test_checkpoint_stats_helper_body_matches_across_install_scripts() -> None:
     for script in scripts:
         body = _extract_function_body(
             script.read_text(encoding="utf-8"),
-            "_pg_firstaid_checkpoint_stats",
+            "pg_temp._pgfirstaid_stage2_checkpoint"
+            if script.name == "pgFirstAid.sql"
+            else "_pg_firstaid_checkpoint_stats",
         )
         assert body is not None, (
             f"_pg_firstaid_checkpoint_stats() not found in {script.name} — "

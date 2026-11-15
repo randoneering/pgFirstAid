@@ -38,25 +38,33 @@ Thank you OSUOSL for providing hosting for our testing infrastructure and CI/CD 
 - **Detailed Checks** - built-in health checks covering critical performance and stability issues
 - **Prioritized Results** - Issues ranked by severity (CRITICAL → HIGH → MEDIUM → LOW → INFO)
 - **Actionable Recommendations** - Each issue includes specific remediation steps
+- **Copyable Agent Prompts** - Every non-INFO finding includes check-specific guidance with its actual objects and observed values
 - **Documentation Links** - Direct links to official PostgreSQL documentation for deeper learning
 - **Optional `pg_stat_statements` Checks** - Runs additional query workload checks when `pg_stat_statements` is installed
 
 ## Quick Start
 
-### Installation
+### Install or upgrade
 
-```sql
--- Copy and paste the function or view definition into your PostgreSQL database
--- Then run it:
+Run the complete matching SQL file as the installation owner or a database administrator.
+Use the same file for new installations and upgrades; no manual `DROP` is needed.
 
---- function
-SELECT * FROM pg_firstAid();
+| Installation | SQL file | Query afterward |
+|---|---|---|
+| Function | [`pgFirstAid.sql`](pgFirstAid.sql) | `SELECT * FROM pg_firstAid();` |
+| Self-hosted view | [`view_pgFirstAid.sql`](view_pgFirstAid.sql) | `SELECT * FROM v_pgfirstaid;` |
+| Managed view | [`view_pgFirstAid_managed.sql`](view_pgFirstAid_managed.sql) | `SELECT * FROM v_pgfirstaid;` |
 
---- view
-SELECT * FROM v_pgfirstAid;
+In a SQL editor, execute the entire file as a script with stop-on-error enabled.
+For the function, the equivalent psql command is:
+
+```bash
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f pgFirstAid.sql
 ```
 
-That's it! No configuration needed. Deploy as a user with the highest possible privileges (in your environment) to avoid issues.
+The installer preserves existing ownership, grants, and comments.
+Unsupported custom definitions or blocking dependencies stop safely instead of being discarded.
+See the [short upgrade guide](docs/health-checks/agent-prompts.md#upgrade-an-existing-installation) for view commands and troubleshooting.
 
 ### Example Output
 
@@ -65,9 +73,28 @@ That's it! No configuration needed. Deploy as a user with the highest possible p
 | CRITICAL | Table Health| Missing Primary Key | public.users | Table missing a primary key... | No primary key defined | Add a primary key or unique constraint... | https://www.postgresql.org/... |
 | HIGH | Table Health | Missing Statistics | public.orders | Table has never been analyzed... | Last analyze: Never | Run ANALYZE on this table... | https://www.postgresql.org/... |
 
+The `agent_prompt` column is omitted from this compact example.
+View results also include `severity_order` before `agent_prompt`.
+
 ## What Does It Check?
 
 See the full list of checks, grouped by severity, in [`docs/health-checks/README.md`](docs/health-checks/README.md).
+
+## Copy a Remediation Prompt
+
+Each non-INFO result includes an `agent_prompt` tailored to that finding's affected objects and measured values.
+Copy the complete cell into your agent to start with read-only diagnosis and an approval-gated remediation plan.
+
+```sql
+SELECT severity, check_name, object_name, agent_prompt
+FROM pg_firstAid()
+WHERE severity <> 'INFO';
+```
+
+Use `FROM v_pgfirstaid` for either view installation.
+INFO rows return `NULL` for `agent_prompt`.
+Review prompts for sensitive object names or captured SQL before sharing them externally.
+See [agent prompts and upgrades](docs/health-checks/agent-prompts.md) for details.
 
 ## Usage Tips
 
@@ -169,6 +196,7 @@ Copy any workflow file to `.github/workflows/` in your repo. See [`workflows/REA
 - A coverage guard ensures every `check_name` in `pgFirstAid.sql` is referenced by at least one pgTAP assertion.
 - The GitHub Actions validation workflows also run `testing/seed_and_validate.py --managed` against live database targets to confirm the seeded checks actually fire end-to-end.
 - Managed database validation is exercised through the reusable workflow in `.github/workflows/managed-db-validate.yml`.
+- Function-upgrade tests cover the normal SQL file on fresh and existing installations, including grant preservation, dependency protection, and rollback.
 
 > **Important:** We currently validate managed-database testing against AWS, but we do not have the funding or credits needed to keep Azure and GCP test environments running. If you have access to Azure Database for PostgreSQL or GCP Cloud SQL and want to help validate pgFirstAid there, we would be happy to have the help.
 
@@ -180,6 +208,11 @@ Copy any workflow file to `.github/workflows/` in your repo. See [`workflows/REA
 - Automated managed-database validation is active for AWS today. Azure and GCP support is best-effort until we can fund those test environments.
 
 ## Contributing
+
+Prompt and function/view migration helpers each have one maintained source under `data/`.
+Edit the canonical helper, then run `uv run python tools/sync_sql_helpers.py` to refresh the standalone installers.
+PR Safe Checks rejects embedded copies that differ from their canonical source.
+See [SQL helper generation](tools/README.md#edit-shared-sql-helpers) for details.
 
 Found a bug? Have an idea for a new health check? Let me know! I want this to grow to be a tool that is available for all, accidental DBA or not.
 

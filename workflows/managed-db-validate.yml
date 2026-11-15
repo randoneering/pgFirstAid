@@ -102,7 +102,7 @@ jobs:
 
       - name: Install pgFirstAid on RDS
         run: |
-          psql -h ${{ steps.rds-endpoint.outputs.host }} \
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 -h ${{ steps.rds-endpoint.outputs.host }} \
                -U ${{ secrets.AWS_RDS_USER }} \
                -d postgres <<'SQL'
           -- Check for pg_stat_statements extension
@@ -247,7 +247,7 @@ jobs:
 
       - name: Install pgFirstAid on Cloud SQL
         run: |
-          psql -h ${{ steps.cloudsql-endpoint.outputs.host }} \
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 -h ${{ steps.cloudsql-endpoint.outputs.host }} \
                -U ${{ secrets.GCP_CLOUD_SQL_USER }} \
                -d postgres <<'SQL'
           -- Check for pg_stat_statements extension
@@ -402,7 +402,7 @@ jobs:
 
       - name: Install pgFirstAid on Azure PostgreSQL
         run: |
-          psql -h ${{ steps.azure-endpoint.outputs.host }} \
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 -h ${{ steps.azure-endpoint.outputs.host }} \
                -U ${{ secrets.AZURE_POSTGRESQL_USER }} \
                -d postgres <<'SQL'
           -- Check for pg_stat_statements extension

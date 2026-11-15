@@ -60,6 +60,29 @@ _BUGS_DOC = {
 }
 
 
+class WrapperRefreshTests(unittest.TestCase):
+    def test_new_cve_summary_cannot_close_existing_installer_wrapper(self) -> None:
+        template = (
+            "-- pgFirstAid atomic installer v1\nDO $pgfirstaid_install$\nBEGIN\n"
+            f"{gen.SENTINEL_BEGIN_TEMPLATE.format(kind='cves')}\n('old')\n"
+            f"{gen.SENTINEL_END_TEMPLATE.format(kind='cves')}\n"
+            f"{gen.SENTINEL_BEGIN_TEMPLATE.format(kind='bugs')}\n('old')\n"
+            f"{gen.SENTINEL_END_TEMPLATE.format(kind='bugs')}\n"
+            "\nEND;\n$pgfirstaid_install$;\n"
+        )
+        rows = ["        ('summary $pgfirstaid_install$ and ''quotes''')"]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "installer.sql"
+            path.write_text(template)
+            rendered = gen.regenerate_one(path, rows, ["        ('bug')"])
+            self.assertIn("DO $pgfirstaid_install_1$\nBEGIN\n", rendered)
+            self.assertTrue(rendered.endswith("END;\n$pgfirstaid_install_1$;\n"))
+            self.assertIn(rows[0], rendered)
+            self.assertEqual(path.read_text(), template)
+            path.write_text(rendered)
+            self.assertEqual(gen.regenerate_one(path, rows, ["        ('bug')"]), rendered)
+
+
 class VersionNumTests(unittest.TestCase):
     def test_known_version_numbers(self) -> None:
         # Regression-locks the MJMmm → int conversion used in our predicate.

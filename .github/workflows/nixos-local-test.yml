@@ -119,6 +119,8 @@ jobs:
       # cloud_provider input is undefined on pull_request. Default to 'direct'.
       CLOUD_PROVIDER: ${{ inputs.cloud_provider || 'direct' }}
       PGFIRSTAID_FAIL_SEVERITY: HIGH
+      # These dedicated CI databases can contain the previous return shape.
+      PGFA_TEST_ALLOW_LEGACY_UPGRADE: "1"
 
     steps:
       - name: Checkout

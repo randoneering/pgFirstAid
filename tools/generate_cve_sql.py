@@ -31,6 +31,12 @@ import json
 import sys
 from pathlib import Path
 
+if __package__:
+    from .sql_installer import refresh_installer
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from sql_installer import refresh_installer
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
 
@@ -179,7 +185,7 @@ def regenerate_one(sql_path: Path, cve_rows: list[str], bug_rows: list[str]) -> 
     text = sql_path.read_text()
     text = replace_block(text, "cves", cve_rows)
     text = replace_block(text, "bugs", bug_rows)
-    return text
+    return refresh_installer(text.encode()).decode()
 
 
 def main() -> int:

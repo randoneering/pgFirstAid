@@ -16,6 +16,14 @@ This directory contains five non-overlapping GitHub Actions workflows for integr
 └──────────────┴──────────────┴──────────────┴──────────────┴──────────────────┘
 ```
 
+## Existing installations
+
+The normal SQL installer upgrades the known older function automatically while preserving ownership, grants, and comments.
+Run the latest matching SQL file again, or let these templates install it as usual.
+See the [short upgrade guide](../docs/health-checks/agent-prompts.md#upgrade-an-existing-installation).
+Installations stop safely for blocking dependencies, unknown signatures, or unsupported custom metadata.
+Keep `PGFIRSTAID_VERSION` pinned to a release you have tested.
+
 ## Available Workflows
 
 ### 1. `pgfirstaid-pr-audit.yml` - **PR Developer Feedback**

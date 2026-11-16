@@ -1,122 +1,122 @@
 [
   {
-    "issue_id": "PG15-4da71fc37",
-    "summary": "Guard against integer overflow in calculations of frame start and end positions for window aggregates (Richard Guo) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.18/",
-    "fixed_in_minor": 18
+    "issue_id": "PG15-11ed90979",
+    "summary": "In PL/Perl, fix use-after-free triggered by releasing a prepared query that is being executed (Masahiko Sawada) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.20/",
+    "fixed_in_minor": 20
   },
   {
-    "issue_id": "PG15-6916f4410",
-    "summary": "Fix crashes in some ecpg functions when called without any established connection (Shruthi Gowda) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.18/",
-    "fixed_in_minor": 18
+    "issue_id": "PG15-249fa011f",
+    "summary": "Harden more memory-size calculations against integer overflow (Álvaro Herrera) § §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.20/",
+    "fixed_in_minor": 20
   },
   {
-    "issue_id": "PG15-f033abc6c",
-    "summary": "Fix possible server crash when processing extended statistics on expressions of extension data types (Michael Paquier) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.18/",
-    "fixed_in_minor": 18
+    "issue_id": "PG15-274da088e",
+    "summary": "Fix small memory leak in pgoutput with streamed prepared transactions (Ayush Tiwari) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.20/",
+    "fixed_in_minor": 20
   },
   {
-    "issue_id": "PG15-065cbfb88",
-    "summary": "Avoid exposing a WAL receiver's full connection string during timeline jumps (Chao Li) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
+    "issue_id": "PG15-3efcadec9",
+    "summary": "Fix buffer overrun in tsvector_delete() (Anthropic OSS program) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.20/",
+    "fixed_in_minor": 20
   },
   {
-    "issue_id": "PG15-126141425",
-    "summary": "Fix possible mis-decoding of index tuples during GiST and SP-GiST index-only scans (Peter Geoghegan) §",
-    "doc_link": "https://www.postgresql.org/docs/release/15.19/",
-    "fixed_in_minor": 19
+    "issue_id": "PG15-3f82c47b5",
+    "summary": "Fix potential use-after-free cases in WAL sender (Ayush Tiwari) §",
+    "doc_link": "https://www.postgresql.org/docs/release/15.20/",
+    "fixed_in_minor": 20
   },
   {
-    "issue_id": "PG16-04745ba9c",
-    "summary": "Fix possible server crash when processing extended statistics on expressions of extension data types (Michael Paquier) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
-    "fixed_in_minor": 14
+    "issue_id": "PG16-05114072c",
+    "summary": "Fix use-after-free hazards in re-entrant use of PL/Tcl (Tom Lane) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.16/",
+    "fixed_in_minor": 16
   },
   {
-    "issue_id": "PG16-0fe032e6a",
-    "summary": "Guard against integer overflow in calculations of frame start and end positions for window aggregates (Richard Guo) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
-    "fixed_in_minor": 14
+    "issue_id": "PG16-078110c00",
+    "summary": "Fix potential use-after-free cases in WAL sender (Ayush Tiwari) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.16/",
+    "fixed_in_minor": 16
   },
   {
-    "issue_id": "PG16-1352651c2",
-    "summary": "In contrib/postgres_fdw, avoid crash due to premature cleanup of a failed connection (Etsuro Fujita) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
-    "fixed_in_minor": 14
+    "issue_id": "PG16-15b78dc39",
+    "summary": "Fix use-after-free in pg_show_all_settings() (Masahiko Sawada) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.16/",
+    "fixed_in_minor": 16
   },
   {
-    "issue_id": "PG16-42383d32d",
-    "summary": "Prevent buffer overruns when parsing an affix file for an Ispell dictionary (Tom Lane) § §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
-    "fixed_in_minor": 14
+    "issue_id": "PG16-2d7573b00",
+    "summary": "Fix buffer overrun in ts_rank_cd() (Anthropic OSS program) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.16/",
+    "fixed_in_minor": 16
   },
   {
-    "issue_id": "PG16-7e4c871f4",
-    "summary": "Fix crashes in some ecpg functions when called without any established connection (Shruthi Gowda) §",
-    "doc_link": "https://www.postgresql.org/docs/release/16.14/",
-    "fixed_in_minor": 14
+    "issue_id": "PG16-4614c78a8",
+    "summary": "Fix use-after-free in expanded-record domain constraint checking (Tom Lane) §",
+    "doc_link": "https://www.postgresql.org/docs/release/16.16/",
+    "fixed_in_minor": 16
   },
   {
-    "issue_id": "PG17-d424d06ed",
-    "summary": "In PL/Perl, avoid NULL pointer dereference crash when working with an invalid PostgreSQL::InServer::ARRAY object (Xing Guo) §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.11/",
-    "fixed_in_minor": 11
+    "issue_id": "PG17-04c25af21",
+    "summary": "Detect integer overflow in to_char() with V format (Andrey Rachitskiy) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.12/",
+    "fixed_in_minor": 12
   },
   {
-    "issue_id": "PG17-4761f2eee",
-    "summary": "Fix minor memory leaks in ICU-based string processing (Jeff Davis) §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.10/",
-    "fixed_in_minor": 10
+    "issue_id": "PG17-2009539be",
+    "summary": "In PL/Perl, fix use-after-free triggered by releasing a prepared query that is being executed (Masahiko Sawada) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.12/",
+    "fixed_in_minor": 12
   },
   {
-    "issue_id": "PG17-530b6b02f",
-    "summary": "Fix possible server crash when processing extended statistics on expressions of extension data types (Michael Paquier) §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.10/",
-    "fixed_in_minor": 10
+    "issue_id": "PG17-2affc1964",
+    "summary": "Avoid crash when describing a FETCH statement whose cursor is gone (Dirkjan Bussink) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.12/",
+    "fixed_in_minor": 12
   },
   {
-    "issue_id": "PG17-5d67549d9",
-    "summary": "Fix crashes in some ecpg functions when called without any established connection (Shruthi Gowda) §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.10/",
-    "fixed_in_minor": 10
+    "issue_id": "PG17-3094cdb7d",
+    "summary": "Fix use-after-free in COPY FROM ON_ERROR reporting (Masahiko Sawada) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.12/",
+    "fixed_in_minor": 12
   },
   {
-    "issue_id": "PG17-af8f9248f",
-    "summary": "In contrib/postgres_fdw, avoid crash due to premature cleanup of a failed connection (Etsuro Fujita) §",
-    "doc_link": "https://www.postgresql.org/docs/release/17.10/",
-    "fixed_in_minor": 10
+    "issue_id": "PG17-39173a9bd",
+    "summary": "Fix potential use-after-free cases in WAL sender (Ayush Tiwari) §",
+    "doc_link": "https://www.postgresql.org/docs/release/17.12/",
+    "fixed_in_minor": 12
   },
   {
-    "issue_id": "PG18-917fdbc63",
-    "summary": "Fix null-pointer crash in ecpg compiler (Jehan-Guillaume de Rorthais) §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
-    "fixed_in_minor": 6
+    "issue_id": "PG18-1be7010d1",
+    "summary": "Avoid integer overflow while calculating BRIN minmax_multi distances for tid values (Tomas Vondra) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.7/",
+    "fixed_in_minor": 7
   },
   {
-    "issue_id": "PG18-91b57eade",
-    "summary": "Fix crash with namespace nodes in contrib/xml2's xpath_nodeset() function (Andrey Chernyy, Michael Paquier) §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
-    "fixed_in_minor": 6
+    "issue_id": "PG18-250405afb",
+    "summary": "In PL/Perl, fix use-after-free triggered by releasing a prepared query that is being executed (Masahiko Sawada) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.7/",
+    "fixed_in_minor": 7
   },
   {
-    "issue_id": "PG18-c3e36a9a5",
-    "summary": "In contrib/ltree, fix integer overflow in comparisons (Ayush Tiwari) §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
-    "fixed_in_minor": 6
+    "issue_id": "PG18-2afbad0ce",
+    "summary": "Reject incremental backups based on a backup from a divergent history (Sai Pranav, Fujii Masao) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.7/",
+    "fixed_in_minor": 7
   },
   {
-    "issue_id": "PG18-e430ecc59",
-    "summary": "In PL/Perl, avoid NULL pointer dereference crash when working with an invalid PostgreSQL::InServer::ARRAY object (Xing Guo) §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.6/",
-    "fixed_in_minor": 6
+    "issue_id": "PG18-2d91c1c78",
+    "summary": "Fix use-after-free in expanded-record domain constraint checking (Tom Lane) §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.7/",
+    "fixed_in_minor": 7
   },
   {
-    "issue_id": "PG18-00c6e0819",
-    "summary": "Prevent buffer overruns when parsing an affix file for an Ispell dictionary (Tom Lane) § §",
-    "doc_link": "https://www.postgresql.org/docs/release/18.4/",
-    "fixed_in_minor": 4
+    "issue_id": "PG18-317b7bcab",
+    "summary": "Harden more memory-size calculations against integer overflow (Álvaro Herrera) § §",
+    "doc_link": "https://www.postgresql.org/docs/release/18.7/",
+    "fixed_in_minor": 7
   }
 ]

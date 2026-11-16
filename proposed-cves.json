@@ -1,0 +1,441 @@
+[
+  {
+    "cve_id": "CVE-2026-116304",
+    "cvss": 8.8,
+    "summary": "PostgreSQL parallel RECORD typmod use-after-free executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116304/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116306",
+    "cvss": 8.8,
+    "summary": "PostgreSQL composite-type change during field assignment executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116306/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116307",
+    "cvss": 8.8,
+    "summary": "PostgreSQL plperl prepared-query use-after-free executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116307/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116309",
+    "cvss": 8.8,
+    "summary": "PostgreSQL plperl blessed-reference type confusion may execute arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116309/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116314",
+    "cvss": 8.8,
+    "summary": "PostgreSQL pg_restore executes arbitrary code due to missing non-plain archive validation",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116314/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116315",
+    "cvss": 8.8,
+    "summary": "PostgreSQL tsvector_delete() heap buffer overflow executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116315/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116316",
+    "cvss": 8.8,
+    "summary": "PostgreSQL security-restricted operations can create types in pg_temp, which later queries of the session find",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116316/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116317",
+    "cvss": 8.8,
+    "summary": "PostgreSQL ts_rank_cd() heap buffer overflow may execute arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116317/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116318",
+    "cvss": 8.8,
+    "summary": "PostgreSQL pg_dump not-null constraint name allows SQL injection",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116318/",
+    "fixed_in": {
+      "18": 7
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116319",
+    "cvss": 8.8,
+    "summary": "PostgreSQL plperl reentrant return_next() use-after-free executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116319/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116320",
+    "cvss": 8.8,
+    "summary": "PostgreSQL plperl array and hash conversion use-after-free executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116320/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116323",
+    "cvss": 8.8,
+    "summary": "PostgreSQL pltcl reentrant result conversion use-after-free executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116323/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116326",
+    "cvss": 8.8,
+    "summary": "PostgreSQL plperl tied-object exceptions follow stale sigjmp_buf",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116326/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116328",
+    "cvss": 8.8,
+    "summary": "PostgreSQL generation memory context integer wraparound executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116328/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116329",
+    "cvss": 8.8,
+    "summary": "PostgreSQL statistics import type confusion executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116329/",
+    "fixed_in": {
+      "18": 7
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116330",
+    "cvss": 8.8,
+    "summary": "PostgreSQL pg_dump tar restore.sql fails to block psql command injection",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116330/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116331",
+    "cvss": 8.8,
+    "summary": "PostgreSQL min/max aggregate type confusion executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116331/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116332",
+    "cvss": 8.8,
+    "summary": "PostgreSQL portal setup use-after-free executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116332/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116335",
+    "cvss": 8.8,
+    "summary": "PostgreSQL commutator or negator result-type confusion executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116335/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116336",
+    "cvss": 8.8,
+    "summary": "PostgreSQL REINDEX CONCURRENTLY does not block DROP INDEX during index functions",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116336/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120139",
+    "cvss": 8.8,
+    "summary": "PostgreSQL tuple-size integer wraparound executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120139/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120141",
+    "cvss": 8.8,
+    "summary": "PostgreSQL materialized set-returning function type confusion executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120141/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120142",
+    "cvss": 8.8,
+    "summary": "PostgreSQL dropped-column type confusion executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120142/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120143",
+    "cvss": 8.8,
+    "summary": "PostgreSQL transition-table cursor use-after-free executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120143/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120144",
+    "cvss": 8.8,
+    "summary": "PostgreSQL type-cache invalidation gap executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120144/",
+    "fixed_in": {
+      "18": 7
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120145",
+    "cvss": 8.8,
+    "summary": "PostgreSQL logical replication can write to subscriber system catalogs, executing arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120145/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120147",
+    "cvss": 8.8,
+    "summary": "PostgreSQL dblink reentrant disconnect use-after-free executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120147/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120149",
+    "cvss": 8.8,
+    "summary": "PostgreSQL FDW batch-insert mismatch executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120149/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120150",
+    "cvss": 8.8,
+    "summary": "PostgreSQL expanded-record domain-check use-after-free executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120150/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120151",
+    "cvss": 8.8,
+    "summary": "PostgreSQL plpgsql record-field type confusion executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120151/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-18447",
+    "cvss": 8.8,
+    "summary": "PostgreSQL output parameter type confusion executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-18447/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-6460",
+    "cvss": 8.8,
+    "summary": "PostgreSQL type confusion after ALTER ... SET DATA TYPE executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6460/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120148",
+    "cvss": 8.1,
+    "summary": "PostgreSQL extended-statistics pseudo-type confusion executes arbitrary code",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120148/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-14661",
+    "cvss": 8.1,
+    "summary": "PostgreSQL dblink and subscriptions can append to arbitrary files",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-14661/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116325",
+    "cvss": 8.0,
+    "summary": "PostgreSQL reindexdb index name quoting allows SQL injection",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116325/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12
+    }
+  },
+  {
+    "cve_id": "CVE-2026-116313",
+    "cvss": 7.2,
+    "summary": "PostgreSQL \"vacuumdb --missing-stats-only\" lets a database owner execute code as the vacuumdb user",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-116313/",
+    "fixed_in": {
+      "18": 7
+    }
+  },
+  {
+    "cve_id": "CVE-2026-120153",
+    "cvss": 7.2,
+    "summary": "PostgreSQL extension-script substitutions allow SQL injection through object names",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-120153/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  },
+  {
+    "cve_id": "CVE-2026-6467",
+    "cvss": 7.2,
+    "summary": "PostgreSQL extension script schema mishandling executes arbitrary SQL",
+    "doc_link": "https://www.postgresql.org/support/security/CVE-2026-6467/",
+    "fixed_in": {
+      "18": 7,
+      "17": 12,
+      "16": 16,
+      "15": 20
+    }
+  }
+]
